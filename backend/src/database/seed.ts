@@ -10,10 +10,12 @@
 import { randomBytes } from 'crypto';
 import { DataSource } from 'typeorm';
 import { Asset } from '../assets/asset.entity';
-import { EstadoActivo, EstadoOrden, Prioridad, Rol, TipoMovimiento, TipoOrden, UnidadFrecuencia } from '../common/enums';
+import { EstadoActivo, EstadoOrden, OrigenCompra, Prioridad, Rol, TipoMovimiento, TipoOrden, UnidadFrecuencia } from '../common/enums';
 import { InventoryMovement } from '../inventory/inventory-movement.entity';
 import { SparePart } from '../inventory/spare-part.entity';
 import { PARAM_AUTORIZADOR_COMPRAS, PARAM_TARIFA_HORA, Setting } from '../settings/setting.entity';
+import { PurchaseRequest } from '../purchases/purchase-request.entity';
+import { AuditLog } from '../audit/audit-log.entity';
 import { MaintenancePlan, PlanPart, WorkOrder, WorkOrderEvent, WorkOrderPart } from '../maintenance/maintenance.entities';
 import { hashCredencial } from '../users/credentials';
 import { User } from '../users/user.entity';
@@ -97,6 +99,19 @@ async function main() {
         { ordenId: prev.id, repuestoId: rod.id, cantidadPlanificada: 2 },
       ]);
       await ds.getRepository(WorkOrderEvent).insert({ ordenId: prev.id, usuarioId: admin.id, estadoNuevo: EstadoOrden.ASIGNADA, nota: `Preventivo programado para ${fecha}` });
+    }
+
+    // Una solicitud de compra pendiente para que el autorizador tenga algo que revisar.
+    if ((await ds.getRepository(PurchaseRequest).count()) === 0) {
+      const rod = await ds.getRepository(SparePart).findOneByOrFail({ codigo: 'RP-ROD-6205' });
+      const sc = await ds.getRepository(PurchaseRequest).save({
+        origen: OrigenCompra.MANUAL, repuestoId: rod.id, cantidad: 6,
+        justificacion: 'Reponer el stock mínimo de rodamientos (datos de demostración)', solicitadoPorId: admin.id,
+      });
+      await ds.getRepository(AuditLog).insert({
+        usuarioId: admin.id, accion: 'COMPRA_SOLICITADA', entidad: 'compra', entidadId: sc.id,
+        detalle: { codigo: `SC-${String(sc.numero).padStart(6, '0')}`, repuesto: rod.codigo, cantidad: 6, origen: 'Manual' } as never,
+      });
     }
 
     console.log('Datos de demostración cargados. Usuarios: autorizador / Autoriza2026, tecnico / PIN 4826, operario / PIN 7391');

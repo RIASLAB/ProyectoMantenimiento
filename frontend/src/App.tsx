@@ -17,6 +17,14 @@ import { OrderDetail } from './pages/orders/OrderDetail';
 import { OrdersList } from './pages/orders/OrdersList';
 import { Plans } from './pages/orders/Plans';
 import { ReportFault } from './pages/orders/ReportFault';
+import { PurchaseDetail } from './pages/purchases/PurchaseDetail';
+import { PurchasesList } from './pages/purchases/PurchasesList';
+
+/** Página de inicio según el rol: el autorizador llega directo a las compras por aprobar. */
+function Home() {
+  const { user } = useAuth();
+  return <Navigate to={user?.rol === 'AUTORIZADOR' ? '/compras' : '/ordenes'} replace />;
+}
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -43,7 +51,9 @@ export function App() {
           </RequireAuth>
         }
       >
-        <Route index element={<Navigate to="/ordenes" replace />} />
+        <Route index element={<Home />} />
+        <Route path="compras" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><PurchasesList /></OnlyRoles>} />
+        <Route path="compras/:id" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><PurchaseDetail /></OnlyRoles>} />
         <Route path="ordenes" element={<OrdersList />} />
         <Route path="ordenes/reportar" element={<ReportFault />} />
         <Route path="ordenes/planes" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><Plans /></OnlyRoles>} />

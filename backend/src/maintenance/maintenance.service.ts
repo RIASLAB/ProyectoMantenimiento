@@ -13,6 +13,7 @@ import { EstadoActivo, EstadoOrden, MomentoFoto, Prioridad, Rol, TipoMovimiento,
 import { validateUpload } from '../common/files';
 import { InventoryService } from '../inventory/inventory.service';
 import { SparePart } from '../inventory/spare-part.entity';
+import { PurchasesService } from '../purchases/purchases.service';
 import { SettingsService } from '../settings/settings.service';
 import { User } from '../users/user.entity';
 import { AssignDto, CloseOrderDto, CreatePlanDto, ListOrdersQuery, PartQtyDto, ReportFaultDto, UpdatePlanDto } from './maintenance.dto';
@@ -72,6 +73,7 @@ export class MaintenanceService {
     private readonly audit: AuditService,
     private readonly inventory: InventoryService,
     private readonly settings: SettingsService,
+    private readonly purchases: PurchasesService,
     config: ConfigService,
   ) {
     this.dir = resolve(config.get('UPLOADS_DIR', './uploads'), 'ordenes');
@@ -262,6 +264,7 @@ export class MaintenanceService {
   async iniciar(id: string, actor: SessionUser) {
     return this.transicion(id, actor, EstadoOrden.ASIGNADA, EstadoOrden.EN_EJECUCION, 'Trabajo iniciado', async (em, o) => {
       if (!o.iniciadaEn) await em.getRepository(WorkOrder).update(o.id, { iniciadaEn: new Date() });
+      await this.purchases.verificarFaltantes(em, o.id, actor);
     });
   }
 
@@ -373,7 +376,8 @@ export class MaintenanceService {
       for (const p of this.agrupar(repuestos)) {
         await em.getRepository(WorkOrderPart).save({ ordenId: o.id, repuestoId: p.repuestoId, cantidadPlanificada: p.cantidad });
       }
-      return { ok: true };
+      const solicitudes = await this.purchases.verificarFaltantes(em, o.id, actor);
+      return { ok: true, solicitudesCreadas: solicitudes };
     });
   }
 
@@ -549,7 +553,8 @@ export class MaintenanceService {
       }),
     );
     await this.evento(em, o.id, actor, null, estado, `Preventivo programado para ${fecha}`);
-    return { id: o.id, codigo: numeroOT(o.numero), fechaProgramada: fecha };
+    const solicitudesCreadas = await this.purchases.verificarFaltantes(em, o.id, actor);
+    return { id: o.id, codigo: numeroOT(o.numero), fechaProgramada: fecha, solicitudesCreadas };
   }
 
   /**

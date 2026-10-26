@@ -1,4 +1,4 @@
-import type { EstadoActivo, EstadoOrden, Prioridad, Rol, TipoMovimiento, TipoOrden, UnidadFrecuencia } from './api/types';
+import type { EstadoActivo, EstadoCompra, EstadoOrden, Prioridad, Rol, TipoMovimiento, TipoOrden, UnidadFrecuencia } from './api/types';
 
 export const ROL_LABEL: Record<Rol, string> = {
   ADMIN: 'Administrador',
@@ -106,3 +106,21 @@ export function toLocalInput(d: Date) {
   const p = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
+
+export const COMPRA_ESTADO_LABEL: Record<EstadoCompra, string> = {
+  PENDIENTE: 'Pendiente de aprobación',
+  APROBADA: 'Aprobada',
+  RECHAZADA: 'Rechazada',
+  COMPRADA: 'Comprada',
+  RECIBIDA: 'Recibida',
+  CANCELADA: 'Cancelada',
+};
+
+export const COMPRA_ESTADO_TONE: Record<EstadoCompra, 'ok' | 'warn' | 'bad' | 'muted' | 'info'> = {
+  PENDIENTE: 'warn',
+  APROBADA: 'info',
+  RECHAZADA: 'bad',
+  COMPRADA: 'info',
+  RECIBIDA: 'ok',
+  CANCELADA: 'muted',
+};

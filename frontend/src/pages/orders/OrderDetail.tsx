@@ -2,13 +2,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
-import type { MomentoFoto, PersonRef, WorkOrderDetail } from '../../api/types';
+import type { MomentoFoto, PersonRef, Purchase, WorkOrderDetail } from '../../api/types';
+import { NewPurchaseModal } from '../purchases/NewPurchaseModal';
 import { useAuth } from '../../auth/AuthContext';
 import { OrderBadges, PartRow, PartRows, rowsToPayload, useProtectedImage } from '../../components/orders-shared';
 import { Badge, Button, Empty, ErrorBox, Field, Icon, Input, KeyValue, Modal, PageHeader, Select, Spinner, Textarea } from '../../components/ui';
-import { date, dateTime, duration, money, ORDEN_ESTADO_LABEL, PRIORIDAD_LABEL, qty, TIPO_LABEL, toLocalInput } from '../../format';
+import { COMPRA_ESTADO_LABEL, COMPRA_ESTADO_TONE, date, dateTime, duration, money, ORDEN_ESTADO_LABEL, PRIORIDAD_LABEL, qty, TIPO_LABEL, toLocalInput } from '../../format';
 
-type ModalKind = 'asignar' | 'esperar' | 'cerrar' | 'cancelar' | 'repuestos' | null;
+type ModalKind = 'asignar' | 'esperar' | 'cerrar' | 'cancelar' | 'repuestos' | 'compra' | null;
 const MOMENTO_LABEL: Record<MomentoFoto, string> = { REPORTE: 'Reporte', ANTES: 'Antes', DESPUES: 'Después' };
 
 function useOrderMutation<T>(id: string, fn: (body: T) => Promise<unknown>, onDone?: () => void) {
@@ -22,6 +23,7 @@ function useOrderMutation<T>(id: string, fn: (body: T) => Promise<unknown>, onDo
       qc.invalidateQueries({ queryKey: ['activos'] });
       qc.invalidateQueries({ queryKey: ['activo'] });
       qc.invalidateQueries({ queryKey: ['repuestos'] });
+      qc.invalidateQueries({ queryKey: ['compras'] });
       onDone?.();
     },
   });
@@ -169,7 +171,9 @@ export function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const qc = useQueryClient();
-  const { user } = useAuth();
+  const { user, can } = useAuth();
+  const verCompras = can('ADMIN', 'AUTORIZADOR', 'TECNICO');
+  const compras = useQuery({ queryKey: ['compras', 'orden', id], queryFn: () => api.get<Purchase[]>(`/compras?ordenId=${id}`), enabled: verCompras });
   const [modal, setModal] = useState<ModalKind>(null);
   const [visor, setVisor] = useState<string | null>(null);
   const [momento, setMomento] = useState<MomentoFoto>('ANTES');
@@ -299,6 +303,30 @@ export function OrderDetail() {
           </section>
         ) : null}
 
+        {verCompras && (compras.data?.length || (a.editarRepuestos && can('ADMIN', 'TECNICO'))) ? (
+          <section className="card span-2">
+            <div className="card-head">
+              <h2>Compras de repuestos</h2>
+              {a.editarRepuestos && can('ADMIN', 'TECNICO') ? <Button variant="ghost" onClick={() => setModal('compra')}><Icon name="cart" /> Solicitar compra</Button> : null}
+            </div>
+            {!compras.data?.length ? <p className="muted" style={{ margin: 0 }}>Sin solicitudes. Si faltan repuestos planificados, la solicitud se crea automáticamente.</p> : (
+              <ul className="list">
+                {compras.data.map((c) => (
+                  <li key={c.id}>
+                    <Link to={`/compras/${c.id}`} className="list-row">
+                      <div className="list-main">
+                        <span className="code">{c.codigo}</span>
+                        <strong>{qty(c.cantidad)} {c.repuesto.unidad} · {c.repuesto.descripcion}</strong>
+                      </div>
+                      <Badge tone={COMPRA_ESTADO_TONE[c.estado]}>{COMPRA_ESTADO_LABEL[c.estado]}</Badge>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ) : null}
+
         <section className="card">
           <div className="card-head">
             <h2>Fotos</h2>
@@ -340,6 +368,7 @@ export function OrderDetail() {
       <NoteModal o={o} kind="cancelar" open={modal === 'cancelar'} onClose={() => setModal(null)} />
       <PlannedPartsModal o={o} open={modal === 'repuestos'} onClose={() => setModal(null)} />
       <CloseModal o={o} open={modal === 'cerrar'} onClose={() => setModal(null)} />
+      <NewPurchaseModal open={modal === 'compra'} onClose={() => setModal(null)} ordenId={o.id} ordenCodigo={o.codigo} />
       <Modal open={!!visor} title="Foto" onClose={() => setVisor(null)}>
         {visor ? <img src={visor} alt="" style={{ width: '100%', borderRadius: 8 }} /> : null}
       </Modal>

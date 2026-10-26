@@ -62,3 +62,18 @@ export enum MomentoFoto {
   ANTES = 'ANTES',
   DESPUES = 'DESPUES',
 }
+
+/** Ciclo de una solicitud de compra (COM-03, COM-07). */
+export enum EstadoCompra {
+  PENDIENTE = 'PENDIENTE',
+  APROBADA = 'APROBADA',
+  RECHAZADA = 'RECHAZADA',
+  COMPRADA = 'COMPRADA',
+  RECIBIDA = 'RECIBIDA',
+  CANCELADA = 'CANCELADA',
+}
+
+export enum OrigenCompra {
+  AUTOMATICA = 'AUTOMATICA',
+  MANUAL = 'MANUAL',
+}

@@ -6,6 +6,7 @@ import type { KardexRow, SparePart, TipoMovimiento } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { Badge, Button, Empty, ErrorBox, Field, Icon, Input, KeyValue, Modal, PageHeader, Select, Spinner } from '../../components/ui';
 import { dateTime, money, MOV_LABEL, qty } from '../../format';
+import { NewPurchaseModal } from '../purchases/NewPurchaseModal';
 
 const TIPOS_MANUALES: TipoMovimiento[] = ['ENTRADA_COMPRA', 'ENTRADA_DEVOLUCION', 'ENTRADA_AJUSTE', 'SALIDA_CONSUMO', 'SALIDA_AJUSTE'];
 
@@ -162,7 +163,7 @@ function CountModal({ part, open, onClose }: { part: SparePart; open: boolean; o
 export function PartDetail() {
   const { id } = useParams<{ id: string }>();
   const { can } = useAuth();
-  const [modal, setModal] = useState<'mov' | 'count' | null>(null);
+  const [modal, setModal] = useState<'mov' | 'count' | 'compra' | null>(null);
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const verKardex = can('ADMIN', 'AUTORIZADOR');
@@ -190,11 +191,14 @@ export function PartDetail() {
         title={p.descripcion}
         subtitle={<><span className="code">{p.codigo}</span>{!p.activo ? <> <Badge tone="muted">Inactivo</Badge></> : null}</>}
         actions={
-          can('ADMIN') ? (
+          can('ADMIN', 'TECNICO') ? (
             <>
+              <Button variant="ghost" onClick={() => setModal('compra')} disabled={!p.activo}><Icon name="cart" /> Solicitar compra</Button>
+              {can('ADMIN') ? <>
               <Link to={`/inventario/${p.id}/editar`} className="btn btn-ghost"><Icon name="edit" /> Editar</Link>
               <Button variant="secondary" onClick={() => setModal('count')} disabled={!p.activo}><Icon name="clipboard" /> Conteo</Button>
               <Button onClick={() => setModal('mov')} disabled={!p.activo}><Icon name="swap" /> Movimiento</Button>
+              </> : null}
             </>
           ) : null
         }
@@ -260,6 +264,7 @@ export function PartDetail() {
 
       <MovementModal part={p} open={modal === 'mov'} onClose={() => setModal(null)} />
       <CountModal part={p} open={modal === 'count'} onClose={() => setModal(null)} />
+      <NewPurchaseModal open={modal === 'compra'} onClose={() => setModal(null)} repuestoId={p.id} />
     </>
   );
 }

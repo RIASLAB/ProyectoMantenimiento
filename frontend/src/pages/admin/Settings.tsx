@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { api, qs } from '../../api/client';
 import type { AuditItem, User } from '../../api/types';
-import { Button, Empty, ErrorBox, Field, Input, PageHeader, Select, Spinner } from '../../components/ui';
+import { Link } from 'react-router-dom';
+import { Button, Empty, ErrorBox, Field, Icon, Input, PageHeader, Select, Spinner } from '../../components/ui';
 import { dateTime } from '../../format';
 
 const ACCION_LABEL: Record<string, string> = {
@@ -18,6 +19,13 @@ const ACCION_LABEL: Record<string, string> = {
   AJUSTE_INVENTARIO: 'Ajuste de inventario',
   CONTEO_FISICO: 'Conteo físico',
   STOCK_NEGATIVO: 'Stock quedó negativo',
+  COMPRA_SOLICITADA: 'Solicitud de compra',
+  COMPRA_AJUSTADA: 'Solicitud de compra ajustada',
+  COMPRA_APROBADA: 'Aprobó compra',
+  COMPRA_RECHAZADA: 'Rechazó compra',
+  COMPRA_REALIZADA: 'Registró compra',
+  COMPRA_RECIBIDA: 'Recibió compra en bodega',
+  COMPRA_CANCELADA: 'Canceló solicitud de compra',
   TARIFA_HORA_CAMBIADA: 'Cambió la tarifa de mano de obra',
   OT_CANCELADA: 'Canceló una orden de trabajo',
   ACTIVO_ESTADO_AUTOMATICO: 'Estado de máquina actualizado por una orden',
@@ -25,7 +33,7 @@ const ACCION_LABEL: Record<string, string> = {
   PLAN_ACTUALIZADO: 'Modificó plan preventivo',
 };
 
-const ENTIDADES: Array<[string, string]> = [['', 'Todo'], ['usuario', 'Usuarios'], ['parametro', 'Parámetros'], ['activo', 'Máquinas'], ['repuesto', 'Repuestos'], ['orden', 'Órdenes'], ['plan', 'Planes']];
+const ENTIDADES: Array<[string, string]> = [['', 'Todo'], ['usuario', 'Usuarios'], ['parametro', 'Parámetros'], ['activo', 'Máquinas'], ['repuesto', 'Repuestos'], ['orden', 'Órdenes'], ['plan', 'Planes'], ['compra', 'Compras']];
 
 function resumen(d: Record<string, unknown> | null): string {
   if (!d) return '';
@@ -166,6 +174,13 @@ export function Settings() {
     <>
       <PageHeader title="Ajustes" />
       <div className="stack-lg">
+        <Link to="/usuarios" className="card link-card">
+          <div>
+            <h2 style={{ margin: 0 }}>Usuarios</h2>
+            <p className="muted" style={{ margin: '4px 0 0' }}>Crear usuarios, cambiar roles, restablecer PIN o contraseña.</p>
+          </div>
+          <Icon name="users" />
+        </Link>
         <Autorizador />
         <TarifaHora />
         <Bitacora />

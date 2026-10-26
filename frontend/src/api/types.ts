@@ -159,3 +159,39 @@ export interface AssetHistory {
   cerradas: { correctivos: number; preventivos: number };
   ordenes: WorkOrderSummary[];
 }
+
+export type EstadoCompra = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA' | 'COMPRADA' | 'RECIBIDA' | 'CANCELADA';
+
+export interface Purchase {
+  id: string;
+  numero: number;
+  codigo: string;
+  estado: EstadoCompra;
+  origen: 'AUTOMATICA' | 'MANUAL';
+  repuestoId: string;
+  repuesto: { id: string; codigo: string; descripcion: string; unidad: string };
+  cantidad: number;
+  ordenId: string | null;
+  orden: { id: string; codigo: string; estado: EstadoOrden; activo?: { id: string; codigo: string; nombre: string } } | null;
+  justificacion: string;
+  solicitadoPor: PersonRef | null;
+  decididaPor: PersonRef | null;
+  decididaEn: string | null;
+  motivoRechazo: string | null;
+  proveedor: string | null;
+  numeroOrdenCompra: string | null;
+  costoEstimado: number | null;
+  compradaEn: string | null;
+  cantidadRecibida: number | null;
+  costoUnitario: number | null;
+  factura: string | null;
+  recibidaEn: string | null;
+  recibidaPor?: PersonRef | null;
+  creadoEn: string;
+}
+
+export interface PurchaseDetail extends Purchase {
+  stock: number;
+  historial: AuditItem[];
+  acciones: { aprobar: boolean; rechazar: boolean; comprar: boolean; recibir: boolean; cancelar: boolean; esPropia: boolean };
+}
