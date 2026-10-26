@@ -2,7 +2,7 @@
 
 Sistema de mantenimiento e inventario de repuestos: hoja de vida de máquinas, mantenimientos preventivos y correctivos, inventario, solicitudes de compra, registros de calidad HACCP/BPM e indicadores. Funciona en celular, tablet y PC, y tendrá modo sin conexión para la planta.
 
-## Estado actual (Sprint 1 – base del sistema)
+## Estado actual (Sprint 1 – base del sistema, backend y pantallas)
 
 | Módulo | Estado |
 |---|---|
@@ -14,7 +14,8 @@ Sistema de mantenimiento e inventario de repuestos: hoja de vida de máquinas, m
 | Bitácora de auditoría inmutable | ✅ Listo |
 | Máquinas: ficha técnica, documentos adjuntos | ✅ Listo |
 | Inventario: catálogo, entradas/salidas, kardex, costo promedio, conteo físico, exportación | ✅ Listo |
-| Frontend (pantallas) | ⏳ Siguiente |
+| Pantallas: login, máquinas, inventario, usuarios, configuración (celular, tablet y PC) | ✅ Listo |
+| App instalable en el celular (PWA) | ✅ Listo |
 | Órdenes de trabajo y preventivos | ⏳ Sprint 2 |
 | Solicitudes de compra | ⏳ Sprint 2 |
 | Calidad: temperaturas y checklists | ⏳ Sprint 2 |
@@ -27,7 +28,7 @@ Las decisiones que se asumieron mientras los líderes del proceso las definen es
 ## Tecnologías
 
 - **Backend:** NestJS 11 (Node.js 22), TypeORM, PostgreSQL 16.
-- **Frontend:** React + Vite como PWA (próximo entregable).
+- **Frontend:** React 19 + Vite + TanStack Query, como PWA instalable. Sin fuentes ni recursos externos, para que pueda funcionar sin internet en el Sprint 3.
 - **Seguridad:** JWT, bcrypt, Helmet, validación estricta de entradas, registros inmutables en base de datos.
 
 ## Puesta en marcha (desarrollo)
@@ -46,7 +47,18 @@ npm run migration:run
 npm run seed                # crea el usuario "admin" y muestra su contraseña
 # npm run seed -- --demo    # opcional: usuarios, máquinas y repuestos de prueba
 npm run start:dev           # API en http://localhost:3000/api
+
+# 3. Frontend (otra terminal)
+cd frontend
+npm install
+npm run dev                 # http://localhost:5173 (redirige /api al backend)
 ```
+
+Para probar desde un celular en la misma red: `npm run dev -- --host` y abrir `http://<IP-del-PC>:5173`.
+
+### Producción (frontend)
+
+`npm run build` genera `frontend/dist/`, archivos estáticos que se sirven con cualquier servidor web (Nginx, IIS). Ese servidor debe redirigir `/api` al backend y devolver `index.html` para las demás rutas. Para instalar la app en el celular se necesita HTTPS.
 
 ### Pruebas
 
@@ -56,6 +68,8 @@ npm run test:e2e
 ```
 
 Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay 34 pruebas, cada una ligada al requisito de la matriz que verifica.
+
+Además, `e2e/flujos.py` recorre los flujos principales en un navegador real, en escritorio y en celular, y verifica 19 puntos: login, permisos por rol, máquinas, documentos, movimientos, conteo, exportación, usuarios y bitácora. Las instrucciones están al inicio del archivo.
 
 ## API (resumen)
 
