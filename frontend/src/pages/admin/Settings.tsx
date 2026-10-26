@@ -12,6 +12,7 @@ const ACCION_LABEL: Record<string, string> = {
   USUARIO_BLOQUEADO: 'Usuario bloqueado por intentos fallidos',
   AUTORIZADOR_CAMBIADO: 'Cambió el autorizador de compras',
   PARAMETROS_INDICADORES: 'Cambió el horario de producción o las metas de los indicadores',
+  CARGA_MASIVA: 'Carga masiva desde Excel',
   ACTIVO_CREADO: 'Registró máquina',
   ACTIVO_ACTUALIZADO: 'Modificó máquina',
   DOCUMENTO_ADJUNTADO: 'Adjuntó documento',
@@ -46,7 +47,8 @@ const ENTIDADES: Array<[string, string]> = [['', 'Todo'], ['usuario', 'Usuarios'
 function resumen(d: Record<string, unknown> | null): string {
   if (!d) return '';
   return Object.entries(d)
-    .filter(([k]) => !['movimientoId', 'anterior', 'nuevo'].includes(k))
+    // Los objetos anidados (ej. totales de una carga masiva) no caben en una línea.
+    .filter(([k, v]) => !['movimientoId', 'anterior', 'nuevo'].includes(k) && !(v && typeof v === 'object' && !('antes' in v)))
     .map(([k, v]) => {
       if (v && typeof v === 'object' && 'antes' in v) {
         const c = v as { antes: unknown; despues: unknown };
@@ -255,6 +257,13 @@ export function Settings() {
             <p className="muted" style={{ margin: '4px 0 0' }}>Crear usuarios, cambiar roles, restablecer PIN o contraseña.</p>
           </div>
           <Icon name="users" />
+        </Link>
+        <Link to="/configuracion/carga-masiva" className="card link-card">
+          <div>
+            <h2 style={{ margin: 0 }}>Carga masiva desde Excel</h2>
+            <p className="muted" style={{ margin: '4px 0 0' }}>Cargar de una vez las máquinas y los repuestos con su stock inicial.</p>
+          </div>
+          <Icon name="upload" />
         </Link>
         <Autorizador />
         <TarifaHora />

@@ -16,6 +16,7 @@ import { Login } from './pages/Login';
 import { Pending } from './pages/Pending';
 import { Notifications } from './pages/Notifications';
 import { Indicators } from './pages/Indicators';
+import { BulkImport } from './pages/admin/BulkImport';
 import { OrderDetail } from './pages/orders/OrderDetail';
 import { OrdersList } from './pages/orders/OrdersList';
 import { Plans } from './pages/orders/Plans';
@@ -81,6 +82,7 @@ export function App() {
         <Route path="inventario/:id/editar" element={<OnlyRoles roles={['ADMIN']}><PartForm /></OnlyRoles>} />
         <Route path="indicadores" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR']}><Indicators /></OnlyRoles>} />
         <Route path="usuarios" element={<OnlyRoles roles={['ADMIN']}><Users /></OnlyRoles>} />
+        <Route path="configuracion/carga-masiva" element={<OnlyRoles roles={['ADMIN']}><BulkImport /></OnlyRoles>} />
         <Route path="configuracion" element={<OnlyRoles roles={['ADMIN']}><Settings /></OnlyRoles>} />
         <Route path="*" element={<Empty title="Página no encontrada" />} />
       </Route>

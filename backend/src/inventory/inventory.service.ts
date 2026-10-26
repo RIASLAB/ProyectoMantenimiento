@@ -124,6 +124,9 @@ export class InventoryService {
     if (dto.tipo === TipoMovimiento.ENTRADA_COMPRA && dto.costoUnitario === undefined) {
       throw new BadRequestException('La entrada por compra requiere el costo unitario');
     }
+    if (dto.tipo === TipoMovimiento.ENTRADA_INICIAL && dto.costoUnitario === undefined) {
+      throw new BadRequestException('El saldo inicial requiere el costo unitario');
+    }
     if ((dto.tipo === TipoMovimiento.ENTRADA_AJUSTE || dto.tipo === TipoMovimiento.SALIDA_AJUSTE) && !dto.motivo?.trim()) {
       throw new BadRequestException('Los ajustes de inventario requieren un motivo');
     }
@@ -142,6 +145,9 @@ export class InventoryService {
       if (!repuesto.activo) throw new BadRequestException('El repuesto está inactivo');
 
       const stockAntes = await this.stockDe(repuesto.id, em);
+      if (dto.tipo === TipoMovimiento.ENTRADA_INICIAL && (await em.getRepository(InventoryMovement).exists({ where: { repuestoId: repuesto.id } }))) {
+        throw new BadRequestException(`${repuesto.codigo} ya tiene movimientos: el saldo inicial solo puede ser el primero`);
+      }
       const cantidadConSigno = esEntrada ? dto.cantidad : -dto.cantidad;
       const stockDespues = redondear(stockAntes + cantidadConSigno, 3);
 
@@ -151,9 +157,9 @@ export class InventoryService {
         );
       }
 
-      // D-04 (asumido): costo promedio ponderado; solo las compras cambian el promedio.
+      // D-04 (asumido): costo promedio ponderado; solo las compras y el saldo inicial cambian el promedio.
       let costoUnitario = repuesto.costoPromedio;
-      if (dto.tipo === TipoMovimiento.ENTRADA_COMPRA) {
+      if (dto.tipo === TipoMovimiento.ENTRADA_COMPRA || dto.tipo === TipoMovimiento.ENTRADA_INICIAL) {
         costoUnitario = dto.costoUnitario!;
         const base = Math.max(stockAntes, 0);
         const nuevoPromedio = base + dto.cantidad > 0 ? (base * repuesto.costoPromedio + dto.cantidad * costoUnitario) / (base + dto.cantidad) : costoUnitario;

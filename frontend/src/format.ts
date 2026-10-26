@@ -23,6 +23,7 @@ export const ESTADO_TONE: Record<EstadoActivo, 'ok' | 'warn' | 'bad' | 'muted'> 
 
 export const MOV_LABEL: Record<TipoMovimiento, string> = {
   ENTRADA_COMPRA: 'Entrada por compra',
+  ENTRADA_INICIAL: 'Saldo inicial',
   ENTRADA_AJUSTE: 'Ajuste (entrada)',
   ENTRADA_DEVOLUCION: 'Devolución',
   SALIDA_CONSUMO: 'Consumo',

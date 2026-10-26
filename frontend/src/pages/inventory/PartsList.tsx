@@ -57,9 +57,14 @@ export function PartsList() {
               </Button>
             ) : null}
             {can('ADMIN') ? (
-              <Link to="/inventario/nuevo" className="btn btn-primary">
-                <Icon name="plus" /> Nuevo repuesto
-              </Link>
+              <>
+                <Link to="/configuracion/carga-masiva?tipo=repuestos" className="btn btn-secondary">
+                  <Icon name="upload" /> Desde Excel
+                </Link>
+                <Link to="/inventario/nuevo" className="btn btn-primary">
+                  <Icon name="plus" /> Nuevo repuesto
+                </Link>
+              </>
             ) : null}
           </>
         }

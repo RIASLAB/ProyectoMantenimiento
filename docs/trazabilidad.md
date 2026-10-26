@@ -80,6 +80,7 @@ Estado al cierre del Sprint 2 frente a la matriz (`Matriz_Requisitos_CMMS_Nutria
 | SEG-06 | Seguridad técnica | 🟡 | — | Bloqueo por intentos, bcrypt, hashes nunca expuestos | HTTPS y respaldos cifrados (despliegue) |
 | GEN-01 | Celular, tablet y PC | — | ✅ | 1366 px, Pixel 7 e iPhone 13; sin desplazamiento horizontal; "Más" cuando no caben las pestañas | — |
 | GEN-02 | Español | — | ✅ | Todos los textos y errores | Prueba de usabilidad con operarios |
+| INT-01 | Carga inicial masiva | ✅ | ✅ | Plantillas de Excel; errores con fila y columna (vacíos, repetidos en el archivo o en el sistema, fechas y números inválidos); totales cargados = archivo; saldo inicial en el kárdex; lee archivos guardados con otros programas | Cargar los datos reales de la planta |
 | INT-02 | Código SAP | ✅ | ✅ | Campo `codigoSap` | Acordar codificación (D-13) |
 
 ## Modo sin conexión (Sprint 3)
@@ -111,4 +112,4 @@ Estado al cierre del Sprint 2 frente a la matriz (`Matriz_Requisitos_CMMS_Nutria
 
 ## Pendiente para el Sprint 3
 
-Carga masiva desde Excel (INT-01), respaldos y despliegue (NFR-01/03).
+Respaldos y despliegue (NFR-01/03/04).

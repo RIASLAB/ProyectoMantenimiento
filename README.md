@@ -24,7 +24,8 @@ Sistema de mantenimiento e inventario de repuestos: hoja de vida de máquinas, m
 | Modo sin conexión: fallas con foto, temperaturas, checklists y ejecución/cierre de OT; sincronización automática | ✅ Sprint 3 |
 | Notificaciones: bandeja en la app con contador y avisos al celular (Web Push) | ✅ Sprint 3 |
 | Indicadores: disponibilidad, MTBF, MTTR, cumplimiento de preventivos, rotación, gráficos | ✅ Sprint 3 |
-| Carga masiva desde Excel, respaldos y despliegue | ⏳ Sprint 3 |
+| Carga masiva de máquinas y repuestos desde Excel, con validación por fila | ✅ Sprint 3 |
+| Respaldos y guía de despliegue | ⏳ Sprint 3 |
 
 El detalle requisito por requisito está en [docs/trazabilidad.md](docs/trazabilidad.md).
 Las decisiones que se asumieron mientras los líderes del proceso las definen están en [docs/decisiones-asumidas.md](docs/decisiones-asumidas.md).
@@ -84,9 +85,9 @@ cd backend
 npm run test:e2e
 ```
 
-Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **139 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
+Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **155 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
 
-Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**62 verificaciones**):
+Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**70 verificaciones**):
 
 | Script | Qué recorre |
 |---|---|
@@ -94,6 +95,7 @@ Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritori
 | `e2e/ordenes.py` | Operario reporta falla en el celular → admin asigna → técnico cierra con repuestos y horas → hoja de vida |
 | `e2e/compras.py` | Faltante automático → autorizador aprueba/rechaza → admin compra y recibe en bodega |
 | `e2e/calidad.py` | Temperatura fuera de rango, checklist con no conformidad, anulación, exportación, configuración |
+| `e2e/carga_masiva.py` | Descarga la plantilla, la llena, la sube con errores (fila y columna), la corrige y carga máquinas y repuestos con stock inicial |
 | `e2e/avisos_indicadores.py` | Falla y temperatura fuera de rango → campana y bandeja del admin; asignación → aviso al técnico; indicadores en el celular; horario y metas |
 | `e2e/sin_conexion.py` | Se corta la red en el celular: la app abre, se cierra una OT, se registran temperatura y falla con foto; al volver la señal todo se envía solo y un conflicto queda a la vista |
 
@@ -141,6 +143,8 @@ Todas las rutas van bajo `/api` y requieren `Authorization: Bearer <token>`, sal
 | `GET /notificaciones`, `GET /notificaciones/contador` | Todos | Bandeja propia y número sin leer |
 | `POST /notificaciones/:id/leida`, `POST /notificaciones/leidas` | Todos | Marcar una o todas como leídas |
 | `GET/POST /notificaciones/push`, `POST /notificaciones/push/baja` · `prueba` | Todos | Avisos al celular de este dispositivo |
+| `GET /importacion/:tipo/plantilla` | Admin | Plantilla de Excel (`maquinas` o `repuestos`) |
+| `POST /importacion/:tipo/validar` · `POST /importacion/:tipo` | Admin | Revisar el archivo (errores por fila) · cargarlo completo |
 | `GET /indicadores?desde=&hasta=` | Admin, Autorizador | KPI globales y por máquina del período (por defecto, últimos 30 días) |
 | `GET/PUT /indicadores/parametros` | Admin, Autorizador / Admin | Horario de producción y metas |
 

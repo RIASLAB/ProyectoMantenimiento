@@ -5,7 +5,8 @@ const TOKEN_KEY = 'cmms.token';
 const TIMEOUT_MS = 15_000;
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  /** `datos`: cuerpo completo de la respuesta de error (ej. la lista de errores por fila de una carga masiva). */
+  constructor(public status: number, message: string, public datos?: unknown) {
     super(message);
   }
 }
@@ -68,13 +69,15 @@ async function raw(path: string, init: { method?: string; body?: Body } = {}): P
 
   if (!res.ok) {
     let message = `Error ${res.status}`;
+    let data: unknown;
     try {
-      const data = await res.json();
-      message = Array.isArray(data.message) ? data.message.join('. ') : data.message ?? message;
+      data = await res.json();
+      const m = (data as { message?: string | string[] }).message;
+      message = Array.isArray(m) ? m.join('. ') : m ?? message;
     } catch { /* respuesta sin JSON */ }
     if (res.status === 401 && token) window.dispatchEvent(new Event(SESSION_EXPIRED));
     if (res.status === 413) message = 'El archivo es demasiado grande';
-    throw new ApiError(res.status, message);
+    throw new ApiError(res.status, message, data);
   }
   return res;
 }

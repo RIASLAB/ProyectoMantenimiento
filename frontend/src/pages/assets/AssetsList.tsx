@@ -26,9 +26,14 @@ export function AssetsList() {
         subtitle={list.data ? `${list.data.length} equipo${list.data.length === 1 ? '' : 's'}` : undefined}
         actions={
           can('ADMIN') ? (
-            <Link to="/maquinas/nueva" className="btn btn-primary">
-              <Icon name="plus" /> Nueva máquina
-            </Link>
+            <>
+              <Link to="/configuracion/carga-masiva?tipo=maquinas" className="btn btn-secondary">
+                <Icon name="upload" /> Desde Excel
+              </Link>
+              <Link to="/maquinas/nueva" className="btn btn-primary">
+                <Icon name="plus" /> Nueva máquina
+              </Link>
+            </>
           ) : null
         }
       />

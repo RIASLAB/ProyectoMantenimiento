@@ -12,6 +12,8 @@ import { AuthGuard } from './auth/auth.guard';
 import { AuthService } from './auth/auth.service';
 import { Public } from './common/auth.decorators';
 import { dataSourceOptions, ENTITIES } from './database/data-source';
+import { ImportController } from './import/import.controller';
+import { ImportService } from './import/import.service';
 import { InventoryController, SparePartsController } from './inventory/inventory.controller';
 import { InventoryService } from './inventory/inventory.service';
 import { AssetHistoryController, PlansController, WorkOrdersController } from './maintenance/maintenance.controller';
@@ -60,11 +62,11 @@ class HealthController {
   ],
   controllers: [
     HealthController, AuthController, UsersController, SettingsController, AuditController,
-    AssetHistoryController, AssetsController, SparePartsController, InventoryController, WorkOrdersController, PlansController, PurchasesController, QualityController, NotificationsController, KpiController,
+    AssetHistoryController, AssetsController, SparePartsController, InventoryController, WorkOrdersController, PlansController, PurchasesController, QualityController, NotificationsController, KpiController, ImportController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: AuthGuard },
-    AuthService, UsersService, SettingsService, AuditService, AssetsService, InventoryService, MaintenanceService, PurchasesService, QualityService, NotificationsService, KpiService,
+    AuthService, UsersService, SettingsService, AuditService, AssetsService, InventoryService, MaintenanceService, PurchasesService, QualityService, NotificationsService, KpiService, ImportService,
   ],
 })
 export class AppModule {}

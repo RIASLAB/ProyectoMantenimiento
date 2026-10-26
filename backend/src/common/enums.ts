@@ -18,6 +18,8 @@ export enum EstadoActivo {
  */
 export enum TipoMovimiento {
   ENTRADA_COMPRA = 'ENTRADA_COMPRA',
+  /** Saldo con que arranca un repuesto (carga inicial, INT-01). Solo puede ser su primer movimiento. */
+  ENTRADA_INICIAL = 'ENTRADA_INICIAL',
   ENTRADA_AJUSTE = 'ENTRADA_AJUSTE',
   ENTRADA_DEVOLUCION = 'ENTRADA_DEVOLUCION',
   SALIDA_CONSUMO = 'SALIDA_CONSUMO',
@@ -26,6 +28,7 @@ export enum TipoMovimiento {
 
 export const TIPOS_ENTRADA = [
   TipoMovimiento.ENTRADA_COMPRA,
+  TipoMovimiento.ENTRADA_INICIAL,
   TipoMovimiento.ENTRADA_AJUSTE,
   TipoMovimiento.ENTRADA_DEVOLUCION,
 ];
