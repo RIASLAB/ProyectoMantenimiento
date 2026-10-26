@@ -29,3 +29,36 @@ export const TIPOS_ENTRADA = [
   TipoMovimiento.ENTRADA_AJUSTE,
   TipoMovimiento.ENTRADA_DEVOLUCION,
 ];
+
+export enum TipoOrden {
+  CORRECTIVO = 'CORRECTIVO',
+  PREVENTIVO = 'PREVENTIVO',
+}
+
+/** Ciclo de vida de la OT (MNT-03). Las transiciones válidas están en maintenance/work-order.states.ts */
+export enum EstadoOrden {
+  ABIERTA = 'ABIERTA',
+  ASIGNADA = 'ASIGNADA',
+  EN_EJECUCION = 'EN_EJECUCION',
+  ESPERANDO_REPUESTO = 'ESPERANDO_REPUESTO',
+  CERRADA = 'CERRADA',
+  CANCELADA = 'CANCELADA',
+}
+
+export enum Prioridad {
+  BAJA = 'BAJA',
+  MEDIA = 'MEDIA',
+  ALTA = 'ALTA',
+}
+
+export enum UnidadFrecuencia {
+  DIAS = 'DIAS',
+  SEMANAS = 'SEMANAS',
+  MESES = 'MESES',
+}
+
+export enum MomentoFoto {
+  REPORTE = 'REPORTE',
+  ANTES = 'ANTES',
+  DESPUES = 'DESPUES',
+}

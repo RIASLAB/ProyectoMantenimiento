@@ -9,16 +9,10 @@ import { DataSource, Repository } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
 import { SessionUser } from '../common/auth.decorators';
 import { EstadoActivo } from '../common/enums';
+import { validateUpload } from '../common/files';
 import { AssetDocument } from './asset-document.entity';
 import { Asset } from './asset.entity';
 import { CreateAssetDto, UpdateAssetDto } from './assets.dto';
-
-/** Tipos permitidos para manuales y documentos (ACT-02), validados por la firma del archivo, no solo por la extensión. */
-const TIPOS: Record<string, { ext: string; firma: (b: Buffer) => boolean }> = {
-  'application/pdf': { ext: '.pdf', firma: (b) => b.subarray(0, 4).toString('latin1') === '%PDF' },
-  'image/jpeg': { ext: '.jpg', firma: (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
-  'image/png': { ext: '.png', firma: (b) => b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
-};
 
 @Injectable()
 export class AssetsService {
@@ -106,11 +100,9 @@ export class AssetsService {
   }
 
   async addDocument(activoId: string, file: Express.Multer.File | undefined, actor: SessionUser) {
-    if (!file) throw new BadRequestException('Debe adjuntar un archivo en el campo "archivo"');
     if (!(await this.repo.exists({ where: { id: activoId } }))) throw new NotFoundException('Máquina no encontrada');
-    if (file.size > this.maxBytes) throw new BadRequestException(`El archivo supera ${this.maxBytes / 1024 / 1024} MB`);
-    const tipo = TIPOS[file.mimetype];
-    if (!tipo || !tipo.firma(file.buffer)) throw new BadRequestException('Solo se permiten archivos PDF, JPG o PNG válidos');
+    const tipo = validateUpload(file, this.maxBytes, ['application/pdf', 'image/jpeg', 'image/png']);
+    file = file!;
 
     const archivo = `${randomUUID()}${tipo.ext}`;
     await writeFile(join(this.dir, archivo), file.buffer);

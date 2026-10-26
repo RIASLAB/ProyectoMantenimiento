@@ -5,7 +5,7 @@ import { AuditService } from '../audit/audit.service';
 import { SessionUser } from '../common/auth.decorators';
 import { Rol } from '../common/enums';
 import { User } from '../users/user.entity';
-import { PARAM_AUTORIZADOR_COMPRAS, Setting } from './setting.entity';
+import { PARAM_AUTORIZADOR_COMPRAS, PARAM_TARIFA_HORA, Setting } from './setting.entity';
 
 @Injectable()
 export class SettingsService {
@@ -52,5 +52,24 @@ export class SettingsService {
       );
     });
     return this.getAutorizador();
+  }
+
+  /** Tarifa por hora de mano de obra de los técnicos, para el costo de las OT (D-03 asumido). */
+  async getTarifaHora(): Promise<number> {
+    const s = await this.repo.findOne({ where: { clave: PARAM_TARIFA_HORA } });
+    return s?.valor ? Number(s.valor) : 0;
+  }
+
+  async setTarifaHora(valor: number, actor: SessionUser) {
+    await this.ds.transaction(async (em) => {
+      const r = em.getRepository(Setting);
+      const anterior = await r.findOne({ where: { clave: PARAM_TARIFA_HORA } });
+      await r.save({ clave: PARAM_TARIFA_HORA, valor: String(valor) });
+      await this.audit.log(
+        { usuarioId: actor.id, accion: 'TARIFA_HORA_CAMBIADA', entidad: 'parametro', entidadId: PARAM_TARIFA_HORA, detalle: { anterior: anterior?.valor ?? null, nuevo: valor } },
+        em,
+      );
+    });
+    return { tarifaHora: valor };
   }
 }

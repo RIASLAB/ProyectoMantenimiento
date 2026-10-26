@@ -35,6 +35,8 @@ Las decisiones que se asumieron mientras los líderes del proceso las definen es
 
 Requisitos: Node.js 22+, Docker (o un PostgreSQL 13+ propio).
 
+> Docker expone la base de datos en el puerto **5433** para no chocar con un PostgreSQL instalado en el PC. Si usas tu propio PostgreSQL, cambia el puerto a 5432 en `backend/.env`.
+
 ```bash
 # 1. Base de datos
 docker compose up -d

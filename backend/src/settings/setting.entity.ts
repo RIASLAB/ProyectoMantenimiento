@@ -14,3 +14,4 @@ export class Setting {
 }
 
 export const PARAM_AUTORIZADOR_COMPRAS = 'autorizador_compras_id';
+export const PARAM_TARIFA_HORA = 'tarifa_hora_tecnico';

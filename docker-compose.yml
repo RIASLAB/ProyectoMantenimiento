@@ -8,7 +8,8 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: cmms
     ports:
-      - "5432:5432"
+      # 5433 en el PC para no chocar con un PostgreSQL instalado localmente
+      - "5433:5432"
     volumes:
       - cmms-db:/var/lib/postgresql/data
       - ./docker/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql:ro
