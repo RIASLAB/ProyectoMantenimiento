@@ -77,7 +77,7 @@ Estado al cierre del Sprint 2 frente a la matriz (`Matriz_Requisitos_CMMS_Nutria
 | SEG-03 | Roles en la API | ✅ | ✅ | 403 en cada módulo para roles no autorizados | Matriz rol × acción completa |
 | SEG-04 | Gestión de usuarios | ✅ | ✅ | Desactivar corta el acceso de inmediato | — |
 | SEG-05 | Bitácora | ✅ | ✅ | Inmutable; etiquetas legibles para todas las acciones | — |
-| SEG-06 | Seguridad técnica | 🟡 | — | Bloqueo por intentos, bcrypt, hashes nunca expuestos | HTTPS y respaldos cifrados (despliegue) |
+| SEG-06 | Seguridad técnica | ✅ | — | Bloqueo por intentos, bcrypt, hashes nunca expuestos, CSP y cabeceras de seguridad, HTTPS (Caddy), respaldos cifrados AES-256, la API no arranca con una clave JWT débil | Revisión de sistemas en el servidor definitivo |
 | GEN-01 | Celular, tablet y PC | — | ✅ | 1366 px, Pixel 7 e iPhone 13; sin desplazamiento horizontal; "Más" cuando no caben las pestañas | — |
 | GEN-02 | Español | — | ✅ | Todos los textos y errores | Prueba de usabilidad con operarios |
 | INT-01 | Carga inicial masiva | ✅ | ✅ | Plantillas de Excel; errores con fila y columna (vacíos, repetidos en el archivo o en el sistema, fechas y números inválidos); totales cargados = archivo; saldo inicial en el kárdex; lee archivos guardados con otros programas | Cargar los datos reales de la planta |
@@ -110,6 +110,15 @@ Estado al cierre del Sprint 2 frente a la matriz (`Matriz_Requisitos_CMMS_Nutria
 | KPI-06 | Gráficos | ✅ | ✅ | Máquinas que más fallan, valor del inventario y repuestos bajo mínimo; probado en Pixel 7 sin desplazamiento horizontal | — |
 | KPI-07 | Fórmulas y metas aprobadas | — | ✅ | Metas configurables en Ajustes y visibles junto a cada indicador; fórmulas explicadas en pantalla | **Documento aprobado por Dirección** |
 
-## Pendiente para el Sprint 3
+## Requisitos no funcionales (Sprint 3)
 
-Respaldos y despliegue (NFR-01/03/04).
+| ID | Requisito | Estado | Evidencia | Falta |
+|---|---|---|---|---|
+| NFR-01 | Respaldos automáticos | ✅ | Respaldo diario cifrado de base y archivos con retención y copia opcional a NAS; restauración probada en una base nueva (conteos, app y documentos idénticos; clave errada, archivo dañado y base con datos detectados) | Repetir la prueba de restauración en el servidor definitivo ([despliegue.md](despliegue.md#prueba-de-restauración-antes-de-salir-a-producción-obligatoria)) |
+| NFR-02 | Rendimiento en planta | ✅ | Con 4G lenta (1,6 Mbps, 150 ms) y sin caché, las pantallas principales cargan en 2,2 s o menos; con la app instalada, 0,1 s entre pantallas (`e2e/rendimiento.py`) | Medir con el Wi-Fi real de la planta |
+| NFR-03 | Infraestructura y despliegue | 🟡 | `docker-compose.prod.yml` (base, app, respaldos, HTTPS); modo producción probado en navegador; guía paso a paso | Decidir servidor (D-12) y construir las imágenes allí (en el entorno de desarrollo no había acceso a Docker Hub) |
+| NFR-04 | Documentación técnica | ✅ | [arquitectura.md](arquitectura.md) (componentes, módulos, modelo de datos), [despliegue.md](despliegue.md), README | Que otra persona de sistemas levante el entorno siguiendo la guía |
+
+## Pendiente
+
+Decisiones de los líderes (D-05 metas de KPI, D-06 límites reales, D-07 retención, D-10 canal de avisos, D-12 servidor, D-14 alcance) y la prueba en planta con usuarios reales.

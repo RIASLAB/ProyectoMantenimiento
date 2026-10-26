@@ -1,0 +1,93 @@
+# Producción: docker compose -f docker-compose.prod.yml --env-file .env.produccion up -d --build
+# Guía completa: docs/despliegue.md
+name: cmms
+
+x-app-env: &app-env
+  DATABASE_URL: postgres://cmms:${DB_PASSWORD:?Defina DB_PASSWORD}@db:5432/cmms
+  TZ: ${APP_TZ:-America/Bogota}
+  APP_TZ: ${APP_TZ:-America/Bogota}
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cmms
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD}
+      POSTGRES_DB: cmms
+      TZ: ${APP_TZ:-America/Bogota}
+    volumes:
+      - cmms-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cmms -d cmms"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # Sin puertos publicados: la base solo es accesible desde la app y los respaldos.
+
+  app:
+    build: .
+    image: cmms-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      <<: *app-env
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET (al menos 32 caracteres aleatorios)}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-20}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+    volumes:
+      - cmms-uploads:/datos/uploads
+    # Solo accesible a través de Caddy (HTTPS). Para probar sin Caddy, publique "3000:3000".
+    expose:
+      - "3000"
+
+  respaldo:
+    # Usa la misma imagen que construye "app" (trae pg_dump y los scripts).
+    image: cmms-app
+    pull_policy: never
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_started
+    # root para poder escribir en la carpeta ./respaldos del servidor
+    user: "0"
+    command: ["bash", "scripts/respaldo-programado.sh"]
+    environment:
+      <<: *app-env
+      UPLOADS_DIR: /datos/uploads
+      BACKUP_DIR: /respaldos
+      RESPALDO_HORA: ${RESPALDO_HORA:-02:30}
+      RETENCION_DIAS: ${RETENCION_DIAS:-30}
+      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:?Defina BACKUP_PASSPHRASE (clave para cifrar los respaldos)}
+      BACKUP_COPIA_DIR: ${BACKUP_COPIA_DIR:-}
+    volumes:
+      - cmms-uploads:/datos/uploads:ro
+      - ${RESPALDOS_EN_SERVIDOR:-./respaldos}:/respaldos
+    healthcheck:
+      disable: true
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      DOMINIO: ${DOMINIO:?Defina DOMINIO (ej. cmms.nutrialimentos.com.co)}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-datos:/data
+      - caddy-config:/config
+
+volumes:
+  cmms-db:
+  cmms-uploads:
+  caddy-datos:
+  caddy-config:

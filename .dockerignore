@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/.env
+**/uploads
+**/uploads-test
+**/coverage
+**/*.log
+**/*.tsbuildinfo
+respaldos
+.git
+e2e
+docs

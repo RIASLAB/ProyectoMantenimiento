@@ -2,7 +2,7 @@
 
 Sistema de mantenimiento e inventario de repuestos: hoja de vida de máquinas, mantenimientos preventivos y correctivos, inventario, solicitudes de compra, registros de calidad HACCP/BPM e indicadores. Funciona en celular, tablet y PC, y trabaja sin conexión en la planta.
 
-## Estado actual (Sprint 3 en curso)
+## Estado actual (Sprint 3 terminado)
 
 | Módulo | Estado |
 |---|---|
@@ -25,7 +25,7 @@ Sistema de mantenimiento e inventario de repuestos: hoja de vida de máquinas, m
 | Notificaciones: bandeja en la app con contador y avisos al celular (Web Push) | ✅ Sprint 3 |
 | Indicadores: disponibilidad, MTBF, MTTR, cumplimiento de preventivos, rotación, gráficos | ✅ Sprint 3 |
 | Carga masiva de máquinas y repuestos desde Excel, con validación por fila | ✅ Sprint 3 |
-| Respaldos y guía de despliegue | ⏳ Sprint 3 |
+| Producción con Docker y HTTPS, respaldos diarios cifrados con prueba de restauración | ✅ Sprint 3 |
 
 El detalle requisito por requisito está en [docs/trazabilidad.md](docs/trazabilidad.md).
 Las decisiones que se asumieron mientras los líderes del proceso las definen están en [docs/decisiones-asumidas.md](docs/decisiones-asumidas.md).
@@ -74,9 +74,11 @@ npm run push:claves        # genera una clave pública y una privada
 
 Copie las dos claves en `backend/.env` (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`), ajuste `VAPID_SUBJECT` y reinicie el backend. Luego cada usuario toca **Activar avisos** en Notificaciones. Requiere la app compilada (`npm run build && npm run preview`, o el despliegue con HTTPS); en iPhone, además, la app agregada a la pantalla de inicio (iOS 16.4 o superior). Las claves se generan una sola vez: si se cambian, cada celular debe activar los avisos de nuevo.
 
-### Producción (frontend)
+### Producción
 
-`npm run build` genera `frontend/dist/`, archivos estáticos que se sirven con cualquier servidor web (Nginx, IIS). Ese servidor debe redirigir `/api` al backend y devolver `index.html` para las demás rutas. Para instalar la app en el celular se necesita HTTPS.
+Ver **[docs/despliegue.md](docs/despliegue.md)**: `docker-compose.prod.yml` levanta la base, la app (API y app compilada en un solo servicio), los respaldos diarios cifrados y HTTPS automático. La arquitectura y el modelo de datos están en [docs/arquitectura.md](docs/arquitectura.md).
+
+Para probar el modo producción sin Docker: `npm run build` en `frontend` y en `backend`, y luego en `backend` `FRONTEND_DIR=../frontend/dist node dist/main.js` (abre en `http://localhost:3000`).
 
 ### Pruebas
 
@@ -97,6 +99,7 @@ Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritori
 | `e2e/calidad.py` | Temperatura fuera de rango, checklist con no conformidad, anulación, exportación, configuración |
 | `e2e/carga_masiva.py` | Descarga la plantilla, la llena, la sube con errores (fila y columna), la corrige y carga máquinas y repuestos con stock inicial |
 | `e2e/avisos_indicadores.py` | Falla y temperatura fuera de rango → campana y bandeja del admin; asignación → aviso al técnico; indicadores en el celular; horario y metas |
+| `e2e/rendimiento.py` | Mide la carga de las pantallas principales con 4G lenta y sin caché (NFR-02); no cuenta verificaciones |
 | `e2e/sin_conexion.py` | Se corta la red en el celular: la app abre, se cierra una OT, se registran temperatura y falla con foto; al volver la señal todo se envía solo y un conflicto queda a la vista |
 
 Cada script necesita los datos de demostración recién cargados (`npm run seed -- --demo` sobre una base limpia) y el frontend compilado y servido (`npm run build && npm run preview`).

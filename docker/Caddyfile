@@ -1,0 +1,11 @@
+# HTTPS automático (Let's Encrypt) para el dominio de la app. Lo necesitan la instalación en el
+# celular, el modo sin conexión y los avisos al celular.
+{$DOMINIO} {
+	encode zstd gzip
+	reverse_proxy app:3000
+	header Strict-Transport-Security "max-age=31536000"
+	log {
+		output stdout
+		format console
+	}
+}
