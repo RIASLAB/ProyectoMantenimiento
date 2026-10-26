@@ -4,7 +4,7 @@ import { api, qs } from '../../api/client';
 import type { OrdersSummary, WorkOrderSummary } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { OrderBadges } from '../../components/orders-shared';
-import { Empty, ErrorBox, Icon, PageHeader, Select, Spinner } from '../../components/ui';
+import { Empty, ErrorBox, Icon, PageHeader, SavedOfflineNotice, Select, Spinner } from '../../components/ui';
 import { date, dateTime } from '../../format';
 import { useUrlFilters } from '../../hooks';
 
@@ -38,6 +38,7 @@ function Resumen({ onFilter }: { onFilter: (k: string, v: string) => void }) {
 
 export function OrdersList() {
   const { can, user } = useAuth();
+  const location = useLocation();
   const [f, set] = useUrlFilters(['vista', 'tipo', 'estado', 'mias'] as const);
   const vista = f.vista || 'abiertas';
   const operario = user?.rol === 'OPERARIO';
@@ -59,6 +60,7 @@ export function OrdersList() {
           </Link>
         }
       />
+      <SavedOfflineNotice que={(location.state as { guardadoSinConexion?: string } | null)?.guardadoSinConexion} />
       <OrdersTabs />
       {can('ADMIN', 'AUTORIZADOR', 'TECNICO') ? <Resumen onFilter={(k, v) => { set('vista', 'abiertas'); set(k as 'estado', v); }} /> : null}
 

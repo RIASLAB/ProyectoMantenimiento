@@ -183,6 +183,14 @@ export class WorkOrder {
   @Column({ name: 'client_id', type: 'uuid', nullable: true, unique: true })
   clientId: string | null;
 
+  /** Identificador del cierre hecho desde el dispositivo: si el cierre se reenvía al sincronizar, no se repite. */
+  @Column({ name: 'cierre_client_id', type: 'uuid', nullable: true, unique: true })
+  cierreClientId: string | null;
+
+  /** El cierre se hizo sin conexión y se sincronizó después (D-02: el consumo se registra aunque falte stock). */
+  @Column({ name: 'cerrada_sin_conexion', default: false })
+  cerradaSinConexion: boolean;
+
   @OneToMany(() => WorkOrderPart, (p) => p.orden, { cascade: true })
   repuestos: WorkOrderPart[];
 
@@ -324,6 +332,10 @@ export class WorkOrderPhoto {
 
   @Column({ name: 'subido_por_id', type: 'uuid', nullable: true })
   subidoPorId: string | null;
+
+  /** Evita subir dos veces la misma foto al sincronizar. */
+  @Column({ name: 'client_id', type: 'uuid', nullable: true, unique: true })
+  clientId: string | null;
 
   @CreateDateColumn({ name: 'creado_en', type: 'timestamptz' })
   creadoEn: Date;

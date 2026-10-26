@@ -94,8 +94,9 @@ export class WorkOrdersController {
     @Query('momento', new ParseEnumPipe(MomentoFoto)) momento: MomentoFoto,
     @UploadedFile() file: Express.Multer.File | undefined,
     @CurrentUser() actor: SessionUser,
+    @Query('clientId', new ParseUUIDPipe({ optional: true })) clientId?: string,
   ) {
-    return this.svc.agregarFoto(id, momento, file, actor);
+    return this.svc.agregarFoto(id, momento, file, actor, clientId);
   }
 }
 

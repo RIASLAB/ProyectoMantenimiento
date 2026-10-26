@@ -4,7 +4,9 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { api, uuid } from '../../api/client';
 import type { ControlPointInfo } from '../../api/types';
 import { Button, Empty, ErrorBox, Field, Icon, Input, PageHeader, Select, Spinner, Textarea } from '../../components/ui';
+import { useAuth } from '../../auth/AuthContext';
 import { qty, rangoTexto } from '../../format';
+import { enviarOEncolar } from '../../offline/outbox';
 
 /** CAL-01/03: registro rápido de temperatura. Tras guardar, deja el formulario listo para el siguiente punto. */
 export function RecordTemperature() {
@@ -14,7 +16,8 @@ export function RecordTemperature() {
   const [valor, setValor] = useState('');
   const [accion, setAccion] = useState('');
   const [clientId, setClientId] = useState(() => uuid());
-  const [ultimo, setUltimo] = useState<{ punto: string; valor: number; fuera: boolean } | null>(null);
+  const [ultimo, setUltimo] = useState<{ punto: string; valor: number; fuera: boolean; sinConexion: boolean } | null>(null);
+  const { user } = useAuth();
 
   const puntos = useQuery({ queryKey: ['calidad', 'puntos'], queryFn: () => api.get<ControlPointInfo[]>('/calidad/puntos') });
   const punto = puntos.data?.find((p) => p.id === puntoId);
@@ -28,9 +31,14 @@ export function RecordTemperature() {
   const fuera = !!punto && n !== null && Number.isFinite(n) && ((punto.minimo !== null && n < punto.minimo) || (punto.maximo !== null && n > punto.maximo));
 
   const m = useMutation({
-    mutationFn: () => api.post('/calidad/temperaturas', { puntoId, valor: n, accionCorrectiva: fuera ? accion : undefined, clientId }),
-    onSuccess: () => {
-      setUltimo({ punto: `${punto!.activo.codigo} · ${punto!.nombre}`, valor: n!, fuera });
+    // OFF-01: la hora real de la lectura viaja con el registro aunque se envíe más tarde.
+    mutationFn: () => enviarOEncolar({
+      usuarioId: user!.id, tipo: 'temperatura', method: 'POST', path: '/calidad/temperaturas',
+      resumen: `${punto!.activo.codigo} · ${punto!.nombre}: ${qty(n!)} °C${fuera ? ' (fuera de rango)' : ''}`,
+      body: { puntoId, valor: n, accionCorrectiva: fuera ? accion : undefined, clientId, registradoEn: new Date().toISOString() },
+    }),
+    onSuccess: (r) => {
+      setUltimo({ punto: `${punto!.activo.codigo} · ${punto!.nombre}`, valor: n!, fuera, sinConexion: r.encolado });
       setValor(''); setAccion(''); setPuntoId(''); setClientId(uuid());
       qc.invalidateQueries({ queryKey: ['calidad'] });
     },
@@ -42,7 +50,8 @@ export function RecordTemperature() {
       <PageHeader back={<Link to="/calidad" className="back-link"><Icon name="back" size={18} /> Calidad</Link>} title="Registrar temperatura" />
       {ultimo ? (
         <div className={`alert ${ultimo.fuera ? 'alert-warn' : 'alert-ok'}`}>
-          Guardado: {ultimo.punto} → {qty(ultimo.valor)} °C{ultimo.fuera ? ' (fuera de rango, con acción correctiva)' : ''}. Puede registrar el siguiente.
+          {ultimo.sinConexion ? 'Guardado en el dispositivo (sin señal)' : 'Guardado'}: {ultimo.punto} → {qty(ultimo.valor)} °C{ultimo.fuera ? ' (fuera de rango, con acción correctiva)' : ''}.
+          {ultimo.sinConexion ? ' Se enviará al recuperar la señal.' : ''} Puede registrar el siguiente.
         </div>
       ) : null}
       {puntos.isPending ? <Spinner /> : puntos.isError ? <ErrorBox error={puntos.error} /> : puntos.data.length === 0 ? (

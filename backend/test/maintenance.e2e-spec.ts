@@ -196,6 +196,66 @@ describe('MNT-02 · Hora de puesta en marcha', () => {
   });
 });
 
+describe('OFF · Sincronización de acciones hechas sin señal', () => {
+  let o: { id: string };
+  let repId: string;
+  beforeAll(async () => {
+    repId = (await c.http.post('/api/repuestos').set(c.auth(c.admin)).send({ codigo: 'SYNC-1', descripcion: 'Repuesto sync', unidad: 'UND' })).body.id;
+    o = (await c.http.post('/api/ordenes').set(c.auth(op1.token)).send({ activoId, descripcion: 'Falla para sincronizar', maquinaParada: false })).body;
+    await c.http.post(`/api/ordenes/${o.id}/asignar`).set(c.auth(c.admin)).send({ tecnicoId: tec1.id }).expect(201);
+  });
+
+  it('una transición reenviada no es un error', async () => {
+    await c.http.post(`/api/ordenes/${o.id}/iniciar`).set(c.auth(tec1.token)).expect(201);
+    const r = await c.http.post(`/api/ordenes/${o.id}/iniciar`).set(c.auth(tec1.token));
+    expect(r.status).toBe(201);
+    expect(r.body.sinCambios).toBe(true);
+    const d = await c.http.get(`/api/ordenes/${o.id}`).set(c.auth(c.admin));
+    expect(d.body.eventos.filter((e: { estadoNuevo: string }) => e.estadoNuevo === 'EN_EJECUCION')).toHaveLength(1);
+  });
+
+  it('D-02 · cierre sin conexión: consume aunque no haya stock, usa la hora real y no se repite al reenviar', async () => {
+    const cerradaEn = new Date(Date.now() - 20 * 60_000).toISOString();
+    const body = {
+      trabajoRealizado: 'Cambio hecho en zona sin señal', repuestosUsados: [{ repuestoId: repId, cantidad: 2 }], manoObra: [],
+      clientId: '9a1d1f8e-0b2a-4c3d-8e4f-333333333333', registradoSinConexion: true, cerradaEn,
+    };
+    const a = await c.http.post(`/api/ordenes/${o.id}/cerrar`).set(c.auth(tec1.token)).send(body);
+    expect(a.status).toBe(201);
+    const b = await c.http.post(`/api/ordenes/${o.id}/cerrar`).set(c.auth(tec1.token)).send(body);
+    expect(b.body.duplicado).toBe(true);
+    expect((await c.http.get(`/api/repuestos/${repId}`).set(c.auth(c.admin))).body.stock).toBe(-2);
+    const d = await c.http.get(`/api/ordenes/${o.id}`).set(c.auth(c.admin));
+    expect(d.body).toMatchObject({ estado: 'CERRADA', cerradaSinConexion: true });
+    expect(d.body.eventos.at(-1).nota).toMatch(/sin conexión/);
+    const bit = await c.http.get(`/api/bitacora?entidad=repuesto&entidadId=${repId}`).set(c.auth(c.admin));
+    expect(bit.body.items[0].accion).toBe('STOCK_NEGATIVO');
+  });
+
+  it('D-01 · si otro ya cambió la orden, el cierre sincronizado se rechaza con un mensaje claro', async () => {
+    const o2 = (await c.http.post('/api/ordenes').set(c.auth(op1.token)).send({ activoId, descripcion: 'Falla en conflicto', maquinaParada: false })).body;
+    await c.http.post(`/api/ordenes/${o2.id}/asignar`).set(c.auth(c.admin)).send({ tecnicoId: tec1.id }).expect(201);
+    await c.http.post(`/api/ordenes/${o2.id}/iniciar`).set(c.auth(tec1.token)).expect(201);
+    await c.http.post(`/api/ordenes/${o2.id}/cancelar`).set(c.auth(c.admin)).send({ motivo: 'Duplicada' }).expect(201);
+    const r = await c.http.post(`/api/ordenes/${o2.id}/cerrar`).set(c.auth(tec1.token)).send({
+      trabajoRealizado: 'Trabajo hecho sin señal', repuestosUsados: [{ repuestoId: repId, cantidad: 1 }], manoObra: [], clientId: '9a1d1f8e-0b2a-4c3d-8e4f-444444444444', registradoSinConexion: true,
+    });
+    expect(r.status).toBe(400);
+    expect(r.body.message).toMatch(/cancelada no puede pasar a cerrada/);
+    expect((await c.http.get(`/api/repuestos/${repId}`).set(c.auth(c.admin))).body.stock).toBe(-2); // nada se descontó
+  });
+
+  it('una foto reenviada con el mismo clientId no se duplica', async () => {
+    const o3 = (await c.http.post('/api/ordenes').set(c.auth(op1.token)).send({ activoId, descripcion: 'Falla con foto offline', maquinaParada: false })).body;
+    const url = `/api/ordenes/${o3.id}/fotos?momento=REPORTE&clientId=5c2e8b1a-7d3f-4a9b-8c1e-555555555555`;
+    const a = await c.http.post(url).set(c.auth(op1.token)).attach('archivo', JPG, { filename: 'f.jpg', contentType: 'image/jpeg' });
+    const b = await c.http.post(url).set(c.auth(op1.token)).attach('archivo', JPG, { filename: 'f.jpg', contentType: 'image/jpeg' });
+    expect(a.status).toBe(201);
+    expect(b.body).toMatchObject({ id: a.body.id, duplicado: true });
+    expect((await c.http.get(`/api/ordenes/${o3.id}`).set(c.auth(op1.token))).body.fotos).toHaveLength(1);
+  });
+});
+
 describe('MNT-05/06/08 · Preventivos', () => {
   let planId: string;
   let otPrev: string;

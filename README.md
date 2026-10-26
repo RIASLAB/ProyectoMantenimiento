@@ -1,8 +1,8 @@
 # CMMS – Nutrialimentos Cárnicos S.A.S.
 
-Sistema de mantenimiento e inventario de repuestos: hoja de vida de máquinas, mantenimientos preventivos y correctivos, inventario, solicitudes de compra, registros de calidad HACCP/BPM e indicadores. Funciona en celular, tablet y PC, y tendrá modo sin conexión para la planta.
+Sistema de mantenimiento e inventario de repuestos: hoja de vida de máquinas, mantenimientos preventivos y correctivos, inventario, solicitudes de compra, registros de calidad HACCP/BPM e indicadores. Funciona en celular, tablet y PC, y trabaja sin conexión en la planta.
 
-## Estado actual (Sprint 2 terminado)
+## Estado actual (Sprint 3 en curso: modo sin conexión listo)
 
 | Módulo | Estado |
 |---|---|
@@ -21,7 +21,7 @@ Sistema de mantenimiento e inventario de repuestos: hoja de vida de máquinas, m
 | Hoja de vida y costo acumulado por máquina | ✅ Sprint 2 |
 | Solicitudes de compra: automáticas por faltante, aprobación, compra y recepción | ✅ Sprint 2 |
 | Calidad: temperaturas con límites críticos, checklists HACCP/BPM, anulaciones, exportación | ✅ Sprint 2 |
-| Modo offline y sincronización | ⏳ Sprint 3 |
+| Modo sin conexión: fallas con foto, temperaturas, checklists y ejecución/cierre de OT; sincronización automática | ✅ Sprint 3 |
 | Notificaciones (push / bandeja en la app) | ⏳ Sprint 3 |
 | Indicadores (KPIs) y carga masiva desde Excel | ⏳ Sprint 3 |
 
@@ -31,7 +31,7 @@ Las decisiones que se asumieron mientras los líderes del proceso las definen es
 ## Tecnologías
 
 - **Backend:** NestJS 11 (Node.js 22), TypeORM, PostgreSQL 16.
-- **Frontend:** React 19 + Vite + TanStack Query, como PWA instalable. Sin fuentes ni recursos externos, para que pueda funcionar sin internet en el Sprint 3.
+- **Frontend:** React 19 + Vite + TanStack Query, como PWA instalable. Sin fuentes ni recursos externos; el service worker guarda la app y Dexie (IndexedDB) guarda los datos y la cola de envíos.
 - **Seguridad:** JWT, bcrypt, Helmet, validación estricta de entradas, registros inmutables en base de datos.
 
 ## Puesta en marcha (desarrollo)
@@ -72,9 +72,9 @@ cd backend
 npm run test:e2e
 ```
 
-Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **91 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
+Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **95 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
 
-Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**43 verificaciones**):
+Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**53 verificaciones**):
 
 | Script | Qué recorre |
 |---|---|
@@ -82,6 +82,7 @@ Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritori
 | `e2e/ordenes.py` | Operario reporta falla en el celular → admin asigna → técnico cierra con repuestos y horas → hoja de vida |
 | `e2e/compras.py` | Faltante automático → autorizador aprueba/rechaza → admin compra y recibe en bodega |
 | `e2e/calidad.py` | Temperatura fuera de rango, checklist con no conformidad, anulación, exportación, configuración |
+| `e2e/sin_conexion.py` | Se corta la red en el celular: la app abre, se cierra una OT, se registran temperatura y falla con foto; al volver la señal todo se envía solo y un conflicto queda a la vista |
 
 Cada script necesita los datos de demostración recién cargados (`npm run seed -- --demo` sobre una base limpia) y el frontend compilado y servido (`npm run build && npm run preview`).
 
@@ -131,4 +132,5 @@ Todas las rutas van bajo `/api` y requieren `Authorization: Bearer <token>`, sal
 - **Permisos en el servidor:** ocultar un botón no es seguridad; cada endpoint valida el rol.
 - **Todo cambio crítico va a la bitácora** en la misma transacción que el cambio.
 - **Registros de auditoría y calidad inalterables:** bitácora, movimientos de inventario, historial de OT, temperaturas, checklists y anulaciones tienen un trigger en PostgreSQL que impide editarlos o borrarlos.
-- **Listo para offline:** reportes de falla, temperaturas, checklists y movimientos aceptan un `clientId` generado en el dispositivo y la hora real del registro, así un reenvío al sincronizar no duplica nada.
+- **Sin conexión de verdad:** reportes de falla (con foto), temperaturas, checklists, fotos de OT y los cambios de estado y cierre de una OT se guardan en el dispositivo y se envían solos, en orden, cada 20 s o en cuanto vuelve la señal. Cada uno lleva un `clientId` generado en el dispositivo y la hora real del registro, así un reenvío nunca duplica nada.
+- **Modo sin conexión solo con la app compilada:** el service worker no funciona con `npm run dev`. Para probarlo use `npm run build && npm run preview` (o el despliegue con HTTPS).

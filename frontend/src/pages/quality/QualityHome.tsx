@@ -4,7 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { api, openProtectedFile, qs } from '../../api/client';
 import type { ChecklistRecordInfo, ChecklistTemplateInfo, ControlPointInfo, QualitySummary, TemperatureRecordInfo } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
-import { Badge, Button, Empty, ErrorBox, Field, Icon, Input, Modal, PageHeader, Spinner, Textarea } from '../../components/ui';
+import { SavedOfflineNotice, Badge, Button, Empty, ErrorBox, Field, Icon, Input, Modal, PageHeader, Spinner, Textarea } from '../../components/ui';
 import { dateTime, hace, qty, rangoTexto } from '../../format';
 import { useUrlFilters } from '../../hooks';
 
@@ -68,6 +68,7 @@ export function QualityHome() {
         title="Calidad HACCP / BPM"
         actions={can('ADMIN') ? <Link to="/calidad/configuracion" className="btn btn-ghost"><Icon name="settings" /> Configuración</Link> : null}
       />
+      <SavedOfflineNotice que={(location.state as { guardadoSinConexion?: string } | null)?.guardadoSinConexion} />
       {guardado ? <div className="alert alert-ok">Checklist “{guardado}” guardado.</div> : null}
 
       <div className="quick-actions">

@@ -1,4 +1,8 @@
+import { db } from '../offline/db';
+
 const TOKEN_KEY = 'cmms.token';
+/** Con señal débil una petición puede quedarse colgada: pasado este tiempo se trata como "sin conexión". */
+const TIMEOUT_MS = 15_000;
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -21,6 +25,21 @@ export const tokenStore = {
 /** Se dispara cuando la API responde 401: la sesión expiró o el usuario fue desactivado. */
 export const SESSION_EXPIRED = 'cmms:session-expired';
 
+/** Estado de conexión observado (navigator.onLine no es confiable: se combina con el resultado real de las peticiones). */
+export const CONEXION = 'cmms:conexion';
+let enLinea = typeof navigator === 'undefined' ? true : navigator.onLine;
+export const estaEnLinea = () => enLinea;
+function marcarConexion(valor: boolean) {
+  if (valor !== enLinea) {
+    enLinea = valor;
+    window.dispatchEvent(new Event(CONEXION));
+  }
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => marcarConexion(true));
+  window.addEventListener('offline', () => marcarConexion(false));
+}
+
 type Body = object | FormData | undefined;
 
 async function raw(path: string, init: { method?: string; body?: Body } = {}): Promise<Response> {
@@ -35,11 +54,17 @@ async function raw(path: string, init: { method?: string; body?: Body } = {}): P
   }
 
   let res: Response;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
-    res = await fetch(`/api${path}`, { method: init.method ?? 'GET', headers, body });
+    res = await fetch(`/api${path}`, { method: init.method ?? 'GET', headers, body, signal: ctrl.signal });
   } catch {
+    marcarConexion(false);
     throw new ApiError(0, 'No hay conexión con el servidor. Revise la red e intente de nuevo.');
+  } finally {
+    clearTimeout(timer);
   }
+  marcarConexion(true);
 
   if (!res.ok) {
     let message = `Error ${res.status}`;
@@ -54,9 +79,28 @@ async function raw(path: string, init: { method?: string; body?: Body } = {}): P
   return res;
 }
 
+/** Respuestas que no se guardan para uso sin conexión (archivos y datos que cambian por segundo). */
+const NO_CACHEAR = [/\/exportar/, /\/archivo$/, /\/bitacora/];
+
 export const api = {
+  /**
+   * GET con respaldo local (OFF-04): cada respuesta se guarda en el dispositivo y, si no hay conexión,
+   * se devuelve la última copia guardada.
+   */
   async get<T>(path: string): Promise<T> {
-    return (await raw(path)).json();
+    const cacheable = !NO_CACHEAR.some((r) => r.test(path));
+    try {
+      const data = (await (await raw(path)).json()) as T;
+      if (cacheable) db.cache.put({ key: path, data, guardadoEn: Date.now() }).catch(() => undefined);
+      return data;
+    } catch (e) {
+      if (cacheable && e instanceof ApiError && e.status === 0) {
+        const c = await db.cache.get(path).catch(() => undefined);
+        if (c) return c.data as T;
+        throw new ApiError(0, 'Sin conexión y sin datos guardados para esta pantalla. Ábrala una vez con señal.');
+      }
+      throw e;
+    }
   },
   async post<T>(path: string, body?: Body): Promise<T> {
     return (await raw(path, { method: 'POST', body })).json();
@@ -66,6 +110,9 @@ export const api = {
   },
   async put<T>(path: string, body: Body): Promise<T> {
     return (await raw(path, { method: 'PUT', body })).json();
+  },
+  async send<T>(method: 'POST' | 'PUT', path: string, body?: Body): Promise<T> {
+    return (await raw(path, { method, body })).json();
   },
   /** Descarga un archivo protegido (requiere token) como Blob. */
   async blob(path: string): Promise<Blob> {

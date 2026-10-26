@@ -3,7 +3,9 @@ import { FormEvent, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, uuid } from '../../api/client';
 import type { Asset, ChecklistItemInfo, ChecklistTemplateInfo } from '../../api/types';
+import { useAuth } from '../../auth/AuthContext';
 import { Button, ErrorBox, Field, Icon, Input, PageHeader, Select, Spinner, Textarea } from '../../components/ui';
+import { enviarOEncolar } from '../../offline/outbox';
 
 type Valor = string;
 
@@ -28,23 +30,28 @@ export function FillChecklist() {
   const [obs, setObs] = useState('');
   const [accion, setAccion] = useState('');
   const [clientId] = useState(() => uuid());
+  const { user } = useAuth();
 
   const p = useQuery({ queryKey: ['calidad', 'plantilla', id], queryFn: () => api.get<ChecklistTemplateInfo>(`/calidad/plantillas/${id}`) });
   const activos = useQuery({ queryKey: ['activos', '', '', ''], queryFn: () => api.get<Asset[]>('/activos'), enabled: !!p.data && !p.data.activoId });
 
   const noConformes = p.data?.items.filter((i) => conforme(i, valores[i.id]) === false) ?? [];
   const m = useMutation({
-    mutationFn: () => api.post('/calidad/checklists', {
+    mutationFn: () => enviarOEncolar({
+      usuarioId: user!.id, tipo: 'checklist', method: 'POST', path: '/calidad/checklists',
+      resumen: `${p.data!.nombre}${noConformes.length ? ` (${noConformes.length} no conforme${noConformes.length === 1 ? '' : 's'})` : ''}`,
+      body: {
       plantillaId: id,
       activoId: activoId || undefined,
       respuestas: p.data!.items.map((i) => ({ itemId: i.id, valor: valores[i.id] === undefined || valores[i.id] === '' ? null : i.tipo === 'NUMERO' ? Number(valores[i.id]) : valores[i.id] })),
       observaciones: obs || undefined,
       accionCorrectiva: noConformes.length ? accion : undefined,
       clientId,
-    }),
-    onSuccess: () => {
+      registradoEn: new Date().toISOString(),
+    } }),
+    onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['calidad'] });
-      nav('/calidad?vista=checklists', { state: { guardado: p.data!.nombre } });
+      nav('/calidad?vista=checklists', { state: r.encolado ? { guardadoSinConexion: `El checklist “${p.data!.nombre}”` } : { guardado: p.data!.nombre } });
     },
   });
   const set = (k: string, v: string) => setValores((s) => ({ ...s, [k]: v }));

@@ -452,3 +452,15 @@ details summary::-webkit-details-marker { display: none; }
 .more-link { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 12px; border-radius: 10px; text-decoration: none; font-weight: 600; }
 .more-link.active { background: var(--surface-2); color: var(--brand); }
 button.tab-link { border: 0; background: none; font: inherit; font-size: 0.72rem; cursor: pointer; }
+
+/* ---------- Conexión y pendientes ---------- */
+.conn {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border-radius: 999px;
+  font-size: 0.82rem; font-weight: 700; text-decoration: none; white-space: nowrap;
+}
+.conn-offline { background: #3a3f3c; color: #fff; }
+.conn-warn { background: var(--accent); color: #1b1f1c; }
+.conn-bad { background: var(--bad); color: #fff; }
+.sidebar .conn { margin: 0 8px; justify-content: center; }
+.topbar .conn.compact { min-height: 32px; padding: 0 10px; font-size: 0.75rem; max-width: 46vw; overflow: hidden; }
+.topbar .conn.compact span { overflow: hidden; text-overflow: ellipsis; }

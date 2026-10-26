@@ -74,6 +74,17 @@ export class CloseOrderDto {
   /** Hora en que la máquina volvió a operar. Obligatoria si la máquina estaba parada. */
   @IsOptional() @IsDateString()
   finParada?: string;
+
+  /** UUID generado en el dispositivo: un cierre reenviado al sincronizar no se aplica dos veces. */
+  @IsOptional() @IsUUID()
+  clientId?: string;
+
+  /** El técnico cerró sin señal; la hora real del cierre es `cerradaEn`. */
+  @IsOptional() @IsBoolean()
+  registradoSinConexion?: boolean;
+
+  @IsOptional() @IsDateString()
+  cerradaEn?: string;
 }
 
 export class PlannedPartsDto {

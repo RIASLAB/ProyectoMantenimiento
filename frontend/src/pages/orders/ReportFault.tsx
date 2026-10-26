@@ -4,7 +4,9 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, uuid } from '../../api/client';
 import type { Asset, Prioridad } from '../../api/types';
 import { Button, ErrorBox, Field, Icon, PageHeader, Select, Spinner, Textarea } from '../../components/ui';
+import { useAuth } from '../../auth/AuthContext';
 import { PRIORIDAD_LABEL } from '../../format';
+import { comprimirFoto, enviarOEncolar } from '../../offline/outbox';
 
 const MAX_MB = 20;
 
@@ -20,6 +22,8 @@ export function ReportFault() {
   const [foto, setFoto] = useState<File | null>(null);
   const [fotoError, setFotoError] = useState('');
   const [clientId] = useState(() => uuid());
+  const [fotoClientId] = useState(() => uuid());
+  const { user } = useAuth();
 
   const activos = useQuery({ queryKey: ['activos', '', '', ''], queryFn: () => api.get<Asset[]>('/activos') });
   const porArea = useMemo(() => {
@@ -30,26 +34,26 @@ export function ReportFault() {
 
   const m = useMutation({
     mutationFn: async () => {
-      const o = await api.post<{ id: string; codigo: string }>('/ordenes', {
-        activoId, descripcion, maquinaParada: parada, prioridad: prioridad || undefined, clientId,
+      // OFF-01/07: el reporte (y su foto, reducida) se envía de inmediato o queda guardado si no hay señal.
+      const activo = activos.data?.find((a) => a.id === activoId);
+      const blob = foto ? await comprimirFoto(foto) : null;
+      const r = await enviarOEncolar<{ id: string; codigo: string }>({
+        usuarioId: user!.id,
+        tipo: 'reporte',
+        resumen: `${activo?.codigo ?? 'Máquina'}: ${descripcion.slice(0, 80)}${parada ? ' (máquina parada)' : ''}`,
+        method: 'POST',
+        path: '/ordenes',
+        body: { activoId, descripcion, maquinaParada: parada, prioridad: prioridad || undefined, clientId, reportadoEn: new Date().toISOString() },
+        foto: blob ? { blob, nombre: 'falla.jpg', momento: 'REPORTE', clientId: fotoClientId } : undefined,
       });
-      let fotoFallo = false;
-      if (foto) {
-        const fd = new FormData();
-        fd.append('archivo', foto);
-        try {
-          await api.post(`/ordenes/${o.id}/fotos?momento=REPORTE`, fd);
-        } catch {
-          fotoFallo = true;
-        }
-      }
-      return { ...o, fotoFallo };
+      return r;
     },
-    onSuccess: (o) => {
+    onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['ordenes'] });
       qc.invalidateQueries({ queryKey: ['ordenes-resumen'] });
       qc.invalidateQueries({ queryKey: ['activos'] });
-      nav(`/ordenes/${o.id}`, { replace: true, state: { reportada: o.codigo, fotoFallo: o.fotoFallo } });
+      if (r.encolado) nav('/ordenes', { replace: true, state: { guardadoSinConexion: 'El reporte de falla' } });
+      else nav(`/ordenes/${r.respuesta.id}`, { replace: true, state: { reportada: r.respuesta.codigo } });
     },
   });
 

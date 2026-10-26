@@ -80,9 +80,21 @@ Estado al cierre del Sprint 2 frente a la matriz (`Matriz_Requisitos_CMMS_Nutria
 | SEG-06 | Seguridad técnica | 🟡 | — | Bloqueo por intentos, bcrypt, hashes nunca expuestos | HTTPS y respaldos cifrados (despliegue) |
 | GEN-01 | Celular, tablet y PC | — | ✅ | 1366 px, Pixel 7 e iPhone 13; sin desplazamiento horizontal; "Más" cuando no caben las pestañas | — |
 | GEN-02 | Español | — | ✅ | Todos los textos y errores | Prueba de usabilidad con operarios |
-| OFF-02 | Sin duplicados al reenviar | 🟡 | 🟡 | `clientId` en fallas, temperaturas, checklists y movimientos | Sincronización completa (Sprint 3) |
 | INT-02 | Código SAP | ✅ | ✅ | Campo `codigoSap` | Acordar codificación (D-13) |
+
+## Modo sin conexión (Sprint 3)
+
+| ID | Requisito | API | Pantalla | Evidencia | Falta |
+|---|---|---|---|---|---|
+| OFF-01 | Registro sin conexión | ✅ | ✅ | Fallas, temperaturas, checklists, inicio/pausa/cierre de OT y fotos se guardan en el dispositivo; la hora real viaja con el registro (`e2e/sin_conexion.py`) | Probar en la planta con los celulares reales |
+| OFF-02 | Sincronización automática sin duplicados | ✅ | ✅ | Cola en orden cada 20 s y al volver la señal; `clientId` en todo (prueba API "OFF · Sincronización") | — |
+| OFF-03 | Indicador de conexión y pendientes | — | ✅ | "Sin conexión", "N por enviar" o "N con error" en la barra; pantalla *Pendientes* | — |
+| OFF-04 | Consulta sin conexión | — | ✅ | Máquinas, repuestos, OT abiertas, puntos de control y plantillas se descargan al ingresar y cada 10 min | — |
+| OFF-05 | Regla de conflictos | ✅ | ✅ | D-01: gana el primero; el conflicto queda con su motivo para reintentar o descartar | Confirmar D-01 con Carlos |
+| OFF-06 | Consumos sin stock | ✅ | ✅ | D-02: el cierre sin conexión descuenta igual y alerta `STOCK_NEGATIVO` | — |
+| OFF-07 | Fotos sin conexión | ✅ | ✅ | Foto comprimida guardada en el dispositivo y subida al sincronizar, sin duplicar | — |
+| OFF-08 | Persistencia | — | ✅ | IndexedDB: los pendientes sobreviven a recargar o cerrar la app; aviso antes de salir de la sesión | — |
 
 ## Pendiente para el Sprint 3
 
-Modo sin conexión con sincronización (OFF-01 a OFF-08), notificaciones (NOT-01/02), indicadores (KPI-01 a KPI-07), carga masiva desde Excel (INT-01), respaldos y despliegue (NFR-01/03).
+Notificaciones (NOT-01/02), indicadores (KPI-01 a KPI-07), carga masiva desde Excel (INT-01), respaldos y despliegue (NFR-01/03).

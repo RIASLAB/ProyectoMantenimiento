@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes, useEffect, useId, useRef } from 'react';
 
 type Tone = 'ok' | 'warn' | 'bad' | 'muted' | 'info';
@@ -147,5 +148,15 @@ export function Icon({ name, size = 20 }: { name: keyof typeof PATHS | string; s
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d={PATHS[name]} />
     </svg>
+  );
+}
+
+/** Aviso tras guardar algo sin señal (llega por el estado de navegación). */
+export function SavedOfflineNotice({ que }: { que?: string }) {
+  if (!que) return null;
+  return (
+    <div className="alert alert-warn" role="status">
+      <span>{que} quedó guardado en este dispositivo porque no hay señal. Se enviará solo al recuperar la conexión. <Link to="/pendientes">Ver pendientes</Link></span>
+    </div>
   );
 }

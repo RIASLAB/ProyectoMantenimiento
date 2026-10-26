@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { api } from '../../api/client';
+import { api, uuid } from '../../api/client';
 import type { MomentoFoto, PersonRef, Purchase, WorkOrderDetail } from '../../api/types';
 import { NewPurchaseModal } from '../purchases/NewPurchaseModal';
+import { db } from '../../offline/db';
+import { comprimirFoto, enviarOEncolar, usePendientes } from '../../offline/outbox';
 import { useAuth } from '../../auth/AuthContext';
 import { OrderBadges, PartRow, PartRows, rowsToPayload, useProtectedImage } from '../../components/orders-shared';
 import { Badge, Button, Empty, ErrorBox, Field, Icon, Input, KeyValue, Modal, PageHeader, Select, Spinner, Textarea } from '../../components/ui';
@@ -24,6 +26,57 @@ function useOrderMutation<T>(id: string, fn: (body: T) => Promise<unknown>, onDo
       qc.invalidateQueries({ queryKey: ['activo'] });
       qc.invalidateQueries({ queryKey: ['repuestos'] });
       qc.invalidateQueries({ queryKey: ['compras'] });
+      onDone?.();
+    },
+  });
+}
+
+type Accion = 'iniciar' | 'esperar-repuesto' | 'reanudar' | 'cerrar';
+type Acciones = WorkOrderDetail['acciones'];
+const SIGUIENTE: Record<Accion, { estado: WorkOrderDetail['estado']; acciones: Partial<Acciones>; texto: string }> = {
+  iniciar: { estado: 'EN_EJECUCION', acciones: { iniciar: false, esperarRepuesto: true, cerrar: true, reanudar: false }, texto: 'Iniciar trabajo' },
+  'esperar-repuesto': { estado: 'ESPERANDO_REPUESTO', acciones: { esperarRepuesto: false, cerrar: false, reanudar: true }, texto: 'Pausar: esperando repuesto' },
+  reanudar: { estado: 'EN_EJECUCION', acciones: { reanudar: false, esperarRepuesto: true, cerrar: true }, texto: 'Reanudar trabajo' },
+  cerrar: {
+    estado: 'CERRADA',
+    acciones: { asignar: false, tomar: false, iniciar: false, esperarRepuesto: false, reanudar: false, cerrar: false, cancelar: false, editarRepuestos: false, subirFotos: false },
+    texto: 'Cerrar orden',
+  },
+};
+
+/**
+ * Acciones del técnico sobre la OT con soporte sin conexión (OFF-01): si no hay señal, la acción queda guardada
+ * y la pantalla muestra el nuevo estado de inmediato, para poder seguir (p. ej. iniciar y luego cerrar).
+ */
+function useAccionOT(orden: WorkOrderDetail | undefined, onDone?: () => void) {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async ({ accion, body }: { accion: Accion; body?: object }) => {
+      const o = orden!;
+      const r = await enviarOEncolar(
+        { usuarioId: user!.id, tipo: 'accion-orden', resumen: `${o.codigo}: ${SIGUIENTE[accion].texto}`, method: 'POST', path: `/ordenes/${o.id}/${accion}`, body, ordenId: o.id },
+        // Al cerrar sin señal, el servidor registra el consumo aunque falte stock (D-02).
+        (b) => (accion === 'cerrar' ? { ...(b as object), registradoSinConexion: true } : b),
+      );
+      return { ...r, accion };
+    },
+    onSuccess: async (r) => {
+      const o = orden!;
+      if (r.encolado) {
+        const key = `/ordenes/${o.id}`;
+        const sig = SIGUIENTE[r.accion];
+        const nuevo = (d: WorkOrderDetail | undefined) => d && { ...d, estado: sig.estado, acciones: { ...d.acciones, ...sig.acciones } };
+        qc.setQueryData(['orden', o.id], nuevo);
+        const c = await db.cache.get(key);
+        if (c) await db.cache.put({ ...c, data: nuevo(c.data as WorkOrderDetail) });
+      } else {
+        qc.invalidateQueries({ queryKey: ['orden', o.id] });
+      }
+      qc.invalidateQueries({ queryKey: ['ordenes'] });
+      qc.invalidateQueries({ queryKey: ['ordenes-resumen'] });
+      qc.invalidateQueries({ queryKey: ['activos'] });
+      qc.invalidateQueries({ queryKey: ['repuestos'] });
       onDone?.();
     },
   });
@@ -53,9 +106,11 @@ function AssignModal({ o, open, onClose }: { o: WorkOrderDetail; open: boolean; 
 
 function NoteModal({ o, open, onClose, kind }: { o: WorkOrderDetail; open: boolean; onClose: () => void; kind: 'esperar' | 'cancelar' }) {
   const [texto, setTexto] = useState('');
-  const m = useOrderMutation(o.id, () =>
-    kind === 'esperar' ? api.post(`/ordenes/${o.id}/esperar-repuesto`, { nota: texto || undefined }) : api.post(`/ordenes/${o.id}/cancelar`, { motivo: texto }),
-    () => { setTexto(''); onClose(); });
+  const cancelarM = useOrderMutation(o.id, () => api.post(`/ordenes/${o.id}/cancelar`, { motivo: texto }), () => { setTexto(''); onClose(); });
+  const esperarM = useAccionOT(o, () => { setTexto(''); onClose(); });
+  const m = kind === 'esperar'
+    ? { ...esperarM, mutate: () => esperarM.mutate({ accion: 'esperar-repuesto', body: { nota: texto || undefined } }) }
+    : cancelarM;
   return (
     <Modal open={open} title={kind === 'esperar' ? 'En espera de repuesto' : 'Cancelar orden'} onClose={onClose}
       footer={<><Button variant="ghost" onClick={onClose}>Volver</Button><Button variant={kind === 'cancelar' ? 'danger' : 'primary'} busy={m.isPending} disabled={kind === 'cancelar' && texto.trim().length < 3} onClick={() => m.mutate(undefined)}>{kind === 'esperar' ? 'Pausar trabajo' : 'Cancelar orden'}</Button></>}>
@@ -103,17 +158,20 @@ function CloseModal({ o, open, onClose }: { o: WorkOrderDetail; open: boolean; o
     setFinInicial(ahora);
   }, [open, o.repuestos, o.asignadoA, user]);
 
-  const m = useOrderMutation(o.id, () =>
-    api.post(`/ordenes/${o.id}/cerrar`, {
+  const [clientId] = useState(() => uuid());
+  const accion = useAccionOT(o, onClose);
+  const m = { ...accion, mutate: () => accion.mutate({ accion: 'cerrar', body: {
       trabajoRealizado: trabajo,
       repuestosUsados: rowsToPayload(rows),
       manoObra: labor.filter((l) => l.tecnicoId && Number(l.horas) > 0).map((l) => ({ tecnicoId: l.tecnicoId, horas: Number(l.horas) })),
       costoServiciosExternos: externos ? Number(externos) : undefined,
       // Si no se cambió la hora sugerida, se envía el momento exacto (con segundos).
       finParada: o.maquinaParada ? (fin === finInicial ? new Date() : new Date(fin)).toISOString() : undefined,
-    }), onClose);
+      cerradaEn: new Date().toISOString(),
+      clientId,
+    } }) };
 
-  const submit = (e: FormEvent) => { e.preventDefault(); m.mutate(undefined); };
+  const submit = (e: FormEvent) => { e.preventDefault(); m.mutate(); };
 
   return (
     <Modal open={open} title={`Cerrar ${o.codigo}`} onClose={onClose}
@@ -182,14 +240,18 @@ export function OrderDetail() {
   const llegada = location.state as { reportada?: string; fotoFallo?: boolean } | null;
 
   const q = useQuery({ queryKey: ['orden', id], queryFn: () => api.get<WorkOrderDetail>(`/ordenes/${id}`) });
-  const simple = useOrderMutation<string>(id!, (accion) => api.post(`/ordenes/${id}/${accion}`));
+  const pendientesOT = usePendientes(user?.id).filter((i) => i.ordenId === id);
+  const simple = useAccionOT(q.data);
   const tomar = useOrderMutation<string>(id!, (me) => api.post(`/ordenes/${id}/asignar`, { tecnicoId: me }));
 
   const subir = useMutation({
-    mutationFn: (f: File) => {
-      const fd = new FormData();
-      fd.append('archivo', f);
-      return api.post(`/ordenes/${id}/fotos?momento=${momento}`, fd);
+    mutationFn: async (f: File) => {
+      if (!['image/jpeg', 'image/png'].includes(f.type)) throw new Error('La foto debe ser JPG o PNG');
+      const blob = await comprimirFoto(f);
+      return enviarOEncolar({
+        usuarioId: user!.id, tipo: 'foto-orden', resumen: `Foto (${momento.toLowerCase()}) de la orden`, method: 'POST',
+        path: `/ordenes/${id}/fotos`, ordenId: id, foto: { blob, nombre: 'foto.jpg', momento, clientId: uuid() },
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['orden', id] }),
     onError: (e) => setFotoError(e.message),
@@ -220,13 +282,20 @@ export function OrderDetail() {
       />
 
       {llegada?.reportada ? <div className="alert alert-ok">Falla reportada como {llegada.reportada}. El equipo de mantenimiento ya fue avisado.</div> : null}
-      {llegada?.fotoFallo ? <div className="alert alert-warn">La foto no se pudo subir. Puede adjuntarla abajo.</div> : null}
+      {pendientesOT.length ? (
+        <div className="alert alert-warn">
+          <span>
+            <strong>Guardado en este dispositivo, sin enviar:</strong> {pendientesOT.map((p) => p.resumen.replace(`${o.codigo}: `, '')).join(' · ')}.
+            {' '}Se enviará{pendientesOT.length === 1 ? '' : 'n'} al recuperar la señal. <Link to="/pendientes">Ver pendientes</Link>
+          </span>
+        </div>
+      ) : null}
 
       {(a.tomar || a.asignar || a.iniciar || a.esperarRepuesto || a.reanudar || a.cerrar || a.cancelar) ? (
         <div className="action-bar">
           {a.tomar ? <Button busy={tomar.isPending} onClick={() => tomar.mutate(user!.id)}><Icon name="wrench" /> Tomar esta orden</Button> : null}
-          {a.iniciar ? <Button busy={simple.isPending} onClick={() => simple.mutate('iniciar')}>Iniciar trabajo</Button> : null}
-          {a.reanudar ? <Button busy={simple.isPending} onClick={() => simple.mutate('reanudar')}>Reanudar trabajo</Button> : null}
+          {a.iniciar ? <Button busy={simple.isPending} onClick={() => simple.mutate({ accion: 'iniciar' })}>Iniciar trabajo</Button> : null}
+          {a.reanudar ? <Button busy={simple.isPending} onClick={() => simple.mutate({ accion: 'reanudar' })}>Reanudar trabajo</Button> : null}
           {a.cerrar ? <Button onClick={() => setModal('cerrar')}>Cerrar orden</Button> : null}
           {a.esperarRepuesto ? <Button variant="secondary" onClick={() => setModal('esperar')}>Esperar repuesto</Button> : null}
           {a.asignar ? <Button variant="secondary" onClick={() => setModal('asignar')}>{o.asignadoA ? 'Reasignar' : 'Asignar'}</Button> : null}

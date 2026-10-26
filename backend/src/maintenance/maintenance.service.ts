@@ -282,7 +282,19 @@ export class MaintenanceService {
     return this.ds.transaction(async (em) => {
       const o = await this.bloquear(em, id);
       this.exigirEjecutor(o, actor);
+      if (dto.clientId && o.cierreClientId === dto.clientId) {
+        return { ok: true, duplicado: true, costoRepuestos: o.costoRepuestos, costoManoObra: o.costoManoObra, siguientePreventivo: null };
+      }
+      // D-01 (asumido): gana el primero en sincronizar. Si otra persona ya cerró o canceló la orden, este cierre se rechaza.
       this.exigirTransicion(o.estado, EstadoOrden.CERRADA);
+
+      const sinConexion = !!dto.registradoSinConexion;
+      let cerradaEn = new Date();
+      if (dto.cerradaEn) {
+        cerradaEn = new Date(dto.cerradaEn);
+        if (cerradaEn.getTime() > Date.now() + 5 * 60_000) throw new BadRequestException('La hora de cierre no puede estar en el futuro');
+        if (o.iniciadaEn && cerradaEn < o.iniciadaEn) cerradaEn = o.iniciadaEn;
+      }
 
       let finParada: Date | null = null;
       if (o.maquinaParada) {
@@ -308,10 +320,11 @@ export class MaintenanceService {
         let fila = planificados.find((p) => p.repuestoId === repuestoId);
         let costoUnitario: number | null = null;
         if (cantidad > 0) {
+          // D-02: un cierre hecho sin señal registra el consumo aunque el stock quede negativo (el repuesto ya se usó).
           const r = await this.inventory.registrarMovimiento(
             { repuestoId, tipo: TipoMovimiento.SALIDA_CONSUMO, cantidad, referencia: codigo },
             actor,
-            { em },
+            { em, permitirNegativo: sinConexion },
           );
           costoUnitario = r.movimiento.costoUnitario;
           costoRepuestos += cantidad * costoUnitario;
@@ -339,13 +352,15 @@ export class MaintenanceService {
         estado: EstadoOrden.CERRADA,
         trabajoRealizado: dto.trabajoRealizado.trim(),
         finParada,
-        cerradaEn: new Date(),
+        cerradaEn,
         cerradaPorId: actor.id,
+        cierreClientId: dto.clientId ?? null,
+        cerradaSinConexion: sinConexion,
         costoRepuestos: redondear(costoRepuestos),
         costoManoObra: redondear(costoManoObra),
         costoServiciosExternos: dto.costoServiciosExternos ?? 0,
       });
-      await this.evento(em, o.id, actor, o.estado, EstadoOrden.CERRADA, 'Orden cerrada');
+      await this.evento(em, o.id, actor, o.estado, EstadoOrden.CERRADA, sinConexion ? 'Orden cerrada (sin conexión, sincronizada después)' : 'Orden cerrada');
       await this.recomputarEstadoActivo(em, o.activoId, actor);
       const siguiente = o.tipo === TipoOrden.PREVENTIVO ? await this.programarSiguiente(em, o, actor) : null;
       return { ok: true, costoRepuestos: redondear(costoRepuestos), costoManoObra: redondear(costoManoObra), siguientePreventivo: siguiente };
@@ -383,7 +398,12 @@ export class MaintenanceService {
 
   // ======================= Fotos =======================
 
-  async agregarFoto(id: string, momento: MomentoFoto, file: Express.Multer.File | undefined, actor: SessionUser) {
+  async agregarFoto(id: string, momento: MomentoFoto, file: Express.Multer.File | undefined, actor: SessionUser, clientId?: string) {
+    if (clientId) {
+      const previa = await this.ds.getRepository(WorkOrderPhoto).findOne({ where: { clientId } });
+      if (previa && previa.subidoPorId === actor.id) return { ...previa, duplicado: true };
+      if (previa) throw new BadRequestException('Identificador de foto repetido');
+    }
     const o = await this.orders.findOne({ where: { id } });
     if (!o) throw new NotFoundException('Orden de trabajo no encontrada');
     if (!Object.values(MomentoFoto).includes(momento)) throw new BadRequestException('Momento de foto inválido');
@@ -396,7 +416,7 @@ export class MaintenanceService {
     const archivo = `${randomUUID()}${tipo.ext}`;
     await writeFile(join(this.dir, archivo), file!.buffer);
     const foto = await this.ds.getRepository(WorkOrderPhoto).save({
-      ordenId: o.id, momento, archivo, mime: file!.mimetype, tamanoBytes: file!.size, subidoPorId: actor.id,
+      ordenId: o.id, momento, archivo, mime: file!.mimetype, tamanoBytes: file!.size, subidoPorId: actor.id, clientId: clientId ?? null,
     });
     const { archivo: _omit, ...publico } = foto;
     return publico;
@@ -487,6 +507,8 @@ export class MaintenanceService {
     return this.ds.transaction(async (em) => {
       const o = await this.bloquear(em, id);
       this.exigirEjecutor(o, actor);
+      // Idempotente: si la acción ya se aplicó (p. ej. un reenvío al sincronizar), no es un error.
+      if (o.estado === hacia) return { ok: true, sinCambios: true };
       if (o.estado !== desde) throw new BadRequestException(`La orden está ${ETIQUETA_ESTADO[o.estado]}; no se puede pasar a ${ETIQUETA_ESTADO[hacia]}`);
       this.exigirTransicion(o.estado, hacia);
       await em.getRepository(WorkOrder).update(o.id, { estado: hacia });

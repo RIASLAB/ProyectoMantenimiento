@@ -13,6 +13,7 @@ import { PartDetail } from './pages/inventory/PartDetail';
 import { PartForm } from './pages/inventory/PartForm';
 import { PartsList } from './pages/inventory/PartsList';
 import { Login } from './pages/Login';
+import { Pending } from './pages/Pending';
 import { OrderDetail } from './pages/orders/OrderDetail';
 import { OrdersList } from './pages/orders/OrdersList';
 import { Plans } from './pages/orders/Plans';
@@ -56,6 +57,7 @@ export function App() {
         }
       >
         <Route index element={<Home />} />
+        <Route path="pendientes" element={<Pending />} />
         <Route path="compras" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><PurchasesList /></OnlyRoles>} />
         <Route path="compras/:id" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><PurchaseDetail /></OnlyRoles>} />
         <Route path="ordenes" element={<OrdersList />} />

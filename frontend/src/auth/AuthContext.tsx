@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
-import { api, SESSION_EXPIRED, tokenStore } from '../api/client';
+import { api, ApiError, SESSION_EXPIRED, tokenStore } from '../api/client';
+import { db } from '../offline/db';
 import type { Rol, SessionUser } from '../api/types';
 
 interface AuthState {
@@ -24,6 +25,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tokenStore.set(null);
     setUser(null);
     qc.clear();
+    // Los datos guardados para trabajar sin señal se borran al salir; la cola de envíos no
+    // (se envía cuando ese mismo usuario vuelva a ingresar en este dispositivo).
+    db.cache.clear().catch(() => undefined);
   }, [qc]);
 
   // Restaura la sesión al recargar la página
@@ -32,7 +36,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api
       .get<SessionUser>('/auth/yo')
       .then(setUser)
-      .catch(() => tokenStore.set(null))
+      // Sin señal no se cierra la sesión: solo si el servidor la rechaza.
+      .catch((e) => { if (!(e instanceof ApiError && e.status === 0)) tokenStore.set(null); })
       .finally(() => setLoading(false));
   }, []);
 
