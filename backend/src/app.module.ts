@@ -18,6 +18,8 @@ import { AssetHistoryController, PlansController, WorkOrdersController } from '.
 import { MaintenanceService } from './maintenance/maintenance.service';
 import { PurchasesController } from './purchases/purchases.controller';
 import { PurchasesService } from './purchases/purchases.service';
+import { QualityController } from './quality/quality.controller';
+import { QualityService } from './quality/quality.service';
 import { SettingsController } from './settings/settings.controller';
 import { SettingsService } from './settings/settings.service';
 import { UsersController } from './users/users.controller';
@@ -54,11 +56,11 @@ class HealthController {
   ],
   controllers: [
     HealthController, AuthController, UsersController, SettingsController, AuditController,
-    AssetHistoryController, AssetsController, SparePartsController, InventoryController, WorkOrdersController, PlansController, PurchasesController,
+    AssetHistoryController, AssetsController, SparePartsController, InventoryController, WorkOrdersController, PlansController, PurchasesController, QualityController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: AuthGuard },
-    AuthService, UsersService, SettingsService, AuditService, AssetsService, InventoryService, MaintenanceService, PurchasesService,
+    AuthService, UsersService, SettingsService, AuditService, AssetsService, InventoryService, MaintenanceService, PurchasesService, QualityService,
   ],
 })
 export class AppModule {}

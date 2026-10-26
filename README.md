@@ -2,7 +2,7 @@
 
 Sistema de mantenimiento e inventario de repuestos: hoja de vida de máquinas, mantenimientos preventivos y correctivos, inventario, solicitudes de compra, registros de calidad HACCP/BPM e indicadores. Funciona en celular, tablet y PC, y tendrá modo sin conexión para la planta.
 
-## Estado actual (Sprint 1 – base del sistema, backend y pantallas)
+## Estado actual (Sprint 2 terminado)
 
 | Módulo | Estado |
 |---|---|
@@ -16,11 +16,14 @@ Sistema de mantenimiento e inventario de repuestos: hoja de vida de máquinas, m
 | Inventario: catálogo, entradas/salidas, kardex, costo promedio, conteo físico, exportación | ✅ Listo |
 | Pantallas: login, máquinas, inventario, usuarios, configuración (celular, tablet y PC) | ✅ Listo |
 | App instalable en el celular (PWA) | ✅ Listo |
-| Órdenes de trabajo y preventivos | ⏳ Sprint 2 |
-| Solicitudes de compra | ⏳ Sprint 2 |
-| Calidad: temperaturas y checklists | ⏳ Sprint 2 |
+| Órdenes de trabajo: reporte de fallas, asignación, ejecución, cierre con repuestos y mano de obra | ✅ Sprint 2 |
+| Planes preventivos con kit de repuestos, avisos y programación automática | ✅ Sprint 2 |
+| Hoja de vida y costo acumulado por máquina | ✅ Sprint 2 |
+| Solicitudes de compra: automáticas por faltante, aprobación, compra y recepción | ✅ Sprint 2 |
+| Calidad: temperaturas con límites críticos, checklists HACCP/BPM, anulaciones, exportación | ✅ Sprint 2 |
 | Modo offline y sincronización | ⏳ Sprint 3 |
-| Indicadores (KPIs) | ⏳ Sprint 3 |
+| Notificaciones (push / bandeja en la app) | ⏳ Sprint 3 |
+| Indicadores (KPIs) y carga masiva desde Excel | ⏳ Sprint 3 |
 
 El detalle requisito por requisito está en [docs/trazabilidad.md](docs/trazabilidad.md).
 Las decisiones que se asumieron mientras los líderes del proceso las definen están en [docs/decisiones-asumidas.md](docs/decisiones-asumidas.md).
@@ -47,7 +50,7 @@ cp .env.example .env        # ajustar JWT_SECRET y DATABASE_URL si aplica
 npm install
 npm run migration:run
 npm run seed                # crea el usuario "admin" y muestra su contraseña
-# npm run seed -- --demo    # opcional: usuarios, máquinas y repuestos de prueba
+# npm run seed -- --demo    # opcional: usuarios, máquinas, repuestos, órdenes, compras y calidad de prueba
 npm run start:dev           # API en http://localhost:3000/api
 
 # 3. Frontend (otra terminal)
@@ -69,9 +72,18 @@ cd backend
 npm run test:e2e
 ```
 
-Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay 34 pruebas, cada una ligada al requisito de la matriz que verifica.
+Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **91 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
 
-Además, `e2e/flujos.py` recorre los flujos principales en un navegador real, en escritorio y en celular, y verifica 19 puntos: login, permisos por rol, máquinas, documentos, movimientos, conteo, exportación, usuarios y bitácora. Las instrucciones están al inicio del archivo.
+Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**43 verificaciones**):
+
+| Script | Qué recorre |
+|---|---|
+| `e2e/flujos.py` | Login, permisos por rol, máquinas, documentos, inventario, usuarios, bitácora |
+| `e2e/ordenes.py` | Operario reporta falla en el celular → admin asigna → técnico cierra con repuestos y horas → hoja de vida |
+| `e2e/compras.py` | Faltante automático → autorizador aprueba/rechaza → admin compra y recibe en bodega |
+| `e2e/calidad.py` | Temperatura fuera de rango, checklist con no conformidad, anulación, exportación, configuración |
+
+Cada script necesita los datos de demostración recién cargados (`npm run seed -- --demo` sobre una base limpia) y el frontend compilado y servido (`npm run build && npm run preview`).
 
 ## API (resumen)
 
@@ -94,10 +106,29 @@ Todas las rutas van bajo `/api` y requieren `Authorization: Bearer <token>`, sal
 | `POST /inventario/movimientos` | Admin | Entradas, salidas y ajustes |
 | `POST /inventario/conteos` | Admin | Conteo físico con ajuste automático |
 | `GET /inventario/exportar` | Admin, Autorizador | CSV para Excel |
+| `GET /ordenes`, `GET /ordenes/:id`, `GET /ordenes/resumen` | Todos (operario: solo las suyas) | Órdenes de trabajo |
+| `POST /ordenes` | Todos | Reportar falla |
+| `POST /ordenes/:id/asignar` · `iniciar` · `esperar-repuesto` · `reanudar` · `cerrar` | Admin, técnico asignado | Ciclo de la OT |
+| `POST /ordenes/:id/cancelar` | Admin | Cancelar con motivo |
+| `PUT /ordenes/:id/repuestos` | Admin, técnico asignado | Repuestos planificados (genera faltantes) |
+| `POST /ordenes/:id/fotos?momento=` | Reportante, ejecutor | Fotos JPG/PNG |
+| `GET/POST /planes`, `PATCH /planes/:id` | Admin (crear) | Planes preventivos |
+| `GET /activos/:id/historial` | Todos | Hoja de vida y costo acumulado |
+| `GET/POST /compras`, `GET /compras/:id` | Admin, autorizador, técnico | Solicitudes de compra |
+| `POST /compras/:id/aprobar` · `rechazar` | Autorizador vigente | Decisión (nunca sobre una propia) |
+| `POST /compras/:id/comprar` · `recibir` | Admin | Compra y entrada a bodega |
+| `GET/PUT /parametros/tarifa-hora` | Admin | Tarifa de mano de obra |
+| `GET /calidad/puntos`, `POST/PATCH` | Todos / Admin | Puntos de control y límites |
+| `GET/POST /calidad/temperaturas` | Todos | Registros de temperatura |
+| `GET/POST /calidad/plantillas`, `PATCH` | Todos / Admin | Plantillas de checklist |
+| `GET/POST /calidad/checklists` | Todos | Checklists diligenciados |
+| `POST /calidad/anulaciones` | Admin | Anular un registro con motivo |
+| `GET /calidad/exportar/temperaturas` · `checklists` | Admin, Autorizador | CSV para auditoría |
 
 ## Principios de diseño
 
 - **El stock no se edita:** es la suma de movimientos inmutables. Un error se corrige con un ajuste, y queda rastro.
 - **Permisos en el servidor:** ocultar un botón no es seguridad; cada endpoint valida el rol.
 - **Todo cambio crítico va a la bitácora** en la misma transacción que el cambio.
-- **Listo para offline:** los movimientos aceptan un `clientId` generado en el dispositivo, así un reenvío al sincronizar no duplica registros.
+- **Registros de auditoría y calidad inalterables:** bitácora, movimientos de inventario, historial de OT, temperaturas, checklists y anulaciones tienen un trigger en PostgreSQL que impide editarlos o borrarlos.
+- **Listo para offline:** reportes de falla, temperaturas, checklists y movimientos aceptan un `clientId` generado en el dispositivo y la hora real del registro, así un reenvío al sincronizar no duplica nada.

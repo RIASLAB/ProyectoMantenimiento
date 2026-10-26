@@ -124,3 +124,20 @@ export const COMPRA_ESTADO_TONE: Record<EstadoCompra, 'ok' | 'warn' | 'bad' | 'm
   RECIBIDA: 'ok',
   CANCELADA: 'muted',
 };
+
+export function rangoTexto(min: number | null, max: number | null) {
+  if (min !== null && max !== null) return `${qty(min)} a ${qty(max)} °C`;
+  if (min !== null) return `mínimo ${qty(min)} °C`;
+  if (max !== null) return `máximo ${qty(max)} °C`;
+  return 'sin límites';
+}
+
+/** "hace 3 h", "hace 2 días". */
+export function hace(iso: string) {
+  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (min < 1) return 'hace un momento';
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 48) return `hace ${h} h`;
+  return `hace ${Math.round(h / 24)} días`;
+}

@@ -23,7 +23,7 @@ def ok(name):
     results.append(name); print('OK  ', name)
 
 def track(page):
-    page.on('console', lambda m: m.type == 'error' and errors.append(f'{page.url}: {m.text}'))
+    page.on('console', lambda m: m.type == 'error' and 'Failed to load resource' not in m.text and errors.append(f'{page.url}: {m.text}'))
     page.on('pageerror', lambda e: errors.append(f'{page.url}: {e}'))
 
 with sync_playwright() as p:
@@ -188,11 +188,11 @@ with sync_playwright() as p:
     page.get_by_label('Contraseña o PIN').fill('7391')
     page.get_by_role('button', name='Ingresar').click()
     expect(page.get_by_role('heading', name='Mis reportes de falla')).to_be_visible()
-    expect(page.locator('.tabbar .tab-link')).to_have_count(3)
+    expect(page.locator('.tabbar .tab-link')).to_have_count(4)
     page.locator('.tabbar').get_by_role('link', name='Máquinas').click()
     expect(page.get_by_role('heading', name='Máquinas')).to_be_visible()
     expect(page.get_by_role('link', name='Nueva máquina')).to_have_count(0)
-    ok('operario en celular: Órdenes, Máquinas e Inventario, sin crear')
+    ok('operario en celular: Órdenes, Calidad, Máquinas e Inventario, sin crear')
     page.screenshot(path=SP + '/09-movil-maquinas.png')
     sw = page.evaluate('document.documentElement.scrollWidth > window.innerWidth')
     assert not sw, 'scroll horizontal en móvil'

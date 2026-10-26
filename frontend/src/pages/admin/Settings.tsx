@@ -26,6 +26,13 @@ const ACCION_LABEL: Record<string, string> = {
   COMPRA_REALIZADA: 'Registró compra',
   COMPRA_RECIBIDA: 'Recibió compra en bodega',
   COMPRA_CANCELADA: 'Canceló solicitud de compra',
+  TEMPERATURA_FUERA_DE_RANGO: 'Temperatura fuera de rango',
+  CHECKLIST_NO_CONFORME: 'Checklist con no conformidades',
+  REGISTRO_CALIDAD_ANULADO: 'Anuló un registro de calidad',
+  PUNTO_CONTROL_CREADO: 'Creó punto de control',
+  PUNTO_CONTROL_ACTUALIZADO: 'Modificó punto de control',
+  PLANTILLA_CREADA: 'Creó plantilla de checklist',
+  PLANTILLA_ACTUALIZADA: 'Modificó plantilla de checklist',
   TARIFA_HORA_CAMBIADA: 'Cambió la tarifa de mano de obra',
   OT_CANCELADA: 'Canceló una orden de trabajo',
   ACTIVO_ESTADO_AUTOMATICO: 'Estado de máquina actualizado por una orden',
@@ -33,7 +40,7 @@ const ACCION_LABEL: Record<string, string> = {
   PLAN_ACTUALIZADO: 'Modificó plan preventivo',
 };
 
-const ENTIDADES: Array<[string, string]> = [['', 'Todo'], ['usuario', 'Usuarios'], ['parametro', 'Parámetros'], ['activo', 'Máquinas'], ['repuesto', 'Repuestos'], ['orden', 'Órdenes'], ['plan', 'Planes'], ['compra', 'Compras']];
+const ENTIDADES: Array<[string, string]> = [['', 'Todo'], ['usuario', 'Usuarios'], ['parametro', 'Parámetros'], ['activo', 'Máquinas'], ['repuesto', 'Repuestos'], ['orden', 'Órdenes'], ['plan', 'Planes'], ['compra', 'Compras'], ['calidad', 'Calidad']];
 
 function resumen(d: Record<string, unknown> | null): string {
   if (!d) return '';

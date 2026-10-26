@@ -16,6 +16,7 @@ import { SparePart } from '../inventory/spare-part.entity';
 import { PARAM_AUTORIZADOR_COMPRAS, PARAM_TARIFA_HORA, Setting } from '../settings/setting.entity';
 import { PurchaseRequest } from '../purchases/purchase-request.entity';
 import { AuditLog } from '../audit/audit-log.entity';
+import { ChecklistTemplate, ControlPoint, TemperatureRecord } from '../quality/quality.entities';
 import { MaintenancePlan, PlanPart, WorkOrder, WorkOrderEvent, WorkOrderPart } from '../maintenance/maintenance.entities';
 import { hashCredencial } from '../users/credentials';
 import { User } from '../users/user.entity';
@@ -112,6 +113,31 @@ async function main() {
         usuarioId: admin.id, accion: 'COMPRA_SOLICITADA', entidad: 'compra', entidadId: sc.id,
         detalle: { codigo: `SC-${String(sc.numero).padStart(6, '0')}`, repuesto: rod.codigo, cantidad: 6, origen: 'Manual' } as never,
       });
+    }
+
+    // Calidad: puntos de control con límites, una plantilla de checklist y algunas lecturas.
+    if ((await ds.getRepository(ControlPoint).count()) === 0) {
+      const cf = await ds.getRepository(Asset).findOneByOrFail({ codigo: 'CF-001' });
+      const hrn = await ds.getRepository(Asset).findOneByOrFail({ codigo: 'HRN-001' });
+      const camara = await ds.getRepository(ControlPoint).save({ activoId: cf.id, nombre: 'Temperatura de cámara', minimo: 0, maximo: 4, frecuenciaHoras: 4 });
+      await ds.getRepository(ControlPoint).save({ activoId: hrn.id, nombre: 'Centro térmico del producto', minimo: 72, maximo: null, frecuenciaHoras: 8 });
+      for (const [horas, valor] of [[7, 2.1], [3, 3.4]] as const) {
+        await ds.getRepository(TemperatureRecord).save({
+          puntoId: camara.id, activoId: cf.id, valor, limiteMinimo: 0, limiteMaximo: 4, fueraDeRango: false,
+          registradoEn: new Date(Date.now() - horas * 3_600_000), usuarioId: operario.id,
+        });
+      }
+      await ds.getRepository(ChecklistTemplate).save({
+        nombre: 'Pre-operacional y limpieza', area: 'Proceso',
+        descripcion: 'Antes de iniciar el turno (datos de demostración)',
+        items: [
+          { id: 'limpio', texto: '¿Superficies en contacto con alimento limpias y desinfectadas?', tipo: 'SI_NO', obligatorio: true, esperado: 'SI' },
+          { id: 'residuos', texto: '¿Hay residuos de producto del turno anterior?', tipo: 'SI_NO', obligatorio: true, esperado: 'NO' },
+          { id: 'guardas', texto: '¿Guardas de seguridad instaladas?', tipo: 'SI_NO', obligatorio: true, esperado: 'SI' },
+          { id: 'ppm', texto: 'Concentración de desinfectante (ppm)', tipo: 'NUMERO', obligatorio: true, minimo: 100, maximo: 200 },
+          { id: 'novedad', texto: 'Novedades del turno anterior', tipo: 'TEXTO', obligatorio: false },
+        ],
+      } as never);
     }
 
     console.log('Datos de demostración cargados. Usuarios: autorizador / Autoriza2026, tecnico / PIN 4826, operario / PIN 7391');

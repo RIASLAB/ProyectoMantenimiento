@@ -19,6 +19,10 @@ import { Plans } from './pages/orders/Plans';
 import { ReportFault } from './pages/orders/ReportFault';
 import { PurchaseDetail } from './pages/purchases/PurchaseDetail';
 import { PurchasesList } from './pages/purchases/PurchasesList';
+import { FillChecklist } from './pages/quality/FillChecklist';
+import { QualityHome } from './pages/quality/QualityHome';
+import { QualitySetup } from './pages/quality/QualitySetup';
+import { RecordTemperature } from './pages/quality/RecordTemperature';
 
 /** Página de inicio según el rol: el autorizador llega directo a las compras por aprobar. */
 function Home() {
@@ -58,6 +62,10 @@ export function App() {
         <Route path="ordenes/reportar" element={<ReportFault />} />
         <Route path="ordenes/planes" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><Plans /></OnlyRoles>} />
         <Route path="ordenes/:id" element={<OrderDetail />} />
+        <Route path="calidad" element={<QualityHome />} />
+        <Route path="calidad/temperatura" element={<RecordTemperature />} />
+        <Route path="calidad/checklist/:id" element={<FillChecklist />} />
+        <Route path="calidad/configuracion" element={<OnlyRoles roles={['ADMIN']}><QualitySetup /></OnlyRoles>} />
         <Route path="maquinas" element={<AssetsList />} />
         <Route path="maquinas/nueva" element={<OnlyRoles roles={['ADMIN']}><AssetForm /></OnlyRoles>} />
         <Route path="maquinas/:id" element={<AssetDetail />} />

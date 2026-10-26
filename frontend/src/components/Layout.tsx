@@ -1,14 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
-import { NavLink, Outlet } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Rol } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { ROL_LABEL } from '../format';
-import { Icon } from './ui';
+import { Icon, Modal } from './ui';
 
 /** `tab: false` = no aparece en la barra inferior del celular (se llega desde Ajustes). */
 const NAV: Array<{ to: string; label: string; icon: string; roles?: Rol[]; tab?: boolean }> = [
   { to: '/ordenes', label: 'Órdenes', icon: 'wrench' },
+  { to: '/calidad', label: 'Calidad', icon: 'thermo' },
   { to: '/compras', label: 'Compras', icon: 'cart', roles: ['ADMIN', 'AUTORIZADOR', 'TECNICO'] },
   { to: '/maquinas', label: 'Máquinas', icon: 'machine' },
   { to: '/inventario', label: 'Inventario', icon: 'box' },
@@ -27,6 +29,13 @@ export function Layout() {
     refetchInterval: 60_000,
   });
   const pendientes = compras.data?.pendientes ?? 0;
+  // En celular caben 5 pestañas; si hay más, las últimas van en "Más".
+  const tabs = items.filter((n) => n.tab !== false);
+  const visibles = tabs.length > 5 ? tabs.slice(0, 4) : tabs;
+  const resto = tabs.length > 5 ? tabs.slice(4) : [];
+  const [mas, setMas] = useState(false);
+  const location = useLocation();
+  const enResto = resto.some((n) => location.pathname.startsWith(n.to));
   const badge = (to: string) => (to === '/compras' && pendientes > 0 ? <span className="nav-badge" aria-label={`${pendientes} por aprobar`}>{pendientes}</span> : null);
 
   return (
@@ -77,13 +86,28 @@ export function Layout() {
       </main>
 
       <nav className="tabbar" aria-label="Principal">
-        {items.filter((n) => n.tab !== false).map((n) => (
+        {visibles.map((n) => (
           <NavLink key={n.to} to={n.to} className="tab-link">
             <span className="tab-icon"><Icon name={n.icon} size={22} />{badge(n.to)}</span>
             <span>{n.label}</span>
           </NavLink>
         ))}
+        {resto.length ? (
+          <button type="button" className={`tab-link ${enResto ? 'active' : ''}`} onClick={() => setMas(true)}>
+            <Icon name="more" size={22} />
+            <span>Más</span>
+          </button>
+        ) : null}
       </nav>
+      <Modal open={mas} title="Más opciones" onClose={() => setMas(false)}>
+        <nav className="more-menu" aria-label="Más opciones">
+          {resto.map((n) => (
+            <NavLink key={n.to} to={n.to} className="more-link" onClick={() => setMas(false)}>
+              <Icon name={n.icon} /> {n.label} {badge(n.to)}
+            </NavLink>
+          ))}
+        </nav>
+      </Modal>
     </div>
   );
 }

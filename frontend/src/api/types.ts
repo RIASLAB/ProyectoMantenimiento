@@ -195,3 +195,65 @@ export interface PurchaseDetail extends Purchase {
   historial: AuditItem[];
   acciones: { aprobar: boolean; rechazar: boolean; comprar: boolean; recibir: boolean; cancelar: boolean; esPropia: boolean };
 }
+
+export interface ControlPointInfo {
+  id: string;
+  nombre: string;
+  vigente: boolean;
+  activoId: string;
+  minimo: number | null;
+  maximo: number | null;
+  frecuenciaHoras: number | null;
+  activo: { id: string; codigo: string; nombre: string; area: string };
+  ultimo: { valor: number; registradoEn: string; fueraDeRango: boolean } | null;
+  atrasado: boolean;
+}
+
+export interface QualityVoidInfo { motivo: string; creadoEn: string; usuario: PersonRef }
+
+export interface TemperatureRecordInfo {
+  id: string;
+  valor: number;
+  limiteMinimo: number | null;
+  limiteMaximo: number | null;
+  fueraDeRango: boolean;
+  accionCorrectiva: string | null;
+  registradoEn: string;
+  creadoEn: string;
+  punto: { id: string; nombre: string };
+  activo: { id: string; codigo: string; nombre: string };
+  usuario: PersonRef;
+  anulacion: QualityVoidInfo | null;
+}
+
+export type TipoItem = 'SI_NO' | 'NUMERO' | 'TEXTO';
+export interface ChecklistItemInfo { id: string; texto: string; tipo: TipoItem; obligatorio: boolean; esperado?: 'SI' | 'NO'; minimo?: number | null; maximo?: number | null }
+
+export interface ChecklistTemplateInfo {
+  id: string;
+  nombre: string;
+  area: string | null;
+  activoId: string | null;
+  activo: { id: string; codigo: string; nombre: string } | null;
+  descripcion: string | null;
+  items: ChecklistItemInfo[];
+  vigente: boolean;
+}
+
+export interface ChecklistRecordInfo {
+  id: string;
+  plantillaNombre: string;
+  activo: { id: string; codigo: string; nombre: string } | null;
+  respuestas: Array<{ itemId: string; texto: string; tipo: TipoItem; valor: string | number | null; conforme: boolean }>;
+  noConformes: number;
+  observaciones: string | null;
+  accionCorrectiva: string | null;
+  registradoEn: string;
+  creadoEn: string;
+  usuario: PersonRef;
+  anulacion: QualityVoidInfo | null;
+}
+
+export interface QualitySummary {
+  temperaturas24h: number; desviaciones24h: number; checklists24h: number; checklistsNoConformes24h: number; puntosAtrasados: number;
+}
