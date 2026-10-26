@@ -141,6 +141,8 @@ const PATHS: Record<string, string> = {
   calendar: 'M4 6h16v15H4zM4 10h16M8 3v4M16 3v4',
   stop: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM9 9h6v6H9z',
   trash: 'M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3',
+  chart: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
+  bell: 'M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0',
 };
 
 export function Icon({ name, size = 20 }: { name: keyof typeof PATHS | string; size?: number }) {

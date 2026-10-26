@@ -5,7 +5,8 @@ import { DataSource, Repository } from 'typeorm';
 import { Asset } from '../assets/asset.entity';
 import { AuditService } from '../audit/audit.service';
 import { SessionUser } from '../common/auth.decorators';
-import { EstadoActivo } from '../common/enums';
+import { EstadoActivo, Rol } from '../common/enums';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   ChecklistItemDto, CreateChecklistDto, CreateControlPointDto, CreateTemperatureDto, CreateTemplateDto, RecordsQuery,
   UpdateControlPointDto, UpdateTemplateDto, VoidDto,
@@ -36,6 +37,7 @@ export class QualityService {
     @InjectRepository(Asset) private readonly assets: Repository<Asset>,
     private readonly ds: DataSource,
     private readonly audit: AuditService,
+    private readonly notif: NotificationsService,
   ) {}
 
   // ======================= Puntos de control =======================
@@ -138,6 +140,13 @@ export class QualityService {
           usuarioId: actor.id, accion: 'TEMPERATURA_FUERA_DE_RANGO', entidad: 'calidad', entidadId: r.id,
           detalle: { punto: p.nombre, activo: p.activo.codigo, valor: dto.valor, rango: this.textoRango(p), accionCorrectiva: accion },
         }, em);
+        // CAL-02 / NOT-01: aviso al responsable de calidad (asumido: los administradores).
+        await this.notif.notificar(em, { roles: [Rol.ADMIN], excluir: actor.id }, {
+          tipo: 'TEMPERATURA_FUERA_DE_RANGO',
+          titulo: `Temperatura fuera de rango: ${p.activo.codigo} · ${String(dto.valor).replace('.', ',')} °C`,
+          cuerpo: `${p.activo.nombre} — ${p.nombre} (rango ${this.textoRango(p)}). Acción: ${accion} — ${actor.nombre}`,
+          enlace: '/calidad?vista=temperaturas&desviaciones=1',
+        });
       }
       return { ...r, duplicado: false };
     });
@@ -250,6 +259,12 @@ export class QualityService {
           usuarioId: actor.id, accion: 'CHECKLIST_NO_CONFORME', entidad: 'calidad', entidadId: r.id,
           detalle: { plantilla: p.nombre, noConformes, accionCorrectiva: accion },
         }, em);
+        await this.notif.notificar(em, { roles: [Rol.ADMIN], excluir: actor.id }, {
+          tipo: 'CHECKLIST_NO_CONFORME',
+          titulo: `Checklist con ${noConformes} no conformidad${noConformes === 1 ? '' : 'es'}: ${p.nombre}`,
+          cuerpo: `Acción: ${accion} — ${actor.nombre}`,
+          enlace: '/calidad?vista=checklists&desviaciones=1',
+        });
       }
       return { ...r, duplicado: false };
     });

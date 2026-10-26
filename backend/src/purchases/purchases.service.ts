@@ -7,6 +7,7 @@ import { EstadoCompra, EstadoOrden, OrigenCompra, Rol, TipoMovimiento } from '..
 import { InventoryService } from '../inventory/inventory.service';
 import { SparePart } from '../inventory/spare-part.entity';
 import { WorkOrder, WorkOrderEvent, WorkOrderPart } from '../maintenance/maintenance.entities';
+import { Destino, NotificationsService } from '../notifications/notifications.service';
 import { PARAM_AUTORIZADOR_COMPRAS, Setting } from '../settings/setting.entity';
 import { BuyDto, CreatePurchaseDto, ListPurchasesQuery, ReceiveDto } from './purchases.dto';
 import { PurchaseRequest } from './purchase-request.entity';
@@ -28,6 +29,7 @@ export class PurchasesService {
     private readonly ds: DataSource,
     private readonly audit: AuditService,
     private readonly inventory: InventoryService,
+    private readonly notif: NotificationsService,
   ) {}
 
   // ======================= Consultas =======================
@@ -110,6 +112,7 @@ export class PurchasesService {
       );
       await this.log(em, actor, s, 'COMPRA_SOLICITADA', { repuesto: rep.codigo, cantidad: dto.cantidad, origen: 'Manual' });
       if (s.ordenId) await this.eventoOT(em, s.ordenId, actor, `Solicitud de compra ${numeroSC(s.numero)}: ${rep.codigo} × ${dto.cantidad}`);
+      await this.avisarAutorizador(em, s, rep, actor);
       return this.publico(s);
     });
   }
@@ -149,6 +152,7 @@ export class PurchasesService {
       );
       await this.log(em, actor, s, 'COMPRA_SOLICITADA', { repuesto: p.repuesto.codigo, cantidad: faltante, origen: 'Automática por faltante' });
       await this.eventoOT(em, ordenId, actor, `Solicitud de compra automática ${numeroSC(s.numero)}: ${p.repuesto.codigo} × ${faltante}`);
+      await this.avisarAutorizador(em, s, p.repuesto, actor);
       creadas.push(numeroSC(s.numero));
     }
     return creadas;
@@ -165,6 +169,8 @@ export class PurchasesService {
       await em.getRepository(PurchaseRequest).update(s.id, { estado: EstadoCompra.APROBADA, decididaPorId: actor.id, decididaEn: new Date() });
       await this.log(em, actor, s, 'COMPRA_APROBADA', {});
       if (s.ordenId) await this.eventoOT(em, s.ordenId, actor, `Compra ${numeroSC(s.numero)} aprobada`);
+      // Al solicitante, y a los administradores, que son quienes compran.
+      await this.avisar(em, s, { usuarios: [s.solicitadoPorId], roles: [Rol.ADMIN], excluir: actor.id }, 'COMPRA_APROBADA', 'aprobada', `Aprobada por ${actor.nombre}. Falta comprarla.`);
       return { ok: true };
     });
   }
@@ -178,6 +184,8 @@ export class PurchasesService {
       await em.getRepository(PurchaseRequest).update(s.id, { estado: EstadoCompra.RECHAZADA, decididaPorId: actor.id, decididaEn: new Date(), motivoRechazo: motivo.trim() });
       await this.log(em, actor, s, 'COMPRA_RECHAZADA', { motivo: motivo.trim() });
       if (s.ordenId) await this.eventoOT(em, s.ordenId, actor, `Compra ${numeroSC(s.numero)} rechazada: ${motivo.trim()}`);
+      // COM-06: el solicitante recibe el motivo.
+      await this.avisar(em, s, { usuarios: [s.solicitadoPorId, await this.tecnicoOT(em, s)], excluir: actor.id }, 'COMPRA_RECHAZADA', 'rechazada', `Motivo: ${motivo.trim()}`);
       return { ok: true };
     });
   }
@@ -217,6 +225,10 @@ export class PurchasesService {
         const listo = o?.estado === EstadoOrden.ESPERANDO_REPUESTO ? ' La orden ya puede reanudarse.' : '';
         await this.eventoOT(em, s.ordenId, actor, `Llegó el repuesto de ${codigo} (${dto.cantidadRecibida}).${listo}`);
       }
+      // COM-08: se avisa a quien la pidió (y al técnico de la OT).
+      const o = s.ordenId ? await em.getRepository(WorkOrder).findOne({ where: { id: s.ordenId } }) : null;
+      await this.avisar(em, s, { usuarios: [s.solicitadoPorId, o?.asignadoAId], excluir: actor.id }, 'COMPRA_RECIBIDA', 'recibida en bodega',
+        `Llegaron ${dto.cantidadRecibida}.${o ? ` ${numeroOT(o.numero)}${o.estado === EstadoOrden.ESPERANDO_REPUESTO ? ' ya puede reanudarse.' : ''}` : ''}`);
       return { ok: true, stockResultante: mov.stockResultante };
     });
   }
@@ -263,6 +275,26 @@ export class PurchasesService {
 
   private async log(em: EntityManager, actor: SessionUser, s: PurchaseRequest, accion: string, detalle: Record<string, unknown>) {
     await this.audit.log({ usuarioId: actor.id, accion, entidad: 'compra', entidadId: s.id, detalle: { codigo: numeroSC(s.numero), ...detalle } }, em);
+  }
+
+  /** NOT-01: una solicitud nueva le llega al autorizador vigente. */
+  private async avisarAutorizador(em: EntityManager, s: PurchaseRequest, rep: SparePart, actor: SessionUser) {
+    await this.notif.notificar(em, { usuarios: [await this.autorizadorVigente(em)], excluir: actor.id }, {
+      tipo: 'COMPRA_SOLICITADA',
+      titulo: `Solicitud de compra ${numeroSC(s.numero)}: ${rep.codigo} × ${s.cantidad}`,
+      cuerpo: `${rep.descripcion} — ${s.justificacion}`,
+      enlace: `/compras/${s.id}`,
+    });
+  }
+
+  private async avisar(em: EntityManager, s: PurchaseRequest, destino: Destino, tipo: string, que: string, cuerpo: string) {
+    const rep = await em.getRepository(SparePart).findOneOrFail({ where: { id: s.repuestoId } });
+    await this.notif.notificar(em, destino, { tipo, titulo: `Compra ${numeroSC(s.numero)} ${que}: ${rep.codigo} · ${rep.descripcion}`, cuerpo, enlace: `/compras/${s.id}` });
+  }
+
+  private async tecnicoOT(em: EntityManager, s: PurchaseRequest) {
+    if (!s.ordenId) return null;
+    return (await em.getRepository(WorkOrder).findOne({ where: { id: s.ordenId } }))?.asignadoAId ?? null;
   }
 
   private async eventoOT(em: EntityManager, ordenId: string, actor: SessionUser, nota: string) {

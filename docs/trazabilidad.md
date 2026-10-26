@@ -95,6 +95,20 @@ Estado al cierre del Sprint 2 frente a la matriz (`Matriz_Requisitos_CMMS_Nutria
 | OFF-07 | Fotos sin conexión | ✅ | ✅ | Foto comprimida guardada en el dispositivo y subida al sincronizar, sin duplicar | — |
 | OFF-08 | Persistencia | — | ✅ | IndexedDB: los pendientes sobreviven a recargar o cerrar la app; aviso antes de salir de la sesión | — |
 
+## Notificaciones e indicadores (Sprint 3)
+
+| ID | Requisito | API | Pantalla | Evidencia | Falta |
+|---|---|---|---|---|---|
+| NOT-01 | Notificaciones por evento | ✅ | ✅ | Los 6 eventos de la matriz y otros (OT asignada, stock bajo mínimo, checklist no conforme, preventivo vencido); avisos al celular por Web Push; el contador se actualiza cada 30 s (< 1 min) | Confirmar canal (D-10); configurar claves VAPID en el servidor |
+| NOT-02 | Bandeja en la app | ✅ | ✅ | Campana con contador, marcar una o todas como leídas, cada usuario ve solo las suyas | — |
+| KPI-01 | Disponibilidad | ✅ | ✅ | Coincide con el cálculo manual por máquina y global; período seleccionable | Aprobar fórmula y horario (D-05) |
+| KPI-02 | MTBF | ✅ | ✅ | Coincide con el cálculo manual | Aprobar (D-05) |
+| KPI-03 | MTTR | ✅ | ✅ | Coincide con el cálculo manual | Aprobar (D-05) |
+| KPI-04 | Cumplimiento de preventivos | ✅ | ✅ | A tiempo / (a tiempo + tarde + vencidos) | Aprobar (D-05) |
+| KPI-05 | Rotación del inventario | ✅ | ✅ | Consumo / inventario promedio | Aprobar (D-05) |
+| KPI-06 | Gráficos | ✅ | ✅ | Máquinas que más fallan, valor del inventario y repuestos bajo mínimo; probado en Pixel 7 sin desplazamiento horizontal | — |
+| KPI-07 | Fórmulas y metas aprobadas | — | ✅ | Metas configurables en Ajustes y visibles junto a cada indicador; fórmulas explicadas en pantalla | **Documento aprobado por Dirección** |
+
 ## Pendiente para el Sprint 3
 
-Notificaciones (NOT-01/02), indicadores (KPI-01 a KPI-07), carga masiva desde Excel (INT-01), respaldos y despliegue (NFR-01/03).
+Carga masiva desde Excel (INT-01), respaldos y despliegue (NFR-01/03).

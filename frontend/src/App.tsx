@@ -14,6 +14,8 @@ import { PartForm } from './pages/inventory/PartForm';
 import { PartsList } from './pages/inventory/PartsList';
 import { Login } from './pages/Login';
 import { Pending } from './pages/Pending';
+import { Notifications } from './pages/Notifications';
+import { Indicators } from './pages/Indicators';
 import { OrderDetail } from './pages/orders/OrderDetail';
 import { OrdersList } from './pages/orders/OrdersList';
 import { Plans } from './pages/orders/Plans';
@@ -58,6 +60,7 @@ export function App() {
       >
         <Route index element={<Home />} />
         <Route path="pendientes" element={<Pending />} />
+        <Route path="notificaciones" element={<Notifications />} />
         <Route path="compras" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><PurchasesList /></OnlyRoles>} />
         <Route path="compras/:id" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><PurchaseDetail /></OnlyRoles>} />
         <Route path="ordenes" element={<OrdersList />} />
@@ -76,6 +79,7 @@ export function App() {
         <Route path="inventario/nuevo" element={<OnlyRoles roles={['ADMIN']}><PartForm /></OnlyRoles>} />
         <Route path="inventario/:id" element={<PartDetail />} />
         <Route path="inventario/:id/editar" element={<OnlyRoles roles={['ADMIN']}><PartForm /></OnlyRoles>} />
+        <Route path="indicadores" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR']}><Indicators /></OnlyRoles>} />
         <Route path="usuarios" element={<OnlyRoles roles={['ADMIN']}><Users /></OnlyRoles>} />
         <Route path="configuracion" element={<OnlyRoles roles={['ADMIN']}><Settings /></OnlyRoles>} />
         <Route path="*" element={<Empty title="Página no encontrada" />} />

@@ -59,6 +59,8 @@ async function main() {
     for (const a of activos) {
       if (!(await ds.getRepository(Asset).exists({ where: { codigo: a.codigo } }))) await ds.getRepository(Asset).save(a);
     }
+    // Las máquinas de demostración se dan por registradas hace 90 días, para que los indicadores tengan historia.
+    await ds.query(`UPDATE activos SET creado_en = now() - interval '90 days' WHERE codigo = ANY($1) AND creado_en > now() - interval '1 day'`, [activos.map((a) => a.codigo)]);
 
     const repuestos: Array<Partial<SparePart> & { inicial: number; costo: number }> = [
       { codigo: 'RP-CUCH-32', descripcion: 'Cuchilla para molino M-32', unidad: 'UND', ubicacion: 'Estante A1', stockMinimo: 2, inicial: 4, costo: 185000 },

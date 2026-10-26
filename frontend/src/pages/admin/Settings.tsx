@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { api, qs } from '../../api/client';
-import type { AuditItem, User } from '../../api/types';
+import type { AuditItem, KpiParams, User } from '../../api/types';
 import { Link } from 'react-router-dom';
 import { Button, Empty, ErrorBox, Field, Icon, Input, PageHeader, Select, Spinner } from '../../components/ui';
 import { dateTime } from '../../format';
@@ -11,6 +11,7 @@ const ACCION_LABEL: Record<string, string> = {
   USUARIO_ACTUALIZADO: 'Modificó usuario',
   USUARIO_BLOQUEADO: 'Usuario bloqueado por intentos fallidos',
   AUTORIZADOR_CAMBIADO: 'Cambió el autorizador de compras',
+  PARAMETROS_INDICADORES: 'Cambió el horario de producción o las metas de los indicadores',
   ACTIVO_CREADO: 'Registró máquina',
   ACTIVO_ACTUALIZADO: 'Modificó máquina',
   DOCUMENTO_ADJUNTADO: 'Adjuntó documento',
@@ -132,6 +133,73 @@ function TarifaHora() {
   );
 }
 
+const DIAS_CORTOS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const METAS: Array<{ k: keyof KpiParams['metas']; label: string; hint: string; max: number; step: string }> = [
+  { k: 'disponibilidad', label: 'Disponibilidad mínima (%)', hint: 'Ej. 95', max: 100, step: '0.1' },
+  { k: 'mtbf', label: 'MTBF mínimo (horas)', hint: 'Tiempo medio entre fallas', max: 100000, step: '1' },
+  { k: 'mttr', label: 'MTTR máximo (horas)', hint: 'Tiempo medio de reparación', max: 100000, step: '0.1' },
+  { k: 'cumplimiento', label: 'Cumplimiento de preventivos (%)', hint: 'Ej. 90', max: 100, step: '1' },
+  { k: 'rotacion', label: 'Rotación mínima del inventario', hint: 'Veces en el período', max: 1000, step: '0.01' },
+];
+
+/** D-05 / KPI-07: calendario de producción (tiempo planificado) y metas de los indicadores. */
+function ParametrosIndicadores() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['indicadores', 'parametros'], queryFn: () => api.get<KpiParams>('/indicadores/parametros') });
+  const [dias, setDias] = useState<number[]>([]);
+  const [ini, setIni] = useState('00:00');
+  const [fin, setFin] = useState('00:00');
+  const [metas, setMetas] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!q.data) return;
+    setDias(q.data.dias); setIni(q.data.horaInicio); setFin(q.data.horaFin === '24:00' ? '00:00' : q.data.horaFin);
+    setMetas(Object.fromEntries(Object.entries(q.data.metas).map(([k, v]) => [k, v === null ? '' : String(v)])));
+  }, [q.data]);
+  // Un fin a las 00:00 es medianoche del mismo día (24:00).
+  const finReal = fin === '00:00' ? '24:00' : fin;
+  const invalido = finReal <= ini;
+  const m = useMutation({
+    mutationFn: () => api.put('/indicadores/parametros', {
+      dias, horaInicio: ini, horaFin: finReal,
+      metas: Object.fromEntries(METAS.map(({ k }) => [k, metas[k] === '' || metas[k] === undefined ? null : Number(metas[k])])),
+    }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['indicadores'] }); qc.invalidateQueries({ queryKey: ['bitacora'] }); },
+  });
+  const toggle = (d: number) => setDias((s) => (s.includes(d) ? s.filter((x) => x !== d) : [...s, d].sort()));
+  return (
+    <section className="card">
+      <h2>Indicadores</h2>
+      <p className="muted">El horario de producción define el tiempo planificado de la disponibilidad y el MTBF: las paradas fuera de este horario no cuentan. Las metas se muestran junto a cada indicador. Pendiente de aprobación por Dirección (D-05).</p>
+      {q.isPending ? <Spinner /> : q.isError ? <ErrorBox error={q.error} /> : (
+        <form className="stack" onSubmit={(e) => { e.preventDefault(); m.mutate(); }}>
+          <fieldset className="field" style={{ border: 0, padding: 0, margin: 0 }}>
+            <legend className="field-legend">Días de producción</legend>
+            <div className="days">
+              {DIAS_CORTOS.map((d, i) => (
+                <label key={d}><input type="checkbox" checked={dias.includes(i + 1)} onChange={() => toggle(i + 1)} /> {d}</label>
+              ))}
+            </div>
+          </fieldset>
+          <div className="form-grid">
+            <Field label="Desde (hora)">{(i) => <Input id={i} type="time" value={ini} onChange={(e) => setIni(e.target.value)} required />}</Field>
+            <Field label="Hasta (hora)" hint="00:00 = medianoche" error={invalido ? 'Debe ser posterior a la hora de inicio' : undefined}>
+              {(i) => <Input id={i} type="time" value={fin} onChange={(e) => setFin(e.target.value)} required />}
+            </Field>
+            {METAS.map(({ k, label, hint, max, step }) => (
+              <Field key={k} label={label} hint={`${hint}. Vacío = sin meta`}>
+                {(i) => <Input id={i} type="number" inputMode="decimal" min="0" max={max} step={step} value={metas[k] ?? ''} onChange={(e) => setMetas((s) => ({ ...s, [k]: e.target.value }))} />}
+              </Field>
+            ))}
+          </div>
+          {m.isError ? <ErrorBox error={m.error} /> : null}
+          {m.isSuccess ? <div className="alert alert-ok">Horario y metas guardados.</div> : null}
+          <div><Button type="submit" busy={m.isPending} disabled={!dias.length || invalido}>Guardar</Button></div>
+        </form>
+      )}
+    </section>
+  );
+}
+
 function Bitacora() {
   const [entidad, setEntidad] = useState('');
   const [pagina, setPagina] = useState(0);
@@ -190,6 +258,7 @@ export function Settings() {
         </Link>
         <Autorizador />
         <TarifaHora />
+        <ParametrosIndicadores />
         <Bitacora />
       </div>
     </>

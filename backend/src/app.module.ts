@@ -16,6 +16,10 @@ import { InventoryController, SparePartsController } from './inventory/inventory
 import { InventoryService } from './inventory/inventory.service';
 import { AssetHistoryController, PlansController, WorkOrdersController } from './maintenance/maintenance.controller';
 import { MaintenanceService } from './maintenance/maintenance.service';
+import { KpiController } from './kpi/kpi.controller';
+import { KpiService } from './kpi/kpi.service';
+import { NotificationsController } from './notifications/notifications.controller';
+import { NotificationsService } from './notifications/notifications.service';
 import { PurchasesController } from './purchases/purchases.controller';
 import { PurchasesService } from './purchases/purchases.service';
 import { QualityController } from './quality/quality.controller';
@@ -56,11 +60,11 @@ class HealthController {
   ],
   controllers: [
     HealthController, AuthController, UsersController, SettingsController, AuditController,
-    AssetHistoryController, AssetsController, SparePartsController, InventoryController, WorkOrdersController, PlansController, PurchasesController, QualityController,
+    AssetHistoryController, AssetsController, SparePartsController, InventoryController, WorkOrdersController, PlansController, PurchasesController, QualityController, NotificationsController, KpiController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: AuthGuard },
-    AuthService, UsersService, SettingsService, AuditService, AssetsService, InventoryService, MaintenanceService, PurchasesService, QualityService,
+    AuthService, UsersService, SettingsService, AuditService, AssetsService, InventoryService, MaintenanceService, PurchasesService, QualityService, NotificationsService, KpiService,
   ],
 })
 export class AppModule {}

@@ -13,6 +13,7 @@ import { EstadoActivo, EstadoOrden, MomentoFoto, Prioridad, Rol, TipoMovimiento,
 import { validateUpload } from '../common/files';
 import { InventoryService } from '../inventory/inventory.service';
 import { SparePart } from '../inventory/spare-part.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PurchasesService } from '../purchases/purchases.service';
 import { SettingsService } from '../settings/settings.service';
 import { User } from '../users/user.entity';
@@ -74,6 +75,7 @@ export class MaintenanceService {
     private readonly inventory: InventoryService,
     private readonly settings: SettingsService,
     private readonly purchases: PurchasesService,
+    private readonly notif: NotificationsService,
     config: ConfigService,
   ) {
     this.dir = resolve(config.get('UPLOADS_DIR', './uploads'), 'ordenes');
@@ -236,6 +238,13 @@ export class MaintenanceService {
       );
       await this.evento(em, o.id, actor, null, EstadoOrden.ABIERTA, dto.maquinaParada ? 'Falla reportada con máquina parada' : 'Falla reportada');
       await this.recomputarEstadoActivo(em, activo.id, actor);
+      // NOT-01 / MNT-01: la falla le llega a mantenimiento.
+      await this.notif.notificar(em, { roles: [Rol.ADMIN, Rol.TECNICO], excluir: actor.id }, {
+        tipo: 'FALLA_REPORTADA',
+        titulo: `${dto.maquinaParada ? 'Máquina parada' : 'Falla reportada'}: ${activo.codigo} · ${activo.nombre}`,
+        cuerpo: `${numeroOT(o.numero)} · ${o.descripcion} — ${actor.nombre}`,
+        enlace: `/ordenes/${o.id}`,
+      });
       return { ...o, codigo: numeroOT(o.numero), duplicado: false };
     });
   }
@@ -257,6 +266,14 @@ export class MaintenanceService {
       const nuevoEstado = o.estado === EstadoOrden.ABIERTA ? EstadoOrden.ASIGNADA : o.estado;
       await em.getRepository(WorkOrder).update(o.id, { asignadoAId: tecnico.id, estado: nuevoEstado });
       await this.evento(em, o.id, actor, anterior, nuevoEstado, o.asignadoAId ? `Reasignada a ${tecnico.nombre}` : `Asignada a ${tecnico.nombre}`);
+      // MNT-04: el técnico recibe aviso (si no se la tomó él mismo).
+      const activo = await em.getRepository(Asset).findOneOrFail({ where: { id: o.activoId } });
+      await this.notif.notificar(em, { usuarios: [tecnico.id], excluir: actor.id }, {
+        tipo: 'OT_ASIGNADA',
+        titulo: `Le asignaron ${numeroOT(o.numero)}: ${activo.codigo} · ${activo.nombre}`,
+        cuerpo: `${o.tipo === TipoOrden.PREVENTIVO ? 'Preventivo' : 'Correctivo'}${o.maquinaParada ? ' · máquina parada' : ''} · ${o.descripcion}`,
+        enlace: `/ordenes/${o.id}`,
+      });
       return { ok: true };
     });
   }
@@ -362,6 +379,14 @@ export class MaintenanceService {
       });
       await this.evento(em, o.id, actor, o.estado, EstadoOrden.CERRADA, sinConexion ? 'Orden cerrada (sin conexión, sincronizada después)' : 'Orden cerrada');
       await this.recomputarEstadoActivo(em, o.activoId, actor);
+      // Quien reportó la falla se entera de que quedó atendida.
+      if (o.tipo === TipoOrden.CORRECTIVO) {
+        const activo = await em.getRepository(Asset).findOneOrFail({ where: { id: o.activoId } });
+        await this.notif.notificar(em, { usuarios: [o.reportadoPorId], excluir: actor.id }, {
+          tipo: 'FALLA_ATENDIDA', titulo: `Falla atendida: ${activo.codigo} · ${activo.nombre}`,
+          cuerpo: `${numeroOT(o.numero)} · ${dto.trabajoRealizado.trim()}`, enlace: `/ordenes/${o.id}`,
+        });
+      }
       const siguiente = o.tipo === TipoOrden.PREVENTIVO ? await this.programarSiguiente(em, o, actor) : null;
       return { ok: true, costoRepuestos: redondear(costoRepuestos), costoManoObra: redondear(costoManoObra), siguientePreventivo: siguiente };
     });
@@ -374,6 +399,9 @@ export class MaintenanceService {
       await em.getRepository(WorkOrder).update(o.id, { estado: EstadoOrden.CANCELADA, motivoCancelacion: motivo.trim(), cerradaEn: new Date(), cerradaPorId: actor.id, finParada: o.maquinaParada ? new Date() : null });
       await this.evento(em, o.id, actor, o.estado, EstadoOrden.CANCELADA, `Cancelada: ${motivo.trim()}`);
       await this.audit.log({ usuarioId: actor.id, accion: 'OT_CANCELADA', entidad: 'orden', entidadId: o.id, detalle: { codigo: numeroOT(o.numero), motivo } }, em);
+      await this.notif.notificar(em, { usuarios: [o.asignadoAId, o.tipo === TipoOrden.CORRECTIVO ? o.reportadoPorId : null], excluir: actor.id }, {
+        tipo: 'OT_CANCELADA', titulo: `${numeroOT(o.numero)} cancelada`, cuerpo: motivo.trim(), enlace: `/ordenes/${o.id}`,
+      });
       await this.recomputarEstadoActivo(em, o.activoId, actor);
       const siguiente = o.tipo === TipoOrden.PREVENTIVO ? await this.programarSiguiente(em, o, actor) : null;
       return { ok: true, siguientePreventivo: siguiente };

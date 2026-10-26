@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 import { api, ApiError, SESSION_EXPIRED, tokenStore } from '../api/client';
 import { db } from '../offline/db';
+import { soltarAvisos } from '../notifications/push';
 import type { Rol, SessionUser } from '../api/types';
 
 interface AuthState {
@@ -22,6 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [expired, setExpired] = useState(false);
 
   const logout = useCallback(() => {
+    soltarAvisos(tokenStore.get()).catch(() => undefined);
     tokenStore.set(null);
     setUser(null);
     qc.clear();

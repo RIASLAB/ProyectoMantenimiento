@@ -2,7 +2,7 @@
 
 Sistema de mantenimiento e inventario de repuestos: hoja de vida de máquinas, mantenimientos preventivos y correctivos, inventario, solicitudes de compra, registros de calidad HACCP/BPM e indicadores. Funciona en celular, tablet y PC, y trabaja sin conexión en la planta.
 
-## Estado actual (Sprint 3 en curso: modo sin conexión listo)
+## Estado actual (Sprint 3 en curso)
 
 | Módulo | Estado |
 |---|---|
@@ -22,8 +22,9 @@ Sistema de mantenimiento e inventario de repuestos: hoja de vida de máquinas, m
 | Solicitudes de compra: automáticas por faltante, aprobación, compra y recepción | ✅ Sprint 2 |
 | Calidad: temperaturas con límites críticos, checklists HACCP/BPM, anulaciones, exportación | ✅ Sprint 2 |
 | Modo sin conexión: fallas con foto, temperaturas, checklists y ejecución/cierre de OT; sincronización automática | ✅ Sprint 3 |
-| Notificaciones (push / bandeja en la app) | ⏳ Sprint 3 |
-| Indicadores (KPIs) y carga masiva desde Excel | ⏳ Sprint 3 |
+| Notificaciones: bandeja en la app con contador y avisos al celular (Web Push) | ✅ Sprint 3 |
+| Indicadores: disponibilidad, MTBF, MTTR, cumplimiento de preventivos, rotación, gráficos | ✅ Sprint 3 |
+| Carga masiva desde Excel, respaldos y despliegue | ⏳ Sprint 3 |
 
 El detalle requisito por requisito está en [docs/trazabilidad.md](docs/trazabilidad.md).
 Las decisiones que se asumieron mientras los líderes del proceso las definen están en [docs/decisiones-asumidas.md](docs/decisiones-asumidas.md).
@@ -61,6 +62,17 @@ npm run dev                 # http://localhost:5173 (redirige /api al backend)
 
 Para probar desde un celular en la misma red: `npm run dev -- --host` y abrir `http://<IP-del-PC>:5173`.
 
+### Avisos al celular (opcional)
+
+Sin configuración, las notificaciones llegan a la bandeja de la app (campana). Para que lleguen también al celular con la app cerrada:
+
+```bash
+cd backend
+npm run push:claves        # genera una clave pública y una privada
+```
+
+Copie las dos claves en `backend/.env` (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`), ajuste `VAPID_SUBJECT` y reinicie el backend. Luego cada usuario toca **Activar avisos** en Notificaciones. Requiere la app compilada (`npm run build && npm run preview`, o el despliegue con HTTPS); en iPhone, además, la app agregada a la pantalla de inicio (iOS 16.4 o superior). Las claves se generan una sola vez: si se cambian, cada celular debe activar los avisos de nuevo.
+
 ### Producción (frontend)
 
 `npm run build` genera `frontend/dist/`, archivos estáticos que se sirven con cualquier servidor web (Nginx, IIS). Ese servidor debe redirigir `/api` al backend y devolver `index.html` para las demás rutas. Para instalar la app en el celular se necesita HTTPS.
@@ -72,9 +84,9 @@ cd backend
 npm run test:e2e
 ```
 
-Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **95 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
+Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **139 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
 
-Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**53 verificaciones**):
+Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**62 verificaciones**):
 
 | Script | Qué recorre |
 |---|---|
@@ -82,6 +94,7 @@ Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritori
 | `e2e/ordenes.py` | Operario reporta falla en el celular → admin asigna → técnico cierra con repuestos y horas → hoja de vida |
 | `e2e/compras.py` | Faltante automático → autorizador aprueba/rechaza → admin compra y recibe en bodega |
 | `e2e/calidad.py` | Temperatura fuera de rango, checklist con no conformidad, anulación, exportación, configuración |
+| `e2e/avisos_indicadores.py` | Falla y temperatura fuera de rango → campana y bandeja del admin; asignación → aviso al técnico; indicadores en el celular; horario y metas |
 | `e2e/sin_conexion.py` | Se corta la red en el celular: la app abre, se cierra una OT, se registran temperatura y falla con foto; al volver la señal todo se envía solo y un conflicto queda a la vista |
 
 Cada script necesita los datos de demostración recién cargados (`npm run seed -- --demo` sobre una base limpia) y el frontend compilado y servido (`npm run build && npm run preview`).
@@ -125,6 +138,11 @@ Todas las rutas van bajo `/api` y requieren `Authorization: Bearer <token>`, sal
 | `GET/POST /calidad/checklists` | Todos | Checklists diligenciados |
 | `POST /calidad/anulaciones` | Admin | Anular un registro con motivo |
 | `GET /calidad/exportar/temperaturas` · `checklists` | Admin, Autorizador | CSV para auditoría |
+| `GET /notificaciones`, `GET /notificaciones/contador` | Todos | Bandeja propia y número sin leer |
+| `POST /notificaciones/:id/leida`, `POST /notificaciones/leidas` | Todos | Marcar una o todas como leídas |
+| `GET/POST /notificaciones/push`, `POST /notificaciones/push/baja` · `prueba` | Todos | Avisos al celular de este dispositivo |
+| `GET /indicadores?desde=&hasta=` | Admin, Autorizador | KPI globales y por máquina del período (por defecto, últimos 30 días) |
+| `GET/PUT /indicadores/parametros` | Admin, Autorizador / Admin | Horario de producción y metas |
 
 ## Principios de diseño
 

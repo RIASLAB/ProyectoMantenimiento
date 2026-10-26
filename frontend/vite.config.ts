@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg'],
+      includeAssets: ['icon.svg', 'push-sw.js'],
       manifest: {
         name: 'CMMS Nutrialimentos',
         short_name: 'Mantenimiento',
@@ -24,9 +24,11 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // La API nunca se sirve desde caché en este sprint; el modo offline llega en el Sprint 3.
+        // La API no pasa por el service worker: los datos sin señal los guarda la app en IndexedDB (src/offline).
         navigateFallbackDenylist: [/^\/api/],
         runtimeCaching: [],
+        // Avisos al celular (Web Push): manejo del aviso y del toque sobre la notificación.
+        importScripts: ['push-sw.js'],
       },
     }),
   ],

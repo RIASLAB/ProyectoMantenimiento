@@ -3,7 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
 import { SessionUser } from '../common/auth.decorators';
-import { TIPOS_ENTRADA, TipoMovimiento } from '../common/enums';
+import { Rol, TIPOS_ENTRADA, TipoMovimiento } from '../common/enums';
+import { NotificationsService } from '../notifications/notifications.service';
 import { InventoryMovement } from './inventory-movement.entity';
 import { CreateMovementDto, CreateSparePartDto, PhysicalCountDto, UpdateSparePartDto } from './inventory.dto';
 import { SparePart } from './spare-part.entity';
@@ -33,6 +34,7 @@ export class InventoryService {
     @InjectRepository(InventoryMovement) private readonly movs: Repository<InventoryMovement>,
     private readonly ds: DataSource,
     private readonly audit: AuditService,
+    private readonly notif: NotificationsService,
   ) {}
 
   // ---------- Catálogo ----------
@@ -182,6 +184,17 @@ export class InventoryService {
           },
           em,
         );
+      }
+
+      // OFF-06 / INV-06: aviso a los administradores cuando el stock queda negativo o baja del mínimo.
+      if (stockDespues < 0 || (stockDespues < repuesto.stockMinimo && stockAntes >= repuesto.stockMinimo)) {
+        const negativo = stockDespues < 0;
+        await this.notif.notificar(em, { roles: [Rol.ADMIN], excluir: actor.id }, {
+          tipo: negativo ? 'STOCK_NEGATIVO' : 'STOCK_BAJO_MINIMO',
+          titulo: `${negativo ? 'Stock negativo' : 'Stock bajo el mínimo'}: ${repuesto.codigo} · ${repuesto.descripcion}`,
+          cuerpo: `Quedan ${stockDespues} ${repuesto.unidad} (mínimo ${repuesto.stockMinimo})${dto.referencia ? ` · ${dto.referencia}` : ''}${negativo ? '. Revise el inventario físico.' : '. Considere pedir más.'}`,
+          enlace: `/inventario/${repuesto.id}`,
+        });
       }
 
       return {

@@ -5,6 +5,7 @@ import { AuditService } from '../audit/audit.service';
 import { SessionUser } from '../common/auth.decorators';
 import { Rol } from '../common/enums';
 import { User } from '../users/user.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PARAM_AUTORIZADOR_COMPRAS, PARAM_TARIFA_HORA, Setting } from './setting.entity';
 
 @Injectable()
@@ -14,6 +15,7 @@ export class SettingsService {
     @InjectRepository(User) private readonly users: Repository<User>,
     private readonly ds: DataSource,
     private readonly audit: AuditService,
+    private readonly notif: NotificationsService,
   ) {}
 
   /** Autorizador de compras vigente (COM-04). */
@@ -50,6 +52,14 @@ export class SettingsService {
         },
         em,
       );
+      // COM-05: el cambio se notifica a Dirección (administradores) y a los dos autorizadores.
+      const previo = anterior?.valor ? await em.getRepository(User).findOne({ where: { id: anterior.valor } }) : null;
+      await this.notif.notificar(em, { roles: [Rol.ADMIN], usuarios: [usuarioId, previo?.id], excluir: actor.id }, {
+        tipo: 'AUTORIZADOR_CAMBIADO',
+        titulo: `Nuevo autorizador de compras: ${u.nombre}`,
+        cuerpo: `${previo ? `Reemplaza a ${previo.nombre}. ` : ''}Cambio hecho por ${actor.nombre}. Las solicitudes pendientes pasan a ${u.nombre}.`,
+        enlace: '/compras',
+      });
     });
     return this.getAutorizador();
   }

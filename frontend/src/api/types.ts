@@ -257,3 +257,43 @@ export interface ChecklistRecordInfo {
 export interface QualitySummary {
   temperaturas24h: number; desviaciones24h: number; checklists24h: number; checklistsNoConformes24h: number; puntosAtrasados: number;
 }
+
+export interface NotificationInfo {
+  id: string;
+  tipo: string;
+  titulo: string;
+  cuerpo: string | null;
+  enlace: string | null;
+  leidaEn: string | null;
+  creadoEn: string;
+}
+
+export interface KpiParams {
+  dias: number[];
+  horaInicio: string;
+  horaFin: string;
+  metas: { disponibilidad: number | null; mtbf: number | null; mttr: number | null; cumplimiento: number | null; rotacion: number | null };
+}
+
+export interface KpiMachine {
+  id: string; codigo: string; nombre: string; area: string; estado: string;
+  horasPlanificadas: number; horasParada: number; disponibilidad: number | null;
+  fallas: number; mtbfHoras: number | null; reparaciones: number; mttrHoras: number | null;
+}
+
+export interface KpiReport {
+  periodo: { desde: string; hasta: string; dias: number; calculadoEn: string };
+  parametros: KpiParams;
+  metas: KpiParams['metas'];
+  global: {
+    maquinas: number; horasPlanificadas: number; horasParada: number; disponibilidad: number | null;
+    fallas: number; mtbfHoras: number | null; reparaciones: number; mttrHoras: number | null;
+    preventivos: { programados: number; aTiempo: number; tarde: number; vencidos: number; enPlazo: number; cancelados: number; cumplimiento: number | null };
+    inventario: { consumo: number; valorInicial: number; valorFinal: number; valorPromedio: number; rotacion: number | null; diasCobertura: number | null };
+  };
+  maquinas: KpiMachine[];
+  inventarioActual: {
+    repuestos: number; valorTotal: number; bajoMinimo: number; sinStock: number;
+    criticos: Array<{ id: string; codigo: string; descripcion: string; unidad: string; stock: number; minimo: number }>;
+  };
+}
