@@ -13,6 +13,10 @@ import { PartDetail } from './pages/inventory/PartDetail';
 import { PartForm } from './pages/inventory/PartForm';
 import { PartsList } from './pages/inventory/PartsList';
 import { Login } from './pages/Login';
+import { OrderDetail } from './pages/orders/OrderDetail';
+import { OrdersList } from './pages/orders/OrdersList';
+import { Plans } from './pages/orders/Plans';
+import { ReportFault } from './pages/orders/ReportFault';
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -39,7 +43,11 @@ export function App() {
           </RequireAuth>
         }
       >
-        <Route index element={<Navigate to="/maquinas" replace />} />
+        <Route index element={<Navigate to="/ordenes" replace />} />
+        <Route path="ordenes" element={<OrdersList />} />
+        <Route path="ordenes/reportar" element={<ReportFault />} />
+        <Route path="ordenes/planes" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><Plans /></OnlyRoles>} />
+        <Route path="ordenes/:id" element={<OrderDetail />} />
         <Route path="maquinas" element={<AssetsList />} />
         <Route path="maquinas/nueva" element={<OnlyRoles roles={['ADMIN']}><AssetForm /></OnlyRoles>} />
         <Route path="maquinas/:id" element={<AssetDetail />} />

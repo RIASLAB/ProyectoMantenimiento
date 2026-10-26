@@ -43,6 +43,8 @@ with sync_playwright() as p:
 
     page.get_by_label('Contraseña o PIN').fill(ADMIN_PASS)
     page.get_by_role('button', name='Ingresar').click()
+    # Vuelve a la página que se intentó abrir antes de iniciar sesión
+    expect(page).to_have_url(re.compile('/maquinas'))
     expect(page.get_by_role('heading', name='Máquinas')).to_be_visible()
     expect(page.locator('.list-row')).to_have_count(4)
     ok('login admin y lista de 4 máquinas')
@@ -170,7 +172,7 @@ with sync_playwright() as p:
     ok('crear usuario técnico (rechaza PIN débil)')
     page.screenshot(path=SP + '/07-usuarios.png')
 
-    page.get_by_role('link', name='Configuración').first.click()
+    page.get_by_role('link', name='Ajustes').first.click()
     expect(page.get_by_text('Actual: Autorizador Demo')).to_be_visible()
     expect(page.locator('.audit li').first).to_be_visible()
     expect(page.locator('.audit')).to_contain_text('Conteo físico')
@@ -185,10 +187,12 @@ with sync_playwright() as p:
     page.get_by_label('Usuario').fill('operario')
     page.get_by_label('Contraseña o PIN').fill('7391')
     page.get_by_role('button', name='Ingresar').click()
+    expect(page.get_by_role('heading', name='Mis reportes de falla')).to_be_visible()
+    expect(page.locator('.tabbar .tab-link')).to_have_count(3)
+    page.locator('.tabbar').get_by_role('link', name='Máquinas').click()
     expect(page.get_by_role('heading', name='Máquinas')).to_be_visible()
-    expect(page.locator('.tabbar .tab-link')).to_have_count(2)
     expect(page.get_by_role('link', name='Nueva máquina')).to_have_count(0)
-    ok('operario en celular: solo Máquinas e Inventario, sin crear')
+    ok('operario en celular: Órdenes, Máquinas e Inventario, sin crear')
     page.screenshot(path=SP + '/09-movil-maquinas.png')
     sw = page.evaluate('document.documentElement.scrollWidth > window.innerWidth')
     assert not sw, 'scroll horizontal en móvil'
@@ -210,7 +214,7 @@ with sync_playwright() as p:
     page.get_by_label('Usuario').fill('admin')
     page.get_by_label('Contraseña o PIN').fill(ADMIN_PASS)
     page.get_by_role('button', name='Ingresar').click()
-    expect(page.get_by_role('heading', name='Máquinas')).to_be_visible()
+    expect(page).to_have_url(re.compile('/ordenes'))
     page.goto(BASE + '/inventario')
     page.get_by_text('Rodamiento 6205-2RS').click()
     expect(page.get_by_role('heading', name='Kardex')).to_be_visible()

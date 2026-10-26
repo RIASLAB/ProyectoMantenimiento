@@ -344,3 +344,56 @@ a.list-row:hover { border-color: var(--brand-2); }
 .login-brand { text-align: center; margin-bottom: 20px; }
 .login-brand h1 { margin-top: 10px; }
 .login-brand p { margin: 4px 0 0; color: var(--muted); }
+
+/* ---------- Órdenes de trabajo ---------- */
+.part-rows { display: flex; flex-direction: column; gap: 8px; }
+.part-row { display: grid; grid-template-columns: 1fr 96px 44px; gap: 6px; align-items: center; }
+.part-row .input { min-width: 0; }
+.part-row-msg { grid-column: 1 / -1; }
+.input-warn { border-color: var(--warn); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px;
+  border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 0.88rem; text-decoration: none;
+}
+.chip strong { font-size: 1rem; font-variant-numeric: tabular-nums; }
+.chip.chip-bad { border-color: var(--bad); color: var(--bad); background: var(--bad-bg); }
+.chip.chip-warn { border-color: var(--warn); color: var(--warn); background: var(--warn-bg); }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 14px; overflow-x: auto; }
+.tab {
+  min-height: 44px; padding: 0 14px; border: 0; background: none; color: var(--muted); font: inherit; font-weight: 600;
+  border-bottom: 3px solid transparent; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; white-space: nowrap;
+}
+.tab.active, .tab[aria-selected="true"] { color: var(--brand); border-bottom-color: var(--brand); }
+.list-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.desc { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.action-bar { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+@media (max-width: 640px) {
+  .action-bar { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom)); z-index: 5; padding: 10px; margin: 0 -6px 16px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 4px 16px rgb(0 0 0 / 0.12); }
+  .action-bar .btn { flex: 1 1 auto; }
+}
+.timeline { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--line); }
+.timeline li { position: relative; padding: 0 0 14px 12px; }
+.timeline li::before { content: ''; position: absolute; left: -21px; top: 5px; width: 12px; height: 12px; border-radius: 50%; background: var(--surface); border: 2px solid var(--brand-2); }
+.timeline .muted { font-size: 0.82rem; }
+.photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+.photo { position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--line); padding: 0; cursor: zoom-in; }
+.photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo span { position: absolute; left: 6px; bottom: 6px; }
+.big-toggle {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; min-height: 64px;
+  border: 2px solid var(--line); border-radius: 12px; background: var(--surface); cursor: pointer; font-weight: 600;
+}
+.big-toggle.on { border-color: var(--bad); background: var(--bad-bg); color: var(--bad); }
+.big-toggle input { width: 26px; height: 26px; accent-color: var(--bad); }
+.fab {
+  position: fixed; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 6;
+  display: inline-flex; align-items: center; gap: 8px; min-height: 56px; padding: 0 20px; border-radius: 999px;
+  background: var(--bad); color: #fff; font-weight: 700; text-decoration: none; box-shadow: 0 6px 18px rgb(0 0 0 / 0.25);
+}
+@media (min-width: 900px) { .fab { display: none; } }
+.labor-row { display: grid; grid-template-columns: 1fr 96px 44px; gap: 6px; align-items: center; }
+.subtle-head { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 6px; font-weight: 600; }
+.qty { text-align: right; }

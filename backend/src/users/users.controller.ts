@@ -14,6 +14,13 @@ export class UsersController {
     return this.users.list();
   }
 
+  /** Técnicos y administradores activos, para asignar OT y registrar mano de obra. */
+  @Get('tecnicos')
+  @Roles(Rol.ADMIN, Rol.AUTORIZADOR, Rol.TECNICO)
+  tecnicos() {
+    return this.users.tecnicos();
+  }
+
   @Get(':id')
   get(@Param('id', ParseUUIDPipe) id: string) {
     return this.users.get(id);

@@ -12,7 +12,7 @@ export function Login() {
   const [busy, setBusy] = useState(false);
 
   if (user) {
-    const from = (location.state as { from?: string } | null)?.from ?? '/maquinas';
+    const from = (location.state as { from?: string } | null)?.from ?? '/ordenes';
     return <Navigate to={from} replace />;
   }
 

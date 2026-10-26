@@ -2,12 +2,57 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChangeEvent, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, openProtectedFile } from '../../api/client';
-import type { Asset } from '../../api/types';
+import type { Asset, AssetHistory } from '../../api/types';
+import { OrderStateBadge } from '../../components/orders-shared';
 import { useAuth } from '../../auth/AuthContext';
 import { Badge, Button, Empty, ErrorBox, Icon, KeyValue, PageHeader, Spinner } from '../../components/ui';
-import { date, dateTime, daysUntil, ESTADO_LABEL, ESTADO_TONE, fileSize } from '../../format';
+import { date, dateTime, daysUntil, ESTADO_LABEL, ESTADO_TONE, fileSize, money, TIPO_LABEL } from '../../format';
 
 const MAX_MB = 20;
+
+/** Hoja de vida (ACT-03) y costo acumulado (ACT-04). */
+function Historial({ activoId }: { activoId: string }) {
+  const { can } = useAuth();
+  const h = useQuery({ queryKey: ['historial', activoId], queryFn: () => api.get<AssetHistory>(`/activos/${activoId}/historial`) });
+  const verCostos = can('ADMIN', 'AUTORIZADOR');
+  return (
+    <>
+      <h2>Hoja de vida</h2>
+      {h.isPending ? <Spinner /> : h.isError ? <ErrorBox error={h.error} /> : (
+        <>
+          {verCostos ? (
+            <div className="stats">
+              <div className="stat"><span>Costo acumulado</span><strong>{money(h.data.costos.total)}</strong></div>
+              <div className="stat"><span>Repuestos</span><strong>{money(h.data.costos.repuestos)}</strong></div>
+              <div className="stat"><span>Mano de obra</span><strong>{money(h.data.costos.manoObra)}</strong></div>
+              <div className="stat"><span>Servicios externos</span><strong>{money(h.data.costos.externos)}</strong></div>
+            </div>
+          ) : null}
+          <p className="muted">{h.data.cerradas.correctivos} correctivo{h.data.cerradas.correctivos === 1 ? '' : 's'} y {h.data.cerradas.preventivos} preventivo{h.data.cerradas.preventivos === 1 ? '' : 's'} realizados.</p>
+          {h.data.ordenes.length === 0 ? <Empty title="Esta máquina aún no tiene órdenes de trabajo" /> : (
+            <ul className="list">
+              {h.data.ordenes.map((o) => (
+                <li key={o.id}>
+                  <Link to={`/ordenes/${o.id}`} className="list-row">
+                    <div className="list-main">
+                      <span className="code">{o.codigo} · {TIPO_LABEL[o.tipo]}</span>
+                      <span className="clamp">{o.descripcion}</span>
+                      <span className="muted small">{dateTime(o.creadoEn)}{o.asignadoA ? ` · ${o.asignadoA.nombre}` : ''}</span>
+                    </div>
+                    <div className="list-meta" style={{ flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                      <OrderStateBadge estado={o.estado} />
+                      {verCostos && o.estado === 'CERRADA' ? <span className="muted small">{money(o.costoTotal ?? 0)}</span> : null}
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </>
+  );
+}
 const ACCEPT = 'application/pdf,image/jpeg,image/png';
 
 function Garantia({ fecha }: { fecha: string | null }) {
@@ -66,11 +111,18 @@ export function AssetDetail() {
         title={a.nombre}
         subtitle={<><span className="code">{a.codigo}</span> <Badge tone={ESTADO_TONE[a.estado]}>{ESTADO_LABEL[a.estado]}</Badge></>}
         actions={
-          can('ADMIN') ? (
-            <Link to={`/maquinas/${a.id}/editar`} className="btn btn-secondary">
-              <Icon name="edit" /> Editar
-            </Link>
-          ) : null
+          <>
+            {a.estado !== 'DADO_DE_BAJA' ? (
+              <Link to={`/ordenes/reportar?activo=${a.id}`} className="btn btn-primary">
+                <Icon name="alert" /> Reportar falla
+              </Link>
+            ) : null}
+            {can('ADMIN') ? (
+              <Link to={`/maquinas/${a.id}/editar`} className="btn btn-secondary">
+                <Icon name="edit" /> Editar
+              </Link>
+            ) : null}
+          </>
         }
       />
 
@@ -134,10 +186,7 @@ export function AssetDetail() {
         </section>
 
         <section className="card span-2">
-          <h2>Historial de mantenimiento</h2>
-          <Empty title="Disponible en el próximo sprint">
-            <p className="muted">Aquí aparecerán las fallas, mantenimientos, repuestos consumidos y el costo acumulado de la máquina.</p>
-          </Empty>
+          <Historial activoId={a.id} />
         </section>
       </div>
     </>

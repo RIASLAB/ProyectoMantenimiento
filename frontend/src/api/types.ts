@@ -81,3 +81,81 @@ export interface AuditItem {
   creadoEn: string;
   usuario: { id: string; nombre: string } | null;
 }
+
+export type TipoOrden = 'CORRECTIVO' | 'PREVENTIVO';
+export type EstadoOrden = 'ABIERTA' | 'ASIGNADA' | 'EN_EJECUCION' | 'ESPERANDO_REPUESTO' | 'CERRADA' | 'CANCELADA';
+export type Prioridad = 'BAJA' | 'MEDIA' | 'ALTA';
+export type UnidadFrecuencia = 'DIAS' | 'SEMANAS' | 'MESES';
+export type MomentoFoto = 'REPORTE' | 'ANTES' | 'DESPUES';
+
+export interface PersonRef { id: string; nombre: string }
+
+export interface WorkOrderSummary {
+  id: string;
+  numero: number;
+  codigo: string;
+  tipo: TipoOrden;
+  estado: EstadoOrden;
+  prioridad: Prioridad;
+  activoId: string;
+  activo?: { id: string; codigo: string; nombre: string; area?: string };
+  descripcion: string;
+  fechaProgramada: string | null;
+  maquinaParada: boolean;
+  inicioParada: string | null;
+  finParada: string | null;
+  asignadoA: PersonRef | null;
+  reportadoPor: PersonRef | null;
+  creadoEn: string;
+  cerradaEn: string | null;
+  costoRepuestos: number;
+  costoManoObra: number;
+  costoServiciosExternos: number;
+  costoTotal?: number;
+  vencida?: boolean;
+  proxima?: boolean;
+  diasParaVencer?: number | null;
+}
+
+export interface WorkOrderDetail extends WorkOrderSummary {
+  activo: Asset;
+  plan: { id: string; nombre: string; diasAviso: number } | null;
+  iniciadaEn: string | null;
+  cerradaPor: PersonRef | null;
+  trabajoRealizado: string | null;
+  motivoCancelacion: string | null;
+  repuestos: Array<{
+    id: string; repuestoId: string; cantidadPlanificada: number; cantidadUsada: number | null; costoUnitario: number | null;
+    stock: number; faltante: number; repuesto: { id: string; codigo: string; descripcion: string; unidad: string };
+  }>;
+  manoObra: Array<{ id: string; horas: number; tarifaHora: number; tecnico: PersonRef }>;
+  eventos: Array<{ id: string; estadoAnterior: EstadoOrden | null; estadoNuevo: EstadoOrden; nota: string | null; creadoEn: string; usuario: PersonRef | null }>;
+  fotos: Array<{ id: string; momento: MomentoFoto; creadoEn: string; subidoPor: PersonRef | null }>;
+  acciones: Record<'asignar' | 'tomar' | 'iniciar' | 'esperarRepuesto' | 'reanudar' | 'cerrar' | 'cancelar' | 'editarRepuestos' | 'subirFotos', boolean>;
+}
+
+export interface OrdersSummary {
+  abiertas: number; sinAsignar: number; enEjecucion: number; esperandoRepuesto: number;
+  maquinasParadas: number; preventivosVencidos: number; preventivosProximos: number;
+}
+
+export interface Plan {
+  id: string;
+  activoId: string;
+  activo: { id: string; codigo: string; nombre: string };
+  nombre: string;
+  tareas: string | null;
+  frecuenciaValor: number;
+  frecuenciaUnidad: UnidadFrecuencia;
+  diasAviso: number;
+  tecnico: PersonRef | null;
+  tecnicoId: string | null;
+  vigente: boolean;
+  repuestos: Array<{ id: string; repuestoId: string; cantidad: number; repuesto: { id: string; codigo: string; descripcion: string; unidad: string } }>;
+}
+
+export interface AssetHistory {
+  costos: { repuestos: number; manoObra: number; externos: number; total: number };
+  cerradas: { correctivos: number; preventivos: number };
+  ordenes: WorkOrderSummary[];
+}

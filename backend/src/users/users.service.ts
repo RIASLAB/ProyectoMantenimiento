@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
+import { Rol } from '../common/enums';
 import { AuditService } from '../audit/audit.service';
 import { SessionUser } from '../common/auth.decorators';
 import { Setting, PARAM_AUTORIZADOR_COMPRAS } from '../settings/setting.entity';
@@ -18,6 +19,11 @@ export class UsersService {
 
   list() {
     return this.repo.find({ order: { activo: 'DESC', nombre: 'ASC' } });
+  }
+
+  async tecnicos() {
+    const us = await this.repo.find({ where: { activo: true, rol: In([Rol.TECNICO, Rol.ADMIN]) }, order: { rol: 'DESC', nombre: 'ASC' } });
+    return us.map((u) => ({ id: u.id, nombre: u.nombre, rol: u.rol }));
   }
 
   async get(id: string) {

@@ -173,6 +173,29 @@ describe('MNT-09/10 · Cierre', () => {
   });
 });
 
+describe('MNT-02 · Hora de puesta en marcha', () => {
+  it('una diferencia de segundos por la precisión del formulario se ajusta al inicio de la parada', async () => {
+    const inicio = new Date(Date.now() - 1000);
+    const o = (await c.http.post('/api/ordenes').set(c.auth(op1.token)).send({ activoId, descripcion: 'Atasco en la tolva', maquinaParada: true, reportadoEn: inicio.toISOString() })).body;
+    await c.http.post(`/api/ordenes/${o.id}/asignar`).set(c.auth(c.admin)).send({ tecnicoId: tec1.id }).expect(201);
+    await c.http.post(`/api/ordenes/${o.id}/iniciar`).set(c.auth(tec1.token)).expect(201);
+    const fin = new Date(inicio.getTime() - 30_000); // el formulario redondea al minuto
+    const r = await c.http.post(`/api/ordenes/${o.id}/cerrar`).set(c.auth(tec1.token)).send({ trabajoRealizado: 'Se destrabó la tolva', repuestosUsados: [], manoObra: [], finParada: fin.toISOString() });
+    expect(r.status).toBe(201);
+    const d = (await c.http.get(`/api/ordenes/${o.id}`).set(c.auth(c.admin))).body;
+    expect(new Date(d.finParada).getTime()).toBe(new Date(d.inicioParada).getTime());
+  });
+
+  it('pero rechaza una puesta en marcha claramente anterior a la parada', async () => {
+    const o = (await c.http.post('/api/ordenes').set(c.auth(op1.token)).send({ activoId, descripcion: 'Atasco en la tolva 2', maquinaParada: true })).body;
+    await c.http.post(`/api/ordenes/${o.id}/asignar`).set(c.auth(c.admin)).send({ tecnicoId: tec1.id }).expect(201);
+    await c.http.post(`/api/ordenes/${o.id}/iniciar`).set(c.auth(tec1.token)).expect(201);
+    const r = await c.http.post(`/api/ordenes/${o.id}/cerrar`).set(c.auth(tec1.token)).send({ trabajoRealizado: 'Se destrabó la tolva', repuestosUsados: [], manoObra: [], finParada: new Date(Date.now() - 3_600_000).toISOString() });
+    expect(r.status).toBe(400);
+    await c.http.post(`/api/ordenes/${o.id}/cancelar`).set(c.auth(c.admin)).send({ motivo: 'Prueba' }).expect(201);
+  });
+});
+
 describe('MNT-05/06/08 · Preventivos', () => {
   let planId: string;
   let otPrev: string;

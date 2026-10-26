@@ -43,8 +43,11 @@ export function Spinner({ label = 'Cargando…' }: { label?: string }) {
 
 export function ErrorBox({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const msg = error instanceof Error ? error.message : String(error);
+  const ref = useRef<HTMLDivElement>(null);
+  // En formularios largos (sobre todo en celular) el error puede quedar fuera de la vista.
+  useEffect(() => { ref.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [msg]);
   return (
-    <div className="alert alert-bad" role="alert">
+    <div ref={ref} className="alert alert-bad" role="alert">
       <span>{msg}</span>
       {onRetry ? <Button variant="ghost" onClick={onRetry}>Reintentar</Button> : null}
     </div>
@@ -128,6 +131,11 @@ const PATHS: Record<string, string> = {
   alert: 'M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z',
   swap: 'M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4',
   clipboard: 'M9 4h6v3H9zM8 5H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2M9 12h6M9 16h4',
+  wrench: 'M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4 2.6-2.6Z',
+  camera: 'M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1ZM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z',
+  calendar: 'M4 6h16v15H4zM4 10h16M8 3v4M16 3v4',
+  stop: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM9 9h6v6H9z',
+  trash: 'M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3',
 };
 
 export function Icon({ name, size = 20 }: { name: keyof typeof PATHS | string; size?: number }) {

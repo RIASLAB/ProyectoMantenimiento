@@ -5,10 +5,11 @@ import { ROL_LABEL } from '../format';
 import { Icon } from './ui';
 
 const NAV: Array<{ to: string; label: string; icon: string; roles?: Rol[] }> = [
+  { to: '/ordenes', label: 'Órdenes', icon: 'wrench' },
   { to: '/maquinas', label: 'Máquinas', icon: 'machine' },
   { to: '/inventario', label: 'Inventario', icon: 'box' },
   { to: '/usuarios', label: 'Usuarios', icon: 'users', roles: ['ADMIN'] },
-  { to: '/configuracion', label: 'Configuración', icon: 'settings', roles: ['ADMIN'] },
+  { to: '/configuracion', label: 'Ajustes', icon: 'settings', roles: ['ADMIN'] },
 ];
 
 export function Layout() {

@@ -285,7 +285,11 @@ export class MaintenanceService {
       if (o.maquinaParada) {
         finParada = dto.finParada ? new Date(dto.finParada) : null;
         if (!finParada) throw new BadRequestException('Indique la hora en que la máquina volvió a operar');
-        if (o.inicioParada && finParada < o.inicioParada) throw new BadRequestException('La puesta en marcha no puede ser anterior al inicio de la parada');
+        if (o.inicioParada && finParada < o.inicioParada) {
+          // El formulario maneja minutos: una diferencia menor a un minuto se ajusta al inicio de la parada.
+          if (o.inicioParada.getTime() - finParada.getTime() < 60_000) finParada = o.inicioParada;
+          else throw new BadRequestException('La puesta en marcha no puede ser anterior al inicio de la parada');
+        }
         if (finParada.getTime() > Date.now() + 5 * 60_000) throw new BadRequestException('La puesta en marcha no puede estar en el futuro');
       }
 

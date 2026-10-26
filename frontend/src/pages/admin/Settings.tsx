@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { api, qs } from '../../api/client';
 import type { AuditItem, User } from '../../api/types';
-import { Button, Empty, ErrorBox, Field, PageHeader, Select, Spinner } from '../../components/ui';
+import { Button, Empty, ErrorBox, Field, Input, PageHeader, Select, Spinner } from '../../components/ui';
 import { dateTime } from '../../format';
 
 const ACCION_LABEL: Record<string, string> = {
@@ -18,9 +18,14 @@ const ACCION_LABEL: Record<string, string> = {
   AJUSTE_INVENTARIO: 'Ajuste de inventario',
   CONTEO_FISICO: 'Conteo físico',
   STOCK_NEGATIVO: 'Stock quedó negativo',
+  TARIFA_HORA_CAMBIADA: 'Cambió la tarifa de mano de obra',
+  OT_CANCELADA: 'Canceló una orden de trabajo',
+  ACTIVO_ESTADO_AUTOMATICO: 'Estado de máquina actualizado por una orden',
+  PLAN_CREADO: 'Creó plan preventivo',
+  PLAN_ACTUALIZADO: 'Modificó plan preventivo',
 };
 
-const ENTIDADES: Array<[string, string]> = [['', 'Todo'], ['usuario', 'Usuarios'], ['parametro', 'Parámetros'], ['activo', 'Máquinas'], ['repuesto', 'Repuestos']];
+const ENTIDADES: Array<[string, string]> = [['', 'Todo'], ['usuario', 'Usuarios'], ['parametro', 'Parámetros'], ['activo', 'Máquinas'], ['repuesto', 'Repuestos'], ['orden', 'Órdenes'], ['plan', 'Planes']];
 
 function resumen(d: Record<string, unknown> | null): string {
   if (!d) return '';
@@ -85,6 +90,33 @@ function Autorizador() {
   );
 }
 
+function TarifaHora() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['tarifa-hora'], queryFn: () => api.get<{ tarifaHora: number }>('/parametros/tarifa-hora') });
+  const [valor, setValor] = useState('');
+  useEffect(() => { if (q.data) setValor(String(q.data.tarifaHora)); }, [q.data]);
+  const m = useMutation({
+    mutationFn: () => api.put('/parametros/tarifa-hora', { valor: Number(valor) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tarifa-hora'] }); qc.invalidateQueries({ queryKey: ['bitacora'] }); },
+  });
+  return (
+    <section className="card">
+      <h2>Costo de mano de obra</h2>
+      <p className="muted">Tarifa por hora de los técnicos. Se usa al cerrar cada orden para calcular el costo acumulado de la máquina; las órdenes ya cerradas conservan la tarifa con la que se cerraron.</p>
+      {q.isPending ? <Spinner /> : (
+        <form className="inline-form" onSubmit={(e) => { e.preventDefault(); m.mutate(); }}>
+          <Field label="Tarifa por hora (COP)">
+            {(i) => <Input id={i} type="number" inputMode="decimal" min="0" step="100" value={valor} onChange={(e) => setValor(e.target.value)} required />}
+          </Field>
+          <Button type="submit" busy={m.isPending} disabled={valor === String(q.data?.tarifaHora ?? '')}>Guardar</Button>
+        </form>
+      )}
+      {m.isError ? <ErrorBox error={m.error} /> : null}
+      {m.isSuccess ? <div className="alert alert-ok">Tarifa actualizada.</div> : null}
+    </section>
+  );
+}
+
 function Bitacora() {
   const [entidad, setEntidad] = useState('');
   const [pagina, setPagina] = useState(0);
@@ -132,9 +164,10 @@ function Bitacora() {
 export function Settings() {
   return (
     <>
-      <PageHeader title="Configuración" />
+      <PageHeader title="Ajustes" />
       <div className="stack-lg">
         <Autorizador />
+        <TarifaHora />
         <Bitacora />
       </div>
     </>

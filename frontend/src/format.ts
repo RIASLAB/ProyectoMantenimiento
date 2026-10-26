@@ -1,4 +1,4 @@
-import type { EstadoActivo, Rol, TipoMovimiento } from './api/types';
+import type { EstadoActivo, EstadoOrden, Prioridad, Rol, TipoMovimiento, TipoOrden, UnidadFrecuencia } from './api/types';
 
 export const ROL_LABEL: Record<Rol, string> = {
   ADMIN: 'Administrador',
@@ -62,4 +62,47 @@ export function daysUntil(iso: string) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return Math.round((target - today.getTime()) / 86_400_000);
+}
+
+
+export const ORDEN_ESTADO_LABEL: Record<EstadoOrden, string> = {
+  ABIERTA: 'Sin asignar',
+  ASIGNADA: 'Asignada',
+  EN_EJECUCION: 'En ejecución',
+  ESPERANDO_REPUESTO: 'Esperando repuesto',
+  CERRADA: 'Cerrada',
+  CANCELADA: 'Cancelada',
+};
+
+export const ORDEN_ESTADO_TONE: Record<EstadoOrden, 'ok' | 'warn' | 'bad' | 'muted' | 'info'> = {
+  ABIERTA: 'bad',
+  ASIGNADA: 'info',
+  EN_EJECUCION: 'warn',
+  ESPERANDO_REPUESTO: 'warn',
+  CERRADA: 'ok',
+  CANCELADA: 'muted',
+};
+
+export const TIPO_LABEL: Record<TipoOrden, string> = { CORRECTIVO: 'Correctivo', PREVENTIVO: 'Preventivo' };
+export const PRIORIDAD_LABEL: Record<Prioridad, string> = { BAJA: 'Baja', MEDIA: 'Media', ALTA: 'Alta' };
+
+export function frecuencia(valor: number, unidad: UnidadFrecuencia) {
+  const u = { DIAS: ['día', 'días'], SEMANAS: ['semana', 'semanas'], MESES: ['mes', 'meses'] }[unidad];
+  return valor === 1 ? `Cada ${u[0]}` : `Cada ${valor} ${u[1]}`;
+}
+
+/** Duración legible entre dos fechas. */
+export function duration(desde: string, hasta: string | null) {
+  const ms = (hasta ? new Date(hasta).getTime() : Date.now()) - new Date(desde).getTime();
+  const min = Math.max(0, Math.round(ms / 60000));
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 48) return `${h} h ${min % 60} min`;
+  return `${Math.floor(h / 24)} días ${h % 24} h`;
+}
+
+/** Valor para <input type="datetime-local"> en hora local. */
+export function toLocalInput(d: Date) {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }

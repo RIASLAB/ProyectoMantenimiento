@@ -10,10 +10,11 @@
 import { randomBytes } from 'crypto';
 import { DataSource } from 'typeorm';
 import { Asset } from '../assets/asset.entity';
-import { EstadoActivo, Rol, TipoMovimiento } from '../common/enums';
+import { EstadoActivo, EstadoOrden, Prioridad, Rol, TipoMovimiento, TipoOrden, UnidadFrecuencia } from '../common/enums';
 import { InventoryMovement } from '../inventory/inventory-movement.entity';
 import { SparePart } from '../inventory/spare-part.entity';
-import { PARAM_AUTORIZADOR_COMPRAS, Setting } from '../settings/setting.entity';
+import { PARAM_AUTORIZADOR_COMPRAS, PARAM_TARIFA_HORA, Setting } from '../settings/setting.entity';
+import { MaintenancePlan, PlanPart, WorkOrder, WorkOrderEvent, WorkOrderPart } from '../maintenance/maintenance.entities';
 import { hashCredencial } from '../users/credentials';
 import { User } from '../users/user.entity';
 import dataSource from './data-source';
@@ -41,9 +42,10 @@ async function main() {
   if (demo) {
     const admin = await ds.getRepository(User).findOneOrFail({ where: { usuario: 'admin' } });
     const autorizador = await crearUsuario(ds, 'Autorizador Demo', 'autorizador', Rol.AUTORIZADOR, 'Autoriza2026');
-    await crearUsuario(ds, 'Técnico Demo', 'tecnico', Rol.TECNICO, '4826');
-    await crearUsuario(ds, 'Operario Demo', 'operario', Rol.OPERARIO, '7391');
+    const tecnico = await crearUsuario(ds, 'Técnico Demo', 'tecnico', Rol.TECNICO, '4826');
+    const operario = await crearUsuario(ds, 'Operario Demo', 'operario', Rol.OPERARIO, '7391');
     await ds.getRepository(Setting).save({ clave: PARAM_AUTORIZADOR_COMPRAS, valor: autorizador.id });
+    await ds.getRepository(Setting).save({ clave: PARAM_TARIFA_HORA, valor: '25000' });
 
     const activos: Partial<Asset>[] = [
       { codigo: 'MOL-001', nombre: 'Molino de carne', modelo: 'M-32', fabricante: 'Javar', area: 'Proceso', ubicacion: 'Sala de molienda', fechaCompra: '2021-03-15', fechaFinGarantia: '2023-03-15' },
@@ -69,6 +71,34 @@ async function main() {
         motivo: 'Inventario inicial (datos de demostración)', usuarioId: admin.id,
       });
     }
+    // Órdenes de ejemplo: una falla reportada sin asignar y un plan preventivo con su primera OT.
+    if ((await ds.getRepository(WorkOrder).count()) === 0) {
+      const emb = await ds.getRepository(Asset).findOneByOrFail({ codigo: 'EMB-002' });
+      const mol = await ds.getRepository(Asset).findOneByOrFail({ codigo: 'MOL-001' });
+      const rod = await ds.getRepository(SparePart).findOneByOrFail({ codigo: 'RP-ROD-6205' });
+      const ace = await ds.getRepository(SparePart).findOneByOrFail({ codigo: 'RP-ACE-GA' });
+      const falla = await ds.getRepository(WorkOrder).save({
+        tipo: TipoOrden.CORRECTIVO, estado: EstadoOrden.ABIERTA, prioridad: Prioridad.MEDIA, activoId: emb.id,
+        descripcion: 'Fuga de aceite en la bomba de vacío (datos de demostración)', reportadoPorId: operario.id,
+      });
+      await ds.getRepository(WorkOrderEvent).insert({ ordenId: falla.id, usuarioId: operario.id, estadoNuevo: EstadoOrden.ABIERTA, nota: 'Falla reportada' });
+      const plan = await ds.getRepository(MaintenancePlan).save({
+        activoId: mol.id, nombre: 'Lubricación y revisión de rodamientos', tareas: 'Lubricar rodamientos y revisar holguras',
+        frecuenciaValor: 1, frecuenciaUnidad: UnidadFrecuencia.MESES, diasAviso: 7, tecnicoId: tecnico.id,
+      });
+      await ds.getRepository(PlanPart).save([{ planId: plan.id, repuestoId: ace.id, cantidad: 1 }, { planId: plan.id, repuestoId: rod.id, cantidad: 2 }]);
+      const fecha = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);
+      const prev = await ds.getRepository(WorkOrder).save({
+        tipo: TipoOrden.PREVENTIVO, estado: EstadoOrden.ASIGNADA, prioridad: Prioridad.MEDIA, activoId: mol.id, planId: plan.id,
+        descripcion: `${plan.nombre}\n${plan.tareas}`, fechaProgramada: fecha, asignadoAId: tecnico.id, reportadoPorId: admin.id,
+      });
+      await ds.getRepository(WorkOrderPart).save([
+        { ordenId: prev.id, repuestoId: ace.id, cantidadPlanificada: 1 },
+        { ordenId: prev.id, repuestoId: rod.id, cantidadPlanificada: 2 },
+      ]);
+      await ds.getRepository(WorkOrderEvent).insert({ ordenId: prev.id, usuarioId: admin.id, estadoNuevo: EstadoOrden.ASIGNADA, nota: `Preventivo programado para ${fecha}` });
+    }
+
     console.log('Datos de demostración cargados. Usuarios: autorizador / Autoriza2026, tecnico / PIN 4826, operario / PIN 7391');
   }
 
