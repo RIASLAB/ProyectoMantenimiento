@@ -32,7 +32,7 @@ export function ReportFault() {
   const activos = useQuery({ queryKey: ['activos', '', '', ''], queryFn: () => api.get<Asset[]>('/activos') });
   const porArea = useMemo(() => {
     const m = new Map<string, Asset[]>();
-    for (const a of activos.data ?? []) if (a.estado !== 'DADO_DE_BAJA') m.set(a.area, [...(m.get(a.area) ?? []), a]);
+    for (const a of activos.data ?? []) if (a.estado !== 'DADO_DE_BAJA' && a.estado !== 'EN_BODEGA') m.set(a.area, [...(m.get(a.area) ?? []), a]);
     return [...m];
   }, [activos.data]);
   const elegido = activos.data?.find((a) => a.id === activoId);

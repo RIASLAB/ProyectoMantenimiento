@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { api, openProtectedFile } from '../../api/client';
 import type { Asset, AssetDocument, AssetHistory } from '../../api/types';
 import { OrderStateBadge } from '../../components/orders-shared';
+import { InstallModal } from '../../components/InstallModal';
 import { useAuth } from '../../auth/AuthContext';
 import { Badge, Button, Empty, ErrorBox, Icon, KeyValue, Modal, PageHeader, Spinner } from '../../components/ui';
 import { date, dateTime, daysUntil, ESTADO_LABEL, ESTADO_TONE, fileSize, money, qty, TIPO_LABEL } from '../../format';
@@ -71,6 +72,7 @@ export function AssetDetail() {
   const [uploadError, setUploadError] = useState('');
   const [openError, setOpenError] = useState('');
   const [aBorrar, setABorrar] = useState<AssetDocument | null>(null);
+  const [instalar, setInstalar] = useState(false);
 
   const q = useQuery({ queryKey: ['activo', id], queryFn: () => api.get<Asset>(`/activos/${id}`) });
 
@@ -119,7 +121,10 @@ export function AssetDetail() {
         subtitle={<><span className="code">{a.codigo}</span> <Badge tone={ESTADO_TONE[a.estado]}>{ESTADO_LABEL[a.estado]}</Badge></>}
         actions={
           <>
-            {a.estado !== 'DADO_DE_BAJA' ? (
+            {a.estado === 'EN_BODEGA' && can('ADMIN') ? (
+              <Button onClick={() => setInstalar(true)}><Icon name="wrench" /> Instalar</Button>
+            ) : null}
+            {a.estado !== 'DADO_DE_BAJA' && a.estado !== 'EN_BODEGA' ? (
               <Link to={`/ordenes/reportar?activo=${a.id}`} className="btn btn-primary">
                 <Icon name="alert" /> Reportar falla
               </Link>
@@ -214,6 +219,7 @@ export function AssetDetail() {
           <Historial activoId={a.id} />
         </section>
       </div>
+      <InstallModal equipo={instalar ? a : null} onClose={() => setInstalar(false)} />
       <Modal open={!!aBorrar} title="Eliminar documento" onClose={cerrarBorrar}
         footer={<><Button variant="ghost" onClick={cerrarBorrar}>Cancelar</Button><Button variant="danger" busy={borrar.isPending} onClick={() => aBorrar && borrar.mutate(aBorrar.id)}>Eliminar</Button></>}>
         <p style={{ marginTop: 0 }}>¿Eliminar <strong>{aBorrar?.nombreOriginal}</strong> de esta máquina?</p>

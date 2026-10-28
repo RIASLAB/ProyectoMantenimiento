@@ -125,7 +125,8 @@ export class EquipmentService {
               count(*) FILTER (WHERE a.estado = 'OPERATIVO') AS operativos,
               count(*) FILTER (WHERE a.estado = 'EN_MANTENIMIENTO') AS en_mantenimiento,
               count(*) FILTER (WHERE a.estado = 'FUERA_DE_SERVICIO') AS fuera_de_servicio,
-              count(*) FILTER (WHERE a.estado = 'DADO_DE_BAJA') AS dados_de_baja
+              count(*) FILTER (WHERE a.estado = 'DADO_DE_BAJA') AS dados_de_baja,
+              count(*) FILTER (WHERE a.estado = 'EN_BODEGA') AS en_bodega
          FROM activos a
          LEFT JOIN modelos_equipo m ON m.id = a.modelo_id
          LEFT JOIN categorias_equipo c ON c.id = m.categoria_id
@@ -137,11 +138,12 @@ export class EquipmentService {
     const n = (v: string | null) => Number(v ?? 0);
     const filas = rows.map((r) => ({
       categoriaId: r.categoria_id, categoria: r.categoria!, modeloId: r.modelo_id, modelo: r.modelo, area: r.area!,
-      total: n(r.total), operativos: n(r.operativos), enMantenimiento: n(r.en_mantenimiento), fueraDeServicio: n(r.fuera_de_servicio), dadosDeBaja: n(r.dados_de_baja),
+      total: n(r.total), operativos: n(r.operativos), enMantenimiento: n(r.en_mantenimiento), fueraDeServicio: n(r.fuera_de_servicio), dadosDeBaja: n(r.dados_de_baja), enBodega: n(r.en_bodega),
     }));
-    // En uso = sin contar los dados de baja (la pregunta típica: "¿cuántos tengo?")
-    const enUso = filas.reduce((s, f) => s + f.total - f.dadosDeBaja, 0);
-    return { filas, total: filas.reduce((s, f) => s + f.total, 0), enUso };
+    // En uso = instalados (sin los dados de baja ni los que están en bodega sin instalar).
+    const enUso = filas.reduce((s, f) => s + f.total - f.dadosDeBaja - f.enBodega, 0);
+    const enBodega = filas.reduce((s, f) => s + f.enBodega, 0);
+    return { filas, total: filas.reduce((s, f) => s + f.total, 0), enUso, enBodega };
   }
 
   // ---------- Internos ----------

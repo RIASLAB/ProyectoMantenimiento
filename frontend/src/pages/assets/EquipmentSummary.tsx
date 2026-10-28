@@ -25,7 +25,7 @@ export function EquipmentSummary() {
     : f.categoriaId ? categorias.find(([id]) => id === f.categoriaId)?.[1] : 'equipos';
   const donde = f.area ? `en ${f.area}` : 'en total';
   const r = q.data;
-  const bajas = r ? r.total - r.enUso : 0;
+  const bajas = r ? r.total - r.enUso - r.enBodega : 0;
 
   return (
     <>
@@ -66,7 +66,9 @@ export function EquipmentSummary() {
             <span className="respuesta-n">{r.enUso}</span>
             <div>
               <strong>{que} {donde}</strong>
-              <span className="muted">{bajas ? `en uso · además ${bajas} dado${bajas === 1 ? '' : 's'} de baja` : 'en uso'}</span>
+              <span className="muted">
+                instalados{r.enBodega ? ` · además ${r.enBodega} en bodega sin instalar` : ''}{bajas ? ` · ${bajas} dado${bajas === 1 ? '' : 's'} de baja` : ''}
+              </span>
             </div>
             <Link className="btn btn-ghost" to={`/maquinas${qs({ area: f.area, categoriaId: f.categoriaId, modeloId: f.modeloId })}`}>Ver la lista</Link>
           </section>
@@ -83,7 +85,7 @@ export function EquipmentSummary() {
             <div className="table-wrap">
               <table className="table">
                 <thead>
-                  <tr><th>Tipo</th><th>Área</th><th className="num">En uso</th><th className="num">Operativos</th><th className="num">En mant.</th><th className="num">Fuera de servicio</th><th className="num">De baja</th></tr>
+                  <tr><th>Tipo</th><th>Área</th><th className="num">En uso</th><th className="num">Operativos</th><th className="num">En mant.</th><th className="num">Fuera de servicio</th><th className="num">En bodega</th><th className="num">De baja</th></tr>
                 </thead>
                 <tbody>
                   {r.filas.map((x, i) => (
@@ -92,10 +94,11 @@ export function EquipmentSummary() {
                         <Link to={`/maquinas${qs({ area: x.area, modeloId: x.modeloId ?? undefined })}`}><strong>{x.categoria}</strong>{x.modelo ? ` · ${x.modelo}` : ''}</Link>
                       </td>
                       <td data-label="Área">{x.area}</td>
-                      <td data-label="En uso" className="num"><strong>{x.total - x.dadosDeBaja}</strong></td>
+                      <td data-label="En uso" className="num"><strong>{x.total - x.dadosDeBaja - x.enBodega}</strong></td>
                       <td data-label="Operativos" className="num">{x.operativos}</td>
                       <td data-label="En mant." className="num">{x.enMantenimiento}</td>
                       <td data-label="Fuera de servicio" className={`num ${x.fueraDeServicio ? 'text-bad' : ''}`}>{x.fueraDeServicio}</td>
+                      <td data-label="En bodega" className="num">{x.enBodega}</td>
                       <td data-label="De baja" className="num">{x.dadosDeBaja}</td>
                     </tr>
                   ))}

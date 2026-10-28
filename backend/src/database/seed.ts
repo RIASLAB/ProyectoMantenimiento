@@ -104,6 +104,13 @@ async function main() {
           materiales: await Promise.all(t.materiales.map(async ([c, cantidad]) => ds.getRepository(EquipmentModelPart).create({ repuestoId: await rep(c), cantidad }))),
         });
         if (t.equipos.length) await ds.getRepository(Asset).update({ codigo: In(t.equipos) }, { modeloId: modelo.id });
+        if (t.categoria === 'Molino') {
+          // Compraron más molinos de los que instalaron: dos quedan en bodega.
+          for (const codigo of ['MOL-002', 'MOL-003']) {
+            if (await ds.getRepository(Asset).exists({ where: { codigo } })) continue;
+            await ds.getRepository(Asset).save({ codigo, nombre: 'Molino de carne', fabricante: 'Javar', modelo: 'M-32', area: 'Proceso', ubicacion: 'Bodega de equipos', estado: EstadoActivo.EN_BODEGA, fechaCompra: '2025-08-01', modeloId: modelo.id });
+          }
+        }
         if (t.categoria === 'Aire acondicionado') {
           for (const [codigo, area, ubicacion] of [['AA-001', 'Bodega', 'Bodega de insumos'], ['AA-002', 'Bodega', 'Bodega de insumos'], ['AA-003', 'Bodega', 'Bodega de empaque'], ['AA-004', 'Oficinas', 'Oficina de producción']]) {
             if (await ds.getRepository(Asset).exists({ where: { codigo } })) continue;

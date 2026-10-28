@@ -8,13 +8,13 @@ import { Button, ErrorBox, Field, Icon, Input, PageHeader, Select, Spinner, Text
 import { ESTADO_LABEL } from '../../format';
 
 type FormState = Record<
-  'codigo' | 'codigoSap' | 'nombre' | 'modelo' | 'fabricante' | 'serie' | 'area' | 'ubicacion' | 'fechaCompra' | 'fechaFinGarantia' | 'notas' | 'modeloId' | 'cantidad',
+  'codigo' | 'codigoSap' | 'nombre' | 'modelo' | 'fabricante' | 'serie' | 'area' | 'ubicacion' | 'fechaCompra' | 'fechaFinGarantia' | 'notas' | 'modeloId' | 'cantidad' | 'enBodega',
   string
 > & { estado: EstadoActivo };
 
 const EMPTY: FormState = {
   codigo: '', codigoSap: '', nombre: '', modelo: '', fabricante: '', serie: '', area: '', ubicacion: '',
-  fechaCompra: '', fechaFinGarantia: '', notas: '', estado: 'OPERATIVO', modeloId: '', cantidad: '1',
+  fechaCompra: '', fechaFinGarantia: '', notas: '', estado: 'OPERATIVO', modeloId: '', cantidad: '1', enBodega: '0',
 };
 
 /** Códigos que se crearán al registrar varios equipos iguales (AA-001 → AA-001…AA-010). */
@@ -43,20 +43,20 @@ export function AssetForm() {
     setF({
       codigo: a.codigo, codigoSap: a.codigoSap ?? '', nombre: a.nombre, modelo: a.modelo ?? '', fabricante: a.fabricante ?? '',
       serie: a.serie ?? '', area: a.area, ubicacion: a.ubicacion ?? '', fechaCompra: a.fechaCompra ?? '',
-      fechaFinGarantia: a.fechaFinGarantia ?? '', notas: a.notas ?? '', estado: a.estado, modeloId: a.modeloId ?? '', cantidad: '1',
+      fechaFinGarantia: a.fechaFinGarantia ?? '', notas: a.notas ?? '', estado: a.estado, modeloId: a.modeloId ?? '', cantidad: '1', enBodega: '0',
     });
   }, [current.data]);
 
   const save = useMutation({
     mutationFn: (): Promise<{ varios: Array<{ id: string; codigo: string }> } | { a: Asset }> => {
       // Los campos vacíos se envían como null para poder borrarlos al editar.
-      const { cantidad, ...resto } = f;
+      const { cantidad, enBodega, ...resto } = f;
       const body: Record<string, unknown> = { ...resto };
       for (const k of ['codigoSap', 'modelo', 'fabricante', 'serie', 'ubicacion', 'fechaCompra', 'fechaFinGarantia', 'notas', 'modeloId']) {
         if (body[k] === '') body[k] = editing ? null : undefined;
       }
       if (!editing && Number(cantidad) > 1) {
-        return api.post<{ creados: Array<{ id: string; codigo: string }> }>('/activos/varios', { ...body, cantidad: Number(cantidad) })
+        return api.post<{ creados: Array<{ id: string; codigo: string }> }>('/activos/varios', { ...body, cantidad: Number(cantidad), enBodega: Number(enBodega) || 0 })
           .then((r) => ({ varios: r.creados }));
       }
       return (editing ? api.patch<Asset>(`/activos/${id}`, body) : api.post<Asset>('/activos', body)).then((a) => ({ a }));
@@ -125,6 +125,11 @@ export function AssetForm() {
           {!editing ? (
             <Field label="Cantidad de equipos iguales" hint={consecutivos(f.codigo, Number(f.cantidad)) ? `Se crearán ${f.cantidad}: ${consecutivos(f.codigo, Number(f.cantidad))}. La serie se registra después en cada uno.` : 'Ej. 10 aires iguales: el código debe terminar en número (AA-001).'}>
               {(i) => <Input id={i} type="number" min="1" max="100" {...bind('cantidad')} required />}
+            </Field>
+          ) : null}
+          {!editing && Number(f.cantidad) > 1 ? (
+            <Field label="De estos, cuántos quedan en bodega" hint={Number(f.enBodega) > 0 ? `Los últimos ${f.enBodega} quedan "En bodega (sin instalar)": no generan preventivos hasta que se instalen.` : 'Ej. compró 10 e instala 8: escriba 2.'}>
+              {(i) => <Input id={i} type="number" min="0" max={f.cantidad} {...bind('enBodega')} />}
             </Field>
           ) : null}
           <Field label="Fabricante">{(i) => <Input id={i} {...bind('fabricante')} maxLength={100} />}</Field>

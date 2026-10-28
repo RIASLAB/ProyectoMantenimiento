@@ -14,7 +14,7 @@ import { AssetDocument } from './asset-document.entity';
 import { Asset } from './asset.entity';
 import { EquipmentModel } from '../equipment/equipment.entities';
 import { MaintenanceService } from '../maintenance/maintenance.service';
-import { CreateAssetDto, CreateManyAssetsDto, UpdateAssetDto } from './assets.dto';
+import { CreateAssetDto, CreateManyAssetsDto, InstallAssetDto, UpdateAssetDto } from './assets.dto';
 
 @Injectable()
 export class AssetsService {
@@ -92,7 +92,8 @@ export class AssetsService {
 
   /** Registra varios equipos iguales (ej. 10 aires acondicionados) con códigos consecutivos. */
   async createMany(dto: CreateManyAssetsDto, actor: SessionUser) {
-    const { cantidad, ...base } = dto;
+    const { cantidad, enBodega = 0, ...base } = dto;
+    if (enBodega > cantidad) throw new BadRequestException('Los que quedan en bodega no pueden ser más que la cantidad');
     const codigos = this.consecutivos(dto.codigo.trim().toUpperCase(), cantidad);
     this.validarFechas(base.fechaCompra, base.fechaFinGarantia);
     if (base.modeloId) await this.validarModelo(base.modeloId);
@@ -104,13 +105,33 @@ export class AssetsService {
     return this.ds.transaction(async (em) => {
       datos.area = await this.areaExistente(em, datos.area!);
       const creados: Asset[] = [];
-      for (const codigo of codigos) {
-        const a = await em.getRepository(Asset).save(em.getRepository(Asset).create({ ...datos, codigo }));
+      for (const [i, codigo] of codigos.entries()) {
+        // Los últimos `enBodega` quedan sin instalar.
+        const estado = i >= cantidad - enBodega ? EstadoActivo.EN_BODEGA : datos.estado ?? EstadoActivo.OPERATIVO;
+        const a = await em.getRepository(Asset).save(em.getRepository(Asset).create({ ...datos, codigo, estado }));
         await this.audit.log({ usuarioId: actor.id, accion: 'ACTIVO_CREADO', entidad: 'activo', entidadId: a.id, detalle: { codigo, lote: `${codigos[0]} a ${codigos.at(-1)}` } }, em);
         creados.push(a);
       }
       const planes = await this.maintenance.aplicarPlanesDeTipo(em, creados.map((a) => a.id), actor);
       return { creados: creados.map((a) => ({ id: a.id, codigo: a.codigo })), planesAplicados: planes };
+    });
+  }
+
+  /** Instala una máquina que estaba en bodega: queda operativa en su área y recibe los preventivos de su tipo. */
+  async instalar(id: string, dto: InstallAssetDto, actor: SessionUser) {
+    const actual = await this.repo.findOne({ where: { id } });
+    if (!actual) throw new NotFoundException('Máquina no encontrada');
+    if (actual.estado !== EstadoActivo.EN_BODEGA) throw new BadRequestException('La máquina no está en bodega');
+    return this.ds.transaction(async (em) => {
+      const area = await this.areaExistente(em, dto.area);
+      const ubicacion = dto.ubicacion?.trim() || null;
+      await em.getRepository(Asset).update(id, { estado: EstadoActivo.OPERATIVO, area, ubicacion });
+      await this.audit.log({
+        usuarioId: actor.id, accion: 'ACTIVO_INSTALADO', entidad: 'activo', entidadId: id,
+        detalle: { codigo: actual.codigo, area: { antes: actual.area, despues: area }, ubicacion: { antes: actual.ubicacion, despues: ubicacion } },
+      }, em);
+      const planes = await this.maintenance.aplicarPlanesDeTipo(em, [id], actor);
+      return { ok: true, planesAplicados: planes };
     });
   }
 
@@ -158,11 +179,16 @@ export class AssetsService {
 
     return this.ds.transaction(async (em) => {
       if (cambios.area) cambios.area = await this.areaExistente(em, cambios.area);
+      const aBodega = cambios.estado === EstadoActivo.EN_BODEGA && actual.estado !== EstadoActivo.EN_BODEGA;
+      const instalada = actual.estado === EstadoActivo.EN_BODEGA && cambios.estado !== undefined && cambios.estado !== EstadoActivo.EN_BODEGA;
+      if (aBodega) await this.maintenance.alGuardarEnBodega(em, id, actor);
       await em.getRepository(Asset).update(id, cambios);
       await this.audit.log({ usuarioId: actor.id, accion: 'ACTIVO_ACTUALIZADO', entidad: 'activo', entidadId: id, detalle }, em);
       // Cambio de tipo: deja los planes del tipo anterior y recibe los del nuevo.
       if ('modeloId' in detalle) {
         if (actual.modeloId) await this.maintenance.desvincularPlanesDeTipo(em, id, actual.modeloId);
+        await this.maintenance.aplicarPlanesDeTipo(em, [id], actor);
+      } else if (instalada) {
         await this.maintenance.aplicarPlanesDeTipo(em, [id], actor);
       }
       return em.getRepository(Asset).findOneOrFail({ where: { id } });

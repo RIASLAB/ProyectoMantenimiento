@@ -5,7 +5,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { CurrentUser, Roles, SessionUser } from '../common/auth.decorators';
 import { EstadoActivo, Rol } from '../common/enums';
-import { CreateAssetDto, CreateManyAssetsDto, UpdateAssetDto } from './assets.dto';
+import { CreateAssetDto, CreateManyAssetsDto, InstallAssetDto, UpdateAssetDto } from './assets.dto';
 import { AssetsService } from './assets.service';
 
 const LIMITE_MULTER = Number(process.env.MAX_UPLOAD_MB ?? 20) * 1024 * 1024 + 1;
@@ -54,6 +54,12 @@ export class AssetsController {
   @Roles(Rol.ADMIN)
   create(@Body() dto: CreateAssetDto, @CurrentUser() actor: SessionUser) {
     return this.assets.create(dto, actor);
+  }
+
+  @Post(':id/instalar')
+  @Roles(Rol.ADMIN)
+  instalar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: InstallAssetDto, @CurrentUser() actor: SessionUser) {
+    return this.assets.instalar(id, dto, actor);
   }
 
   @Post('varios')

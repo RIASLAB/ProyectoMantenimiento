@@ -26,6 +26,7 @@ Sistema de mantenimiento e inventario de repuestos: hoja de vida de máquinas, m
 | Indicadores: disponibilidad, MTBF, MTTR, cumplimiento de preventivos, rotación, gráficos | ✅ Sprint 3 |
 | Carga masiva de máquinas y repuestos desde Excel, con validación por fila | ✅ Sprint 3 |
 | Tipos de equipo (categoría y modelo) con lista de materiales; equipos iguales; preventivo por tipo; conteo por área | ✅ |
+| Inventario de equipos: máquinas compradas en bodega sin instalar, instalar desde el inventario | ✅ |
 | Producción con Docker y HTTPS, respaldos diarios cifrados con prueba de restauración | ✅ Sprint 3 |
 
 El detalle requisito por requisito está en [docs/trazabilidad.md](docs/trazabilidad.md).
@@ -88,9 +89,9 @@ cd backend
 npm run test:e2e
 ```
 
-Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **175 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
+Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **179 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
 
-Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**84 verificaciones**):
+Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**90 verificaciones**):
 
 | Script | Qué recorre |
 |---|---|
@@ -98,6 +99,7 @@ Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritori
 | `e2e/ordenes.py` | Operario reporta falla en el celular → admin asigna → técnico cierra con repuestos y horas → hoja de vida |
 | `e2e/compras.py` | Faltante automático → autorizador aprueba/rechaza → admin compra y recibe en bodega |
 | `e2e/calidad.py` | Temperatura fuera de rango, checklist con no conformidad, anulación, exportación, configuración |
+| `e2e/equipos_en_bodega.py` | Inventario de equipos sin instalar: 5 molinos con 2 en bodega, instalar, conteo por área y guardar en bodega |
 | `e2e/tipos_equipo.py` | Tipos de equipo con lista de materiales, 3 aires iguales de una vez, cuántos hay en Bodega, preventivo por tipo y materiales en correctivos |
 | `e2e/eliminar_adjuntos.py` | Eliminar fotos de una orden (quién puede y cuándo) y documentos de una máquina |
 | `e2e/carga_masiva.py` | Descarga la plantilla, la llena, la sube con errores (fila y columna), la corrige y carga máquinas y repuestos con stock inicial |
@@ -152,7 +154,8 @@ Todas las rutas van bajo `/api` y requieren `Authorization: Bearer <token>`, sal
 | `GET /importacion/:tipo/plantilla` | Admin | Plantilla de Excel (`maquinas` o `repuestos`) |
 | `DELETE /ordenes/fotos/:id` | Quien la subió o Admin | Eliminar una foto mientras la orden está abierta |
 | `DELETE /activos/documentos/:id` | Admin | Eliminar un documento de una máquina |
-| `POST /activos/varios` | Admin | Registrar varios equipos iguales con códigos consecutivos (`cantidad`) |
+| `POST /activos/varios` | Admin | Registrar varios equipos iguales con códigos consecutivos (`cantidad`, `enBodega`) |
+| `POST /activos/:id/instalar` | Admin | Instalar una máquina que estaba en bodega (área y ubicación) |
 | `GET /tipos-equipo`, `GET /tipos-equipo/:id`, `GET /tipos-equipo/categorias` | Todos | Tipos de equipo (categoría y modelo) con su lista de materiales |
 | `POST/PATCH/DELETE /tipos-equipo` | Admin | Crear, editar o eliminar un tipo de equipo |
 | `GET /tipos-equipo/resumen?area=&categoriaId=&modeloId=` · `/exportar` | Admin, Autorizador, Técnico | Cuántos equipos hay de cada tipo en cada área |

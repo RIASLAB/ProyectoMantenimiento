@@ -89,7 +89,7 @@ describe('INT-01 · Validación con número de fila', () => {
       '7|Área|Es obligatorio',
       '8|Fecha de compra|La fecha no existe',
       '9|Fin de garantía|Es anterior a la fecha de compra',
-      '10|Estado|"Averiada" no es un estado válido: use Operativo o Dado de baja',
+      '10|Estado|"Averiada" no es un estado válido: use Operativo, En bodega o Dado de baja',
     ]);
     expect(r.body.vistaPrevia[0]).toMatchObject({ fila: 2, codigo: 'EMB-010', fechaCompra: '2022-07-01', fechaFinGarantia: '2027-07-01', estado: 'OPERATIVO' });
     expect(r.body.registros).toBeUndefined();

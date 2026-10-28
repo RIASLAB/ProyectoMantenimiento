@@ -148,7 +148,7 @@ export class KpiService {
     // ---------- Máquinas y paradas (KPI-01, 02, 03) ----------
     const maquinas: Array<{ id: string; codigo: string; nombre: string; area: string; estado: string; creado: Date }> = await this.ds.query(
       `SELECT id, codigo, nombre, area, estado, creado_en AS creado FROM activos
-        WHERE creado_en < $1 AND (estado <> 'DADO_DE_BAJA' OR id IN (SELECT activo_id FROM ordenes_trabajo WHERE creado_en >= $2))
+        WHERE creado_en < $1 AND (estado NOT IN ('DADO_DE_BAJA', 'EN_BODEGA') OR id IN (SELECT activo_id FROM ordenes_trabajo WHERE creado_en >= $2))
         ORDER BY codigo`,
       [finIso, ini],
     );

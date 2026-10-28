@@ -51,4 +51,17 @@ export class UpdateAssetDto extends PartialType(CreateAssetDto) {}
 export class CreateManyAssetsDto extends CreateAssetDto {
   @Type(() => Number) @IsInt() @Min(2) @Max(100)
   cantidad: number;
+
+  /** De la cantidad, cuántos quedan en bodega sin instalar (los últimos códigos). */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(100)
+  enBodega?: number;
+}
+
+/** Instalar una máquina que estaba en bodega. */
+export class InstallAssetDto {
+  @IsString() @MinLength(2) @MaxLength(100)
+  area: string;
+
+  @IsOptional() @IsString() @MaxLength(150)
+  ubicacion?: string | null;
 }

@@ -228,6 +228,7 @@ export class QualityService {
     if (activoId) {
       const a = await this.assets.findOne({ where: { id: activoId } });
       if (!a || a.estado === EstadoActivo.DADO_DE_BAJA) throw new BadRequestException('La máquina no existe o está dada de baja');
+      if (a.estado === EstadoActivo.EN_BODEGA) throw new BadRequestException('La máquina está en bodega (sin instalar)');
     }
     const registradoEn = this.momento(dto.registradoEn);
     const porItem = new Map(dto.respuestas.map((r) => [r.itemId, r.valor]));

@@ -46,11 +46,11 @@ with sync_playwright() as p:
     # Vuelve a la página que se intentó abrir antes de iniciar sesión
     expect(page).to_have_url(re.compile('/maquinas'))
     expect(page.get_by_role('heading', name='Máquinas')).to_be_visible()
-    expect(page.locator('.list-row')).to_have_count(8)
-    ok('login admin y lista de 8 máquinas (con los 4 aires de demostración)')
+    expect(page.locator('.list-row')).to_have_count(10)
+    ok('login admin y lista de 10 máquinas (con los aires y los molinos en bodega de demostración)')
     page.screenshot(path=SP + '/02-maquinas.png')
 
-    page.get_by_label('Buscar máquinas').fill('molino')
+    page.get_by_label('Buscar máquinas').fill('embutidora')
     expect(page.locator('.list-row')).to_have_count(1)
     page.get_by_label('Buscar máquinas').fill('')
     page.get_by_label('Filtrar por estado').select_option('EN_MANTENIMIENTO')
@@ -59,7 +59,7 @@ with sync_playwright() as p:
     page.get_by_label('Filtrar por estado').select_option('')
     ok('búsqueda y filtro por estado')
 
-    page.get_by_text('Molino de carne').click()
+    page.locator('.list-row', has_text='MOL-001').click()
     expect(page.get_by_role('heading', name='Molino de carne')).to_be_visible()
     expect(page.get_by_text('Vencida')).to_be_visible()
     with page.expect_file_chooser() as fc:
@@ -83,7 +83,7 @@ with sync_playwright() as p:
     page.get_by_role('link', name='Editar').click()
     page.get_by_label('Ubicación').fill('Sala de molienda 2')
     page.get_by_role('button', name='Guardar cambios').click()
-    expect(page.get_by_text('Sala de molienda 2')).to_be_visible()
+    expect(page.get_by_text('Sala de molienda 2').first).to_be_visible()
     ok('editar ficha')
 
     page.goto(BASE + '/maquinas/nueva')

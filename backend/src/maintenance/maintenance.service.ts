@@ -219,6 +219,7 @@ export class MaintenanceService {
     const activo = await this.assets.findOne({ where: { id: dto.activoId } });
     if (!activo) throw new NotFoundException('Máquina no encontrada');
     if (activo.estado === EstadoActivo.DADO_DE_BAJA) throw new BadRequestException('La máquina está dada de baja');
+    if (activo.estado === EstadoActivo.EN_BODEGA) throw new BadRequestException('La máquina está en bodega (sin instalar): instálela primero');
 
     const momento = dto.reportadoEn ? new Date(dto.reportadoEn) : new Date();
     if (momento.getTime() > Date.now() + 5 * 60_000) throw new BadRequestException('La hora del reporte no puede estar en el futuro');
@@ -525,6 +526,7 @@ export class MaintenanceService {
     const activo = await this.assets.findOne({ where: { id: dto.activoId! } });
     if (!activo) throw new NotFoundException('Máquina no encontrada');
     if (activo.estado === EstadoActivo.DADO_DE_BAJA) throw new BadRequestException('La máquina está dada de baja');
+    if (activo.estado === EstadoActivo.EN_BODEGA) throw new BadRequestException('La máquina está en bodega (sin instalar): instálela primero');
 
     return this.ds.transaction(async (em) => {
       await this.validarRepuestos(em, dto.repuestos);
@@ -554,7 +556,7 @@ export class MaintenanceService {
           repuestos: this.agrupar(dto.repuestos).map((r) => em.getRepository(PlanPart).create({ repuestoId: r.repuestoId, cantidad: r.cantidad })),
         }),
       );
-      const equipos = await em.getRepository(Asset).find({ where: { modeloId: modelo.id, estado: Not(EstadoActivo.DADO_DE_BAJA) }, order: { codigo: 'ASC' } });
+      const equipos = await em.getRepository(Asset).find({ where: { modeloId: modelo.id, estado: Not(In([EstadoActivo.DADO_DE_BAJA, EstadoActivo.EN_BODEGA])) }, order: { codigo: 'ASC' } });
       const ordenes = [];
       for (const a of equipos) ordenes.push(await this.crearPlanDeEquipo(em, plantilla, a, dto.primeraFecha, actor));
       await this.audit.log({
@@ -606,7 +608,7 @@ export class MaintenanceService {
    */
   async aplicarPlanesDeTipo(em: EntityManager, activoIds: string[], actor: SessionUser) {
     if (!activoIds.length) return 0;
-    const activos = await em.getRepository(Asset).find({ where: { id: In(activoIds), estado: Not(EstadoActivo.DADO_DE_BAJA) } });
+    const activos = await em.getRepository(Asset).find({ where: { id: In(activoIds), estado: Not(In([EstadoActivo.DADO_DE_BAJA, EstadoActivo.EN_BODEGA])) } });
     const modelos = [...new Set(activos.map((a) => a.modeloId).filter((x): x is string => !!x))];
     if (!modelos.length) return 0;
     const plantillas = await em.getRepository(MaintenancePlan).find({ where: { modeloId: In(modelos), vigente: true }, relations: { repuestos: true } });
@@ -621,6 +623,26 @@ export class MaintenanceService {
       }
     }
     return creados;
+  }
+
+  /**
+   * Guardar una máquina en bodega (D-19): sus planes dejan de generar órdenes (los del tipo se desvinculan para
+   * volver a aplicarse completos al instalarla) y sus preventivos aún no iniciados se cancelan solos.
+   * Un correctivo abierto o un trabajo en curso lo impiden: primero hay que cerrarlo o cancelarlo.
+   */
+  async alGuardarEnBodega(em: EntityManager, activoId: string, actor: SessionUser) {
+    const abiertas = await em.getRepository(WorkOrder).find({ where: { activoId, estado: In(ABIERTAS) } });
+    const bloquean = abiertas.filter((o) => o.tipo === TipoOrden.CORRECTIVO || o.estado === EstadoOrden.EN_EJECUCION || o.estado === EstadoOrden.ESPERANDO_REPUESTO);
+    if (bloquean.length) {
+      throw new BadRequestException(`No se puede guardar en bodega: tiene ${bloquean.map((o) => numeroOT(o.numero)).join(', ')} sin terminar. Ciérrela${bloquean.length === 1 ? '' : 's'} o cancéle${bloquean.length === 1 ? 'la' : 'las'} primero`);
+    }
+    await em.getRepository(MaintenancePlan).update({ activoId }, { vigente: false, plantillaId: null });
+    for (const o of abiertas) {
+      const motivo = 'La máquina se guardó en bodega';
+      await em.getRepository(WorkOrder).update(o.id, { estado: EstadoOrden.CANCELADA, motivoCancelacion: motivo });
+      await this.evento(em, o.id, actor, o.estado, EstadoOrden.CANCELADA, `Orden cancelada: ${motivo}`);
+    }
+    return abiertas.length;
   }
 
   /** Al quitarle o cambiarle el tipo a una máquina, sus planes del tipo anterior dejan de generar órdenes. */
@@ -701,7 +723,7 @@ export class MaintenanceService {
    */
   private async recomputarEstadoActivo(em: EntityManager, activoId: string, actor: SessionUser) {
     const activo = await em.getRepository(Asset).findOne({ where: { id: activoId } });
-    if (!activo || activo.estado === EstadoActivo.DADO_DE_BAJA) return;
+    if (!activo || activo.estado === EstadoActivo.DADO_DE_BAJA || activo.estado === EstadoActivo.EN_BODEGA) return;
     const abiertas = await em.getRepository(WorkOrder).find({ where: { activoId, estado: In(ABIERTAS) } });
     const nuevo = abiertas.some((o) => o.maquinaParada)
       ? EstadoActivo.FUERA_DE_SERVICIO

@@ -110,6 +110,7 @@ const codigo = (v: Valor) => {
 
 const ESTADOS: Record<string, EstadoActivo> = {
   operativo: EstadoActivo.OPERATIVO, operativa: EstadoActivo.OPERATIVO,
+  'en bodega': EstadoActivo.EN_BODEGA, bodega: EstadoActivo.EN_BODEGA, 'sin instalar': EstadoActivo.EN_BODEGA,
   'dado de baja': EstadoActivo.DADO_DE_BAJA, 'dada de baja': EstadoActivo.DADO_DE_BAJA, baja: EstadoActivo.DADO_DE_BAJA,
 };
 const sinTildes = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[*:]/g, '').replace(/\s+/g, ' ').trim();
@@ -129,11 +130,11 @@ const COLUMNAS: Record<TipoCarga, Columna[]> = {
     { clave: 'fechaCompra', titulo: 'Fecha de compra', ancho: 16, ayuda: 'DD/MM/AAAA', leer: fecha },
     { clave: 'fechaFinGarantia', titulo: 'Fin de garantía', ancho: 16, ayuda: 'DD/MM/AAAA, no anterior a la compra', leer: fecha },
     {
-      clave: 'estado', titulo: 'Estado', ancho: 14, ayuda: 'Operativo (si se deja vacío) o Dado de baja. El resto lo calculan las órdenes de trabajo.',
+      clave: 'estado', titulo: 'Estado', ancho: 14, ayuda: 'Operativo (si se deja vacío), En bodega (comprada sin instalar) o Dado de baja. El resto lo calculan las órdenes de trabajo.',
       leer: (v) => {
         const s = texto(v, 40);
         if (s === null) return EstadoActivo.OPERATIVO;
-        return ESTADOS[sinTildes(s)] ?? falla(`"${s}" no es un estado válido: use Operativo o Dado de baja`);
+        return ESTADOS[sinTildes(s)] ?? falla(`"${s}" no es un estado válido: use Operativo, En bodega o Dado de baja`);
       },
     },
     { clave: 'notas', titulo: 'Notas', ancho: 30, ayuda: '', leer: (v) => texto(v, 4000) },
@@ -192,7 +193,7 @@ export class ImportService {
     for (let r = 2; r <= MAX_FILAS + 1; r++) {
       cols.forEach((c, i) => {
         const cell = ws.getRow(r).getCell(i + 1);
-        if (c.clave === 'estado') cell.dataValidation = { type: 'list', allowBlank: true, formulae: ['"Operativo,Dado de baja"'] };
+        if (c.clave === 'estado') cell.dataValidation = { type: 'list', allowBlank: true, formulae: ['"Operativo,En bodega,Dado de baja"'] };
         if (c.clave.startsWith('fecha')) cell.numFmt = 'dd/mm/yyyy';
         if (c.clave === 'codigo') cell.numFmt = '@';
       });

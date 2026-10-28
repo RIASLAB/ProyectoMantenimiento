@@ -7,6 +7,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { Badge, Button, Empty, ErrorBox, Icon, Input, PageHeader, Spinner } from '../../components/ui';
 import { money, qty } from '../../format';
 import { useDebounced, useUrlFilters } from '../../hooks';
+import { InventoryTabs } from './StoredEquipment';
 
 export function PartsList() {
   const { can } = useAuth();
@@ -69,6 +70,7 @@ export function PartsList() {
           </>
         }
       />
+      <InventoryTabs />
       {exportError ? <div className="alert alert-bad">{exportError}</div> : null}
 
       <div className="toolbar">

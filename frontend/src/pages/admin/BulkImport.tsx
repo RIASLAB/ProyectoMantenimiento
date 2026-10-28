@@ -169,7 +169,7 @@ function resumenTotales(tipo: Tipo, tot: Analisis['totales']) {
 function VistaPrevia({ tipo, filas, total }: { tipo: Tipo; filas: Analisis['vistaPrevia']; total: number }) {
   const cols: Array<[string, string, (v: unknown) => string]> = tipo === 'maquinas'
     ? [['codigo', 'Código', String], ['nombre', 'Nombre', String], ['area', 'Área', String], ['ubicacion', 'Ubicación', (v) => (v ? String(v) : '—')],
-      ['fechaCompra', 'Compra', (v) => (v ? date(String(v)) : '—')], ['estado', 'Estado', (v) => (v === 'DADO_DE_BAJA' ? 'Dado de baja' : 'Operativo')]]
+      ['fechaCompra', 'Compra', (v) => (v ? date(String(v)) : '—')], ['estado', 'Estado', (v) => (v === 'DADO_DE_BAJA' ? 'Dado de baja' : v === 'EN_BODEGA' ? 'En bodega' : 'Operativo')]]
     : [['codigo', 'Código', String], ['descripcion', 'Descripción', String], ['unidad', 'Unidad', String], ['stockMinimo', 'Mínimo', (v) => qty(Number(v))],
       ['stockInicial', 'Stock inicial', (v) => qty(Number(v))], ['costoUnitario', 'Costo unitario', (v) => (v === null ? '—' : money(Number(v)))]];
   const numericas = ['stockMinimo', 'stockInicial', 'costoUnitario'];

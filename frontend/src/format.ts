@@ -12,13 +12,15 @@ export const ESTADO_LABEL: Record<EstadoActivo, string> = {
   EN_MANTENIMIENTO: 'En mantenimiento',
   FUERA_DE_SERVICIO: 'Fuera de servicio',
   DADO_DE_BAJA: 'Dado de baja',
+  EN_BODEGA: 'En bodega (sin instalar)',
 };
 
-export const ESTADO_TONE: Record<EstadoActivo, 'ok' | 'warn' | 'bad' | 'muted'> = {
+export const ESTADO_TONE: Record<EstadoActivo, 'ok' | 'warn' | 'bad' | 'muted' | 'info'> = {
   OPERATIVO: 'ok',
   EN_MANTENIMIENTO: 'warn',
   FUERA_DE_SERVICIO: 'bad',
   DADO_DE_BAJA: 'muted',
+  EN_BODEGA: 'info',
 };
 
 export const MOV_LABEL: Record<TipoMovimiento, string> = {

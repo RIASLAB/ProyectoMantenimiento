@@ -10,6 +10,8 @@ export enum EstadoActivo {
   EN_MANTENIMIENTO = 'EN_MANTENIMIENTO',
   FUERA_DE_SERVICIO = 'FUERA_DE_SERVICIO',
   DADO_DE_BAJA = 'DADO_DE_BAJA',
+  /** Comprada pero sin instalar: está en el inventario de equipos; no genera preventivos ni cuenta en indicadores. */
+  EN_BODEGA = 'EN_BODEGA',
 }
 
 /**

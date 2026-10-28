@@ -72,7 +72,7 @@ export function FillChecklist() {
               {(i) => (
                 <Select id={i} value={activoId} onChange={(e) => setActivoId(e.target.value)}>
                   <option value="">General / no aplica</option>
-                  {activos.data?.filter((a) => a.estado !== 'DADO_DE_BAJA').map((a) => <option key={a.id} value={a.id}>{a.codigo} · {a.nombre}</option>)}
+                  {activos.data?.filter((a) => a.estado !== 'DADO_DE_BAJA' && a.estado !== 'EN_BODEGA').map((a) => <option key={a.id} value={a.id}>{a.codigo} · {a.nombre}</option>)}
                 </Select>
               )}
             </Field>

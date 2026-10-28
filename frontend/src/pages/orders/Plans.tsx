@@ -59,7 +59,7 @@ function PlanModal({ plan, equiposDelTipo, open, onClose }: { plan: Plan | null;
   }, [tipo.data, editing, precargado, rows]);
   useEffect(() => { if (!open) setPrecargado(null); }, [open]);
 
-  const equiposTipo = destino === 'tipo' && f.modeloId ? activos.data?.filter((a) => a.modeloId === f.modeloId && a.estado !== 'DADO_DE_BAJA').length ?? 0 : 0;
+  const equiposTipo = destino === 'tipo' && f.modeloId ? activos.data?.filter((a) => a.modeloId === f.modeloId && a.estado !== 'DADO_DE_BAJA' && a.estado !== 'EN_BODEGA').length ?? 0 : 0;
 
   const m = useMutation({
     mutationFn: () => {
@@ -97,7 +97,7 @@ function PlanModal({ plan, equiposDelTipo, open, onClose }: { plan: Plan | null;
             {(i) => (
               <Select id={i} value={f.activoId} onChange={set('activoId')} required disabled={editing}>
                 <option value="" disabled>Seleccione…</option>
-                {activos.data?.filter((a) => a.estado !== 'DADO_DE_BAJA').map((a) => <option key={a.id} value={a.id}>{a.codigo} · {a.nombre}</option>)}
+                {activos.data?.filter((a) => a.estado !== 'DADO_DE_BAJA' && a.estado !== 'EN_BODEGA').map((a) => <option key={a.id} value={a.id}>{a.codigo} · {a.nombre}</option>)}
               </Select>
             )}
           </Field>

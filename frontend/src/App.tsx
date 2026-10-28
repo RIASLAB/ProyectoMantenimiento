@@ -18,6 +18,7 @@ import { Notifications } from './pages/Notifications';
 import { Indicators } from './pages/Indicators';
 import { EquipmentTypes } from './pages/assets/EquipmentTypes';
 import { EquipmentSummary } from './pages/assets/EquipmentSummary';
+import { StoredEquipment } from './pages/inventory/StoredEquipment';
 import { BulkImport } from './pages/admin/BulkImport';
 import { OrderDetail } from './pages/orders/OrderDetail';
 import { OrdersList } from './pages/orders/OrdersList';
@@ -81,6 +82,7 @@ export function App() {
         <Route path="maquinas/:id" element={<AssetDetail />} />
         <Route path="maquinas/:id/editar" element={<OnlyRoles roles={['ADMIN']}><AssetForm /></OnlyRoles>} />
         <Route path="inventario" element={<PartsList />} />
+        <Route path="inventario/equipos" element={<StoredEquipment />} />
         <Route path="inventario/nuevo" element={<OnlyRoles roles={['ADMIN']}><PartForm /></OnlyRoles>} />
         <Route path="inventario/:id" element={<PartDetail />} />
         <Route path="inventario/:id/editar" element={<OnlyRoles roles={['ADMIN']}><PartForm /></OnlyRoles>} />

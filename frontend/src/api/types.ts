@@ -1,5 +1,5 @@
 export type Rol = 'ADMIN' | 'AUTORIZADOR' | 'TECNICO' | 'OPERARIO';
-export type EstadoActivo = 'OPERATIVO' | 'EN_MANTENIMIENTO' | 'FUERA_DE_SERVICIO' | 'DADO_DE_BAJA';
+export type EstadoActivo = 'OPERATIVO' | 'EN_MANTENIMIENTO' | 'FUERA_DE_SERVICIO' | 'DADO_DE_BAJA' | 'EN_BODEGA';
 export type TipoMovimiento = 'ENTRADA_COMPRA' | 'ENTRADA_INICIAL' | 'ENTRADA_AJUSTE' | 'ENTRADA_DEVOLUCION' | 'SALIDA_CONSUMO' | 'SALIDA_AJUSTE';
 
 export interface SessionUser {
@@ -167,7 +167,8 @@ export interface EquipmentModel extends EquipmentModelRef {
 export interface ResumenEquipos {
   total: number;
   enUso: number;
-  filas: Array<{ categoriaId: string | null; categoria: string; modeloId: string | null; modelo: string | null; area: string; total: number; operativos: number; enMantenimiento: number; fueraDeServicio: number; dadosDeBaja: number }>;
+  enBodega: number;
+  filas: Array<{ categoriaId: string | null; categoria: string; modeloId: string | null; modelo: string | null; area: string; total: number; operativos: number; enMantenimiento: number; fueraDeServicio: number; dadosDeBaja: number; enBodega: number }>;
 }
 
 export interface Plan {

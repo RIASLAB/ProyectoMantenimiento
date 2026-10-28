@@ -17,6 +17,7 @@ const ACCION_LABEL: Record<string, string> = {
   ACTIVO_ACTUALIZADO: 'Modificó máquina',
   DOCUMENTO_ADJUNTADO: 'Adjuntó documento',
   DOCUMENTO_ELIMINADO: 'Eliminó documento',
+  ACTIVO_INSTALADO: 'Instaló una máquina que estaba en bodega',
   MODELO_CREADO: 'Creó tipo de equipo',
   MODELO_ACTUALIZADO: 'Modificó tipo de equipo',
   MODELO_ELIMINADO: 'Eliminó tipo de equipo',

@@ -223,3 +223,64 @@ describe('Carga desde Excel con tipo de equipo', () => {
     expect(a.modeloEquipo).toMatchObject({ nombre: 'Molino M-32' });
   });
 });
+
+describe('Equipos en bodega (comprados sin instalar)', () => {
+  let molinos: Array<{ id: string; codigo: string }>;
+
+  it('de 5 molinos iguales, 2 quedan en bodega; no cuentan como en uso', async () => {
+    await post('/planes', { modeloId: molino, nombre: 'Afilado de cuchilla', frecuenciaValor: 1, frecuenciaUnidad: 'MESES', primeraFecha: masDias(3), repuestos: [{ repuestoId: rep['RP-CUCH'], cantidad: 1 }] }).expect(201);
+    const r = await post('/activos/varios', { codigo: 'MOL-101', nombre: 'Molino', area: 'Proceso', modeloId: molino, cantidad: 5, enBodega: 2 });
+    expect(r.status).toBe(201);
+    molinos = r.body.creados;
+    expect(r.body.planesAplicados).toBe(3); // los 2 de bodega no reciben preventivos
+    const estados = await Promise.all(molinos.map(async (m) => (await get(`/activos/${m.id}`)).body.estado));
+    expect(estados).toEqual(['OPERATIVO', 'OPERATIVO', 'OPERATIVO', 'EN_BODEGA', 'EN_BODEGA']);
+    const res = await get(`/tipos-equipo/resumen?modeloId=${molino}`);
+    expect(res.body).toMatchObject({ enBodega: 2 });
+    expect(res.body.enUso).toBe(res.body.total - 2);
+    expect((await post('/activos/varios', { codigo: 'MOL-201', nombre: 'Molino', area: 'Proceso', cantidad: 2, enBodega: 3 })).status).toBe(400);
+  });
+
+  it('una máquina en bodega no recibe reportes ni planes', async () => {
+    const guardado = molinos[4];
+    const f = await post('/ordenes', { activoId: guardado.id, descripcion: 'Ruido raro', maquinaParada: false }, tec.token);
+    expect(f.status).toBe(400);
+    expect(f.body.message).toContain('en bodega');
+    const p = await post('/planes', { activoId: guardado.id, nombre: 'Plan', frecuenciaValor: 1, frecuenciaUnidad: 'MESES', primeraFecha: masDias(3), repuestos: [] });
+    expect(p.status).toBe(400);
+  });
+
+  it('al instalarla queda operativa en su área y recibe el preventivo de su tipo', async () => {
+    const guardado = molinos[4];
+    expect((await post(`/activos/${guardado.id}/instalar`, { area: 'proceso' }, tec.token)).status).toBe(403);
+    const r = await post(`/activos/${guardado.id}/instalar`, { area: 'proceso', ubicacion: 'Sala 2' });
+    expect(r.status).toBe(201);
+    expect(r.body.planesAplicados).toBe(1);
+    expect((await get(`/activos/${guardado.id}`)).body).toMatchObject({ estado: 'OPERATIVO', area: 'Proceso', ubicacion: 'Sala 2' });
+    const b = await get(`/bitacora?entidad=activo&entidadId=${guardado.id}`);
+    expect(b.body.items[0]).toMatchObject({ accion: 'ACTIVO_INSTALADO' });
+    expect((await post(`/activos/${guardado.id}/instalar`, { area: 'Proceso' })).status).toBe(400);
+  });
+
+  it('al guardarla en bodega se cancelan sus preventivos pendientes y sus planes dejan de generar; un correctivo abierto lo impide', async () => {
+    const m = molinos[0];
+    const falla = await post('/ordenes', { activoId: m.id, descripcion: 'Vibración fuerte', maquinaParada: false });
+    const r = await patch(`/activos/${m.id}`, { estado: 'EN_BODEGA' });
+    expect(r.status).toBe(400);
+    expect(r.body.message).toContain('sin terminar');
+    await post(`/ordenes/${falla.body.id}/cancelar`, { motivo: 'Reporte duplicado' }).expect(201);
+
+    await patch(`/activos/${m.id}`, { estado: 'EN_BODEGA' }).expect(200);
+    const abiertas = ((await get('/ordenes?vista=abiertas')).body as Array<{ activo: { codigo: string } }>).filter((o) => o.activo.codigo === m.codigo);
+    expect(abiertas).toHaveLength(0);
+    const ots = (await get(`/ordenes?activoId=${m.id}&vista=todas`)).body as Array<{ id: string; tipo: string; estado: string }>;
+    const prev = ots.find((o) => o.tipo === 'PREVENTIVO')!;
+    expect(prev.estado).toBe('CANCELADA');
+    expect((await get(`/ordenes/${prev.id}`)).body.motivoCancelacion).toBe('La máquina se guardó en bodega');
+    const planes = (await get(`/planes?activoId=${m.id}`)).body as Array<{ vigente: boolean; plantillaId: string | null }>;
+    expect(planes.every((p) => !p.vigente && p.plantillaId === null)).toBe(true);
+    // Al instalarla de nuevo vuelve a recibir el plan de su tipo
+    const r2 = await post(`/activos/${m.id}/instalar`, { area: 'Proceso' });
+    expect(r2.body.planesAplicados).toBe(1);
+  });
+});

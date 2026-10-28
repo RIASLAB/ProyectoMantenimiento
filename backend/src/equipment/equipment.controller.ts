@@ -35,8 +35,8 @@ export class EquipmentController {
       const s = String(v ?? '');
       return /^[=+\-@]/.test(s) ? `'${s}` : s;
     };
-    const lineas = [['Categoría', 'Modelo', 'Área', 'Total', 'Operativos', 'En mantenimiento', 'Fuera de servicio', 'Dados de baja']]
-      .concat(r.filas.map((f) => [f.categoria, f.modelo ?? '', f.area, f.total, f.operativos, f.enMantenimiento, f.fueraDeServicio, f.dadosDeBaja].map(esc)))
+    const lineas = [['Categoría', 'Modelo', 'Área', 'Total', 'Operativos', 'En mantenimiento', 'Fuera de servicio', 'En bodega', 'Dados de baja']]
+      .concat(r.filas.map((f) => [f.categoria, f.modelo ?? '', f.area, f.total, f.operativos, f.enMantenimiento, f.fueraDeServicio, f.enBodega, f.dadosDeBaja].map(esc)))
       .map((l) => l.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(';'));
     res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="equipos-por-area.csv"' });
     return '﻿' + lineas.join('\r\n');
