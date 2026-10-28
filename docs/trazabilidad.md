@@ -10,7 +10,7 @@ Estado al cierre del Sprint 2 frente a la matriz (`Matriz_Requisitos_CMMS_Nutria
 
 | ID | Requisito | API | Pantalla | Evidencia | Falta |
 |---|---|---|---|---|---|
-| ACT-01 | Ficha técnica | ✅ | ✅ | Código único normalizado, validaciones, operario recibe 403 | — |
+| ACT-01 | Ficha técnica | ✅ | ✅ | Código único normalizado, validaciones, operario recibe 403; tipo de equipo y área; varios equipos iguales de una vez; conteo por tipo y área | — |
 | ACT-02 | Documentos adjuntos | ✅ | ✅ | PDF validado por firma; quién y cuándo; el administrador puede eliminarlos (queda en bitácora) | Definir tamaño máximo (hoy 20 MB) |
 | ACT-03 | Hoja de vida | ✅ | ✅ | Historial de OT por máquina, filtrable desde la lista de OT | — |
 | ACT-04 | Costo acumulado (LCC) | ✅ | ✅ | Repuestos + mano de obra + externos; prueba: $300 + $30.000 + $50.000 = $80.300 | Confirmar D-03 |
@@ -23,9 +23,9 @@ Estado al cierre del Sprint 2 frente a la matriz (`Matriz_Requisitos_CMMS_Nutria
 | MNT-02 | Inicio y fin de parada | ✅ | ✅ | Obligatoria la puesta en marcha al cerrar; no puede ser anterior a la parada | — |
 | MNT-03 | Ciclo de la OT | ✅ | ✅ | Transiciones inválidas rechazadas; historial inmutable con usuario y hora | — |
 | MNT-04 | Asignación | ✅ | ✅ | Admin asigna/reasigna; técnico toma OT sin asignar | Notificación al técnico (Sprint 3) |
-| MNT-05 | Preventivos por tiempo | ✅ | ✅ | Plan genera la OT; al cerrar se programa la siguiente | — |
+| MNT-05 | Preventivos por tiempo | ✅ | ✅ | Plan genera la OT; al cerrar se programa la siguiente; plan por tipo de equipo para todos los equipos iguales (también los nuevos) | — |
 | MNT-06 | Aviso de próximo y vencido | ✅ | ✅ | Insignias "Vence en N d" / "Vencido"; resumen con contadores | Notificación (Sprint 3) |
-| MNT-08 | Kit de repuestos | ✅ | ✅ | El plan copia el kit a cada OT; el técnico ajusta lo usado | — |
+| MNT-08 | Kit de repuestos | ✅ | ✅ | Lista de materiales por tipo de equipo: se carga en el plan, se copia a cada OT y se ofrece al planificar o cerrar correctivos; el técnico ajusta lo usado | Cargar la lista real de cada tipo de equipo |
 | MNT-09 | Descuento automático | ✅ | ✅ | Solo lo usado; movimiento con referencia OT; sin stock no cierra ni descuenta | — |
 | MNT-10 | Mano de obra y externos | ✅ | ✅ | Horas por técnico × tarifa vigente; costos congelados al cierre | — |
 | MNT-11 | Fotos | ✅ | ✅ | Reporte, antes y después; JPG/PNG validados; una foto equivocada se elimina mientras la OT está abierta (queda en el historial y la bitácora) | — |

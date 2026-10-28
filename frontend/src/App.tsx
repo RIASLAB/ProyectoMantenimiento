@@ -16,6 +16,8 @@ import { Login } from './pages/Login';
 import { Pending } from './pages/Pending';
 import { Notifications } from './pages/Notifications';
 import { Indicators } from './pages/Indicators';
+import { EquipmentTypes } from './pages/assets/EquipmentTypes';
+import { EquipmentSummary } from './pages/assets/EquipmentSummary';
 import { BulkImport } from './pages/admin/BulkImport';
 import { OrderDetail } from './pages/orders/OrderDetail';
 import { OrdersList } from './pages/orders/OrdersList';
@@ -73,6 +75,8 @@ export function App() {
         <Route path="calidad/checklist/:id" element={<FillChecklist />} />
         <Route path="calidad/configuracion" element={<OnlyRoles roles={['ADMIN']}><QualitySetup /></OnlyRoles>} />
         <Route path="maquinas" element={<AssetsList />} />
+        <Route path="maquinas/tipos" element={<EquipmentTypes />} />
+        <Route path="maquinas/por-area" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><EquipmentSummary /></OnlyRoles>} />
         <Route path="maquinas/nueva" element={<OnlyRoles roles={['ADMIN']}><AssetForm /></OnlyRoles>} />
         <Route path="maquinas/:id" element={<AssetDetail />} />
         <Route path="maquinas/:id/editar" element={<OnlyRoles roles={['ADMIN']}><AssetForm /></OnlyRoles>} />

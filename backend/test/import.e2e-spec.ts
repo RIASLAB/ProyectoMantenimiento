@@ -23,7 +23,7 @@ async function xlsx(hoja: string, filas: unknown[][], extra?: (ws: ExcelJS.Works
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
-const H_MAQ = ['Código *', 'Nombre *', 'Área *', 'Ubicación', 'Fabricante', 'Modelo', 'Serie', 'Código SAP', 'Fecha de compra', 'Fin de garantía', 'Estado', 'Notas'];
+const H_MAQ = ['Código *', 'Nombre *', 'Área *', 'Ubicación', 'Fabricante', 'Modelo', 'Serie', 'Código SAP', 'Fecha de compra', 'Fin de garantía', 'Estado', 'Notas', 'Tipo de equipo'];
 const H_REP = ['Código *', 'Descripción *', 'Unidad *', 'Ubicación', 'Código SAP', 'Stock mínimo', 'Stock inicial', 'Costo unitario'];
 
 const subir = (ruta: string, buf: Buffer, nombre = 'carga.xlsx', token = c.admin) =>

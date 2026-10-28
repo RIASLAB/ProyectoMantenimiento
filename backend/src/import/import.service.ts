@@ -6,7 +6,9 @@ import { Asset } from '../assets/asset.entity';
 import { AuditService } from '../audit/audit.service';
 import { SessionUser } from '../common/auth.decorators';
 import { EstadoActivo, TipoMovimiento } from '../common/enums';
+import { EquipmentModel } from '../equipment/equipment.entities';
 import { InventoryService } from '../inventory/inventory.service';
+import { MaintenanceService } from '../maintenance/maintenance.service';
 import { SparePart } from '../inventory/spare-part.entity';
 
 /**
@@ -135,6 +137,7 @@ const COLUMNAS: Record<TipoCarga, Columna[]> = {
       },
     },
     { clave: 'notas', titulo: 'Notas', ancho: 30, ayuda: '', leer: (v) => texto(v, 4000) },
+    { clave: 'tipoEquipo', titulo: 'Tipo de equipo', ancho: 26, ayuda: 'Opcional. Nombre exacto del tipo creado en Máquinas → Tipos de equipo (ej. Mini split 12.000 BTU)', leer: (v) => texto(v, 120) },
   ],
   repuestos: [
     { clave: 'codigo', titulo: 'Código', obligatoria: true, ancho: 16, ayuda: 'Código interno único, ej. RP-ROD-6205. Sin espacios.', leer: codigo },
@@ -153,6 +156,7 @@ const NOMBRE_HOJA: Record<TipoCarga, string> = { maquinas: 'Máquinas', repuesto
 export interface FilaMaquina {
   fila: number; codigo: string; nombre: string; area: string; ubicacion: string | null; fabricante: string | null; modelo: string | null;
   serie: string | null; codigoSap: string | null; fechaCompra: string | null; fechaFinGarantia: string | null; estado: EstadoActivo; notas: string | null;
+  modeloId: string | null;
 }
 export interface FilaRepuesto {
   fila: number; codigo: string; descripcion: string; unidad: string; ubicacion: string | null; codigoSap: string | null;
@@ -165,6 +169,7 @@ export class ImportService {
     private readonly ds: DataSource,
     private readonly audit: AuditService,
     private readonly inventory: InventoryService,
+    private readonly maintenance: MaintenanceService,
   ) {}
 
   /** Plantilla con encabezados, ayudas y una hoja de instrucciones. */
@@ -274,6 +279,21 @@ export class ImportService {
       })));
     }
 
+    // Tipo de equipo por nombre (sin importar mayúsculas): debe existir.
+    if (tipo === 'maquinas') {
+      const modelos = await this.ds.getRepository(EquipmentModel).find({ select: { id: true, nombre: true } });
+      const porNombre = new Map(modelos.map((m) => [sinTildes(m.nombre), m.id]));
+      for (const f of filas) {
+        const n = f.tipoEquipo as string | null | undefined;
+        delete f.tipoEquipo;
+        f.modeloId = null;
+        if (!n) continue;
+        const id = porNombre.get(sinTildes(n));
+        if (id) f.modeloId = id;
+        else errores.push({ fila: f.fila, columna: 'Tipo de equipo', mensaje: `No existe el tipo de equipo "${n}". Créelo primero en Máquinas → Tipos de equipo` });
+      }
+    }
+
     errores.sort((a, b) => a.fila - b.fila);
     const conError = new Set(errores.map((e) => e.fila));
     const validas = filas.filter((f) => !conError.has(f.fila));
@@ -295,9 +315,13 @@ export class ImportService {
       if (tipo === 'maquinas') {
         const filas = a.registros as unknown as FilaMaquina[];
         const repo = em.getRepository(Asset);
+        const ids: string[] = [];
         for (let i = 0; i < filas.length; i += 200) {
-          await repo.insert(filas.slice(i, i + 200).map(({ fila: _f, ...m }) => repo.create(m)));
+          const r = await repo.insert(filas.slice(i, i + 200).map(({ fila: _f, ...m }) => repo.create(m)));
+          ids.push(...r.identifiers.map((x) => x.id as string));
         }
+        // Los equipos con tipo reciben los preventivos de su tipo.
+        await this.maintenance.aplicarPlanesDeTipo(em, ids, actor);
       } else {
         const filas = a.registros as unknown as FilaRepuesto[];
         const repo = em.getRepository(SparePart);

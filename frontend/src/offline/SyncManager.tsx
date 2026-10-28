@@ -29,7 +29,11 @@ async function prepararSinConexion(user: SessionUser) {
         .map((o) => api.get(`/ordenes/${o.id}`).catch(ignorar))),
     ),
   ];
-  if (user.rol !== 'OPERARIO') tareas.push(api.get('/usuarios/tecnicos'));
+  if (user.rol !== 'OPERARIO') {
+    tareas.push(api.get('/usuarios/tecnicos'));
+    // Lista de materiales de cada tipo de equipo, para planificar o cerrar sin señal.
+    tareas.push(api.get<Array<{ id: string }>>('/tipos-equipo').then((ts) => Promise.all(ts.map((t) => api.get(`/tipos-equipo/${t.id}`).catch(ignorar)))));
+  }
   await Promise.all(tareas.map((t) => t.catch(ignorar)));
 }
 

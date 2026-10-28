@@ -5,7 +5,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { CurrentUser, Roles, SessionUser } from '../common/auth.decorators';
 import { EstadoActivo, Rol } from '../common/enums';
-import { CreateAssetDto, UpdateAssetDto } from './assets.dto';
+import { CreateAssetDto, CreateManyAssetsDto, UpdateAssetDto } from './assets.dto';
 import { AssetsService } from './assets.service';
 
 const LIMITE_MULTER = Number(process.env.MAX_UPLOAD_MB ?? 20) * 1024 * 1024 + 1;
@@ -15,8 +15,12 @@ export class AssetsController {
   constructor(private readonly assets: AssetsService) {}
 
   @Get()
-  list(@Query('q') q?: string, @Query('estado') estado?: EstadoActivo, @Query('area') area?: string) {
-    return this.assets.list({ q, estado, area });
+  list(
+    @Query('q') q?: string, @Query('estado') estado?: EstadoActivo, @Query('area') area?: string,
+    @Query('modeloId', new ParseUUIDPipe({ optional: true })) modeloId?: string,
+    @Query('categoriaId', new ParseUUIDPipe({ optional: true })) categoriaId?: string,
+  ) {
+    return this.assets.list({ q, estado, area, modeloId, categoriaId });
   }
 
   @Get('areas')
@@ -50,6 +54,12 @@ export class AssetsController {
   @Roles(Rol.ADMIN)
   create(@Body() dto: CreateAssetDto, @CurrentUser() actor: SessionUser) {
     return this.assets.create(dto, actor);
+  }
+
+  @Post('varios')
+  @Roles(Rol.ADMIN)
+  createMany(@Body() dto: CreateManyAssetsDto, @CurrentUser() actor: SessionUser) {
+    return this.assets.createMany(dto, actor);
   }
 
   @Patch(':id')

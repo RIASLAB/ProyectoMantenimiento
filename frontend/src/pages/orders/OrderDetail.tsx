@@ -7,7 +7,7 @@ import { NewPurchaseModal } from '../purchases/NewPurchaseModal';
 import { db } from '../../offline/db';
 import { comprimirFoto, enviarOEncolar, usePendientes } from '../../offline/outbox';
 import { useAuth } from '../../auth/AuthContext';
-import { OrderBadges, PartRow, PartRows, rowsToPayload, useProtectedImage } from '../../components/orders-shared';
+import { OrderBadges, PartRow, PartRows, rowsToPayload, useProtectedImage, useTipoEquipo } from '../../components/orders-shared';
 import { Badge, Button, Empty, ErrorBox, Field, Icon, Input, KeyValue, Modal, PageHeader, Select, Spinner, Textarea } from '../../components/ui';
 import { COMPRA_ESTADO_LABEL, COMPRA_ESTADO_TONE, date, dateTime, duration, money, ORDEN_ESTADO_LABEL, PRIORIDAD_LABEL, qty, TIPO_LABEL, toLocalInput } from '../../format';
 
@@ -126,13 +126,14 @@ function NoteModal({ o, open, onClose, kind }: { o: WorkOrderDetail; open: boole
 
 function PlannedPartsModal({ o, open, onClose }: { o: WorkOrderDetail; open: boolean; onClose: () => void }) {
   const [rows, setRows] = useState<PartRow[]>([]);
+  const tipo = useTipoEquipo(open ? o.activo.modeloId : null);
   useEffect(() => { if (open) setRows(o.repuestos.map((r) => ({ repuestoId: r.repuestoId, cantidad: String(r.cantidadPlanificada) }))); }, [open, o.repuestos]);
   const m = useOrderMutation(o.id, () => api.put(`/ordenes/${o.id}/repuestos`, { repuestos: rowsToPayload(rows) }), onClose);
   return (
     <Modal open={open} title="Repuestos planificados" onClose={onClose}
       footer={<><Button variant="ghost" onClick={onClose}>Cancelar</Button><Button busy={m.isPending} onClick={() => m.mutate(undefined)}>Guardar</Button></>}>
       <div className="stack">
-        <PartRows rows={rows} onChange={setRows} />
+        <PartRows rows={rows} onChange={setRows} sugeridos={tipo.data?.materiales} tituloSugeridos={tipo.data ? `Lista de materiales · ${tipo.data.nombre}` : undefined} />
         {m.isError ? <ErrorBox error={m.error} /> : null}
       </div>
     </Modal>
@@ -141,6 +142,7 @@ function PlannedPartsModal({ o, open, onClose }: { o: WorkOrderDetail; open: boo
 
 function CloseModal({ o, open, onClose }: { o: WorkOrderDetail; open: boolean; onClose: () => void }) {
   const { user } = useAuth();
+  const tipo = useTipoEquipo(open ? o.activo.modeloId : null);
   const tecnicos = useQuery({ queryKey: ['tecnicos'], queryFn: () => api.get<Array<PersonRef & { rol: string }>>('/usuarios/tecnicos'), enabled: open });
   const [trabajo, setTrabajo] = useState('');
   const [rows, setRows] = useState<PartRow[]>([]);
@@ -188,7 +190,7 @@ function CloseModal({ o, open, onClose }: { o: WorkOrderDetail; open: boolean; o
         <div>
           <p className="subtle-head">Repuestos usados</p>
           <p className="muted small" style={{ marginTop: 0 }}>Ajuste a lo que realmente se usó. Se descuenta del inventario al cerrar.</p>
-          <PartRows rows={rows} onChange={setRows} />
+          <PartRows rows={rows} onChange={setRows} sugeridos={tipo.data?.materiales} tituloSugeridos={tipo.data ? `Lista de materiales · ${tipo.data.nombre}` : undefined} />
         </div>
         <div>
           <p className="subtle-head">Mano de obra (horas)</p>

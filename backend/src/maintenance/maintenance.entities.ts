@@ -2,6 +2,7 @@ import {
   Column, CreateDateColumn, Entity, Generated, Index, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn,
 } from 'typeorm';
 import { Asset } from '../assets/asset.entity';
+import { EquipmentModel } from '../equipment/equipment.entities';
 import { EstadoOrden, MomentoFoto, Prioridad, TipoOrden, UnidadFrecuencia } from '../common/enums';
 import { numeric } from '../common/numeric.transformer';
 import { SparePart } from '../inventory/spare-part.entity';
@@ -13,12 +14,34 @@ export class MaintenancePlan {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => Asset)
+  /** Máquina del plan. Vacío en un plan por tipo de equipo (plantilla). */
+  @ManyToOne(() => Asset, { nullable: true })
   @JoinColumn({ name: 'activo_id' })
-  activo: Asset;
+  activo: Asset | null;
 
-  @Column({ name: 'activo_id', type: 'uuid' })
-  activoId: string;
+  @Column({ name: 'activo_id', type: 'uuid', nullable: true })
+  activoId: string | null;
+
+  /** Plan por tipo de equipo: se aplica a todas las máquinas de este modelo, también a las que se agreguen después. */
+  @ManyToOne(() => EquipmentModel, { nullable: true })
+  @JoinColumn({ name: 'modelo_id' })
+  modeloEquipo: EquipmentModel | null;
+
+  @Column({ name: 'modelo_id', type: 'uuid', nullable: true })
+  modeloId: string | null;
+
+  /** Plan de una máquina creado a partir del plan de su tipo; se edita desde el plan del tipo. */
+  @ManyToOne(() => MaintenancePlan, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'plantilla_id' })
+  plantilla: MaintenancePlan | null;
+
+  @Index()
+  @Column({ name: 'plantilla_id', type: 'uuid', nullable: true })
+  plantillaId: string | null;
+
+  /** Plantillas: fecha del primer mantenimiento de los equipos existentes al crearla. */
+  @Column({ name: 'primera_fecha', type: 'date', nullable: true })
+  primeraFecha: string | null;
 
   @Column({ length: 150 })
   nombre: string;

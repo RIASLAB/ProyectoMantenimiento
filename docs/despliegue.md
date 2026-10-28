@@ -107,7 +107,7 @@ $C run --rm --user 0 -v "$PWD/respaldos:/respaldos" -v "$PWD/restaurado:/restaur
   -e DESTINO_UPLOADS_DIR=/restaurado/uploads \
   -e BACKUP_PASSPHRASE="<clave>" \
   respaldo bash scripts/restaurar.sh /respaldos/cmms-AAAAMMDD-HHMMSS.tar.enc
-# → "Restauración correcta: 22 tablas y N archivos coinciden con el respaldo"
+# → "Restauración correcta: 25 tablas y N archivos coinciden con el respaldo"
 ```
 
 Para dejar la restaurada como principal (pérdida del servidor o daño de la base): detenga `app`, restaure directamente sobre `cmms` con `--si` al final del comando (reemplaza su contenido) y copie `restaurado/uploads` al volumen `cmms-uploads`; luego arranque `app`.

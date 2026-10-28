@@ -24,6 +24,10 @@ export class ReportFaultDto {
 
   @IsOptional() @IsUUID()
   clientId?: string;
+
+  /** Materiales que ya se sabe que se van a necesitar (solo administrador o técnico). */
+  @IsOptional() @IsArray() @ArrayMaxSize(50) @ValidateNested({ each: true }) @Type(() => PartQtyDto)
+  repuestos?: PartQtyDto[];
 }
 
 export class AssignDto {
@@ -111,8 +115,13 @@ export class ListOrdersQuery {
 }
 
 export class CreatePlanDto {
-  @IsUUID()
-  activoId: string;
+  /** Plan de una máquina… */
+  @IsOptional() @IsUUID()
+  activoId?: string;
+
+  /** …o plan por tipo de equipo: se aplica a todas las máquinas de ese modelo. */
+  @IsOptional() @IsUUID()
+  modeloId?: string;
 
   @IsString() @MinLength(3) @MaxLength(150)
   nombre: string;

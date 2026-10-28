@@ -6,7 +6,7 @@ import type { Asset, AssetDocument, AssetHistory } from '../../api/types';
 import { OrderStateBadge } from '../../components/orders-shared';
 import { useAuth } from '../../auth/AuthContext';
 import { Badge, Button, Empty, ErrorBox, Icon, KeyValue, Modal, PageHeader, Spinner } from '../../components/ui';
-import { date, dateTime, daysUntil, ESTADO_LABEL, ESTADO_TONE, fileSize, money, TIPO_LABEL } from '../../format';
+import { date, dateTime, daysUntil, ESTADO_LABEL, ESTADO_TONE, fileSize, money, qty, TIPO_LABEL } from '../../format';
 
 const MAX_MB = 20;
 
@@ -138,6 +138,7 @@ export function AssetDetail() {
           <h2>Ficha técnica</h2>
           <KeyValue
             items={[
+              ['Tipo de equipo', a.modeloEquipo ? <Link to={`/maquinas?modeloId=${a.modeloEquipo.id}`}>{a.modeloEquipo.categoria?.nombre} · {a.modeloEquipo.nombre}</Link> : 'Sin tipo'],
               ['Fabricante', a.fabricante],
               ['Modelo', a.modelo],
               ['N.° de serie', a.serie],
@@ -149,6 +150,18 @@ export function AssetDetail() {
             ]}
           />
           {a.notas ? <p className="notes">{a.notas}</p> : null}
+          {a.modeloEquipo ? (
+            <div className="materiales">
+              <p className="subtle-head">Lista de materiales del tipo</p>
+              {a.modeloEquipo.materiales?.length ? (
+                <ul>
+                  {a.modeloEquipo.materiales.map((m) => (
+                    <li key={m.repuestoId}><Link to={`/inventario/${m.repuesto.id}`}><strong>{m.repuesto.codigo}</strong> {m.repuesto.descripcion}</Link> <span className="muted">× {qty(m.cantidad)} {m.repuesto.unidad}</span></li>
+                  ))}
+                </ul>
+              ) : <p className="muted small" style={{ margin: 0 }}>El tipo aún no tiene lista de materiales.</p>}
+            </div>
+          ) : null}
         </section>
 
         <section className="card">

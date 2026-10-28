@@ -46,8 +46,8 @@ with sync_playwright() as p:
     # Vuelve a la página que se intentó abrir antes de iniciar sesión
     expect(page).to_have_url(re.compile('/maquinas'))
     expect(page.get_by_role('heading', name='Máquinas')).to_be_visible()
-    expect(page.locator('.list-row')).to_have_count(4)
-    ok('login admin y lista de 4 máquinas')
+    expect(page.locator('.list-row')).to_have_count(8)
+    ok('login admin y lista de 8 máquinas (con los 4 aires de demostración)')
     page.screenshot(path=SP + '/02-maquinas.png')
 
     page.get_by_label('Buscar máquinas').fill('molino')

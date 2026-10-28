@@ -1,5 +1,6 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { IsDateString, IsEnum, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsDateString, IsEnum, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { EstadoActivo } from '../common/enums';
 
 export class CreateAssetDto {
@@ -38,6 +39,16 @@ export class CreateAssetDto {
 
   @IsOptional() @IsString() @MaxLength(4000)
   notas?: string | null;
+
+  /** Tipo de equipo (modelo). */
+  @IsOptional() @IsUUID()
+  modeloId?: string | null;
 }
 
 export class UpdateAssetDto extends PartialType(CreateAssetDto) {}
+
+/** Varios equipos iguales de una vez: el código debe terminar en número y se numeran seguidos (AA-001, AA-002…). */
+export class CreateManyAssetsDto extends CreateAssetDto {
+  @Type(() => Number) @IsInt() @Min(2) @Max(100)
+  cantidad: number;
+}

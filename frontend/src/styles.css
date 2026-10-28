@@ -551,3 +551,19 @@ button.chip.chip-on { color: #fff; }
 .doc-del { align-self: center; color: var(--muted); }
 .doc-del:hover { color: var(--bad); }
 .modal-foot .btn-ghost.text-bad { color: var(--bad); }
+
+/* ---------- Tipos de equipo y lista de materiales ---------- */
+.sugeridos { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: var(--radius); background: var(--surface-2); }
+.sugeridos-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.sugeridos .chip { min-height: 36px; font-size: 0.85rem; text-align: left; }
+.sugeridos .chip:disabled { opacity: 0.75; cursor: default; }
+.link-btn { background: none; border: 0; padding: 4px 0; color: var(--brand-2); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; }
+.plan-equipos { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; }
+.group-title { font-size: 1.05rem; margin: 0 0 8px; }
+.respuesta { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.respuesta-n { font-size: 3rem; font-weight: 800; line-height: 1; color: var(--brand); font-variant-numeric: tabular-nums; min-width: 1.4em; }
+.respuesta > div { display: flex; flex-direction: column; gap: 2px; flex: 1 1 200px; }
+.respuesta strong { font-size: 1.15rem; }
+.materiales { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.materiales ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 0.92rem; }
+.materiales a { text-decoration: none; }

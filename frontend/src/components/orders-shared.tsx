@@ -1,14 +1,49 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { EstadoOrden, SparePart, WorkOrderSummary } from '../api/types';
-import { ORDEN_ESTADO_LABEL, ORDEN_ESTADO_TONE, TIPO_LABEL } from '../format';
+import type { EquipmentModel, EstadoOrden, MaterialRef, SparePart, WorkOrderSummary } from '../api/types';
+import { ORDEN_ESTADO_LABEL, ORDEN_ESTADO_TONE, qty, TIPO_LABEL } from '../format';
 import { Badge, Button, Icon, Input, Select } from './ui';
 
 export interface PartRow { repuestoId: string; cantidad: string }
 
+/** Tipo de equipo (con su lista de materiales); se guarda en caché para trabajar sin señal. */
+export function useTipoEquipo(id: string | null | undefined) {
+  return useQuery({ queryKey: ['tipo-equipo', id], queryFn: () => api.get<EquipmentModel>(`/tipos-equipo/${id}`), enabled: !!id });
+}
+
+/** La lista de materiales del tipo de equipo como sugerencias para agregar con un toque. */
+function Sugeridos({ titulo, items, rows, onChange }: { titulo: string; items: MaterialRef[]; rows: PartRow[]; onChange: (r: PartRow[]) => void }) {
+  const usados = new Set(rows.map((r) => r.repuestoId));
+  const faltan = items.filter((m) => !usados.has(m.repuestoId));
+  const agregar = (ms: MaterialRef[]) => onChange([...rows.filter((r) => r.repuestoId), ...ms.map((m) => ({ repuestoId: m.repuestoId, cantidad: String(m.cantidad) }))]);
+  return (
+    <div className="sugeridos" aria-label={titulo}>
+      <div className="sugeridos-head">
+        <span className="subtle-head" style={{ margin: 0 }}>{titulo}</span>
+        {faltan.length > 1 ? <button type="button" className="link-btn" onClick={() => agregar(faltan)}>Agregar todos</button> : null}
+      </div>
+      <div className="chips" style={{ margin: 0 }}>
+        {items.map((m) => {
+          const ya = usados.has(m.repuestoId);
+          return (
+            <button key={m.repuestoId} type="button" className={`chip ${ya ? 'chip-on' : ''}`} disabled={ya} onClick={() => agregar([m])}
+              title={m.repuesto.descripcion} aria-label={`${ya ? 'Ya agregado' : 'Agregar'} ${m.repuesto.codigo} ${m.repuesto.descripcion}`}>
+              {ya ? <Icon name="check" size={14} /> : <Icon name="plus" size={14} />} {m.repuesto.codigo} · {m.repuesto.descripcion} × {qty(m.cantidad)} {m.repuesto.unidad}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /** Filas editables de repuesto + cantidad (kit de plan, planificados de la OT y usados al cerrar). */
-export function PartRows({ rows, onChange, showStock = true }: { rows: PartRow[]; onChange: (r: PartRow[]) => void; showStock?: boolean }) {
+export function PartRows({ rows, onChange, showStock = true, sugeridos, tituloSugeridos }: {
+  rows: PartRow[]; onChange: (r: PartRow[]) => void; showStock?: boolean;
+  /** Lista de materiales del tipo de equipo, para agregarlos con un toque. */
+  sugeridos?: MaterialRef[]; tituloSugeridos?: string;
+}) {
   const parts = useQuery({ queryKey: ['repuestos', '', false], queryFn: () => api.get<SparePart[]>('/repuestos') });
   const byId = new Map(parts.data?.map((p) => [p.id, p]));
   const set = (i: number, patch: Partial<PartRow>) => onChange(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
@@ -16,6 +51,7 @@ export function PartRows({ rows, onChange, showStock = true }: { rows: PartRow[]
 
   return (
     <div className="part-rows">
+      {sugeridos?.length ? <Sugeridos titulo={tituloSugeridos ?? 'Lista de materiales del equipo'} items={sugeridos} rows={rows} onChange={onChange} /> : null}
       {rows.length === 0 ? <p className="muted small">Sin repuestos.</p> : null}
       {rows.map((r, i) => {
         const p = byId.get(r.repuestoId);

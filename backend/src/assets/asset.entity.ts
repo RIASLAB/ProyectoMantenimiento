@@ -1,5 +1,6 @@
-import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { EstadoActivo } from '../common/enums';
+import { EquipmentModel } from '../equipment/equipment.entities';
 import { AssetDocument } from './asset-document.entity';
 
 /** Máquina / equipo de planta con su ficha técnica (ACT-01). */
@@ -44,6 +45,15 @@ export class Asset {
 
   @Column({ type: 'text', nullable: true })
   notas: string | null;
+
+  /** Tipo de equipo (categoría y modelo): define su lista de materiales y los preventivos por tipo. */
+  @ManyToOne(() => EquipmentModel, { nullable: true })
+  @JoinColumn({ name: 'modelo_id' })
+  modeloEquipo: EquipmentModel | null;
+
+  @Index()
+  @Column({ name: 'modelo_id', type: 'uuid', nullable: true })
+  modeloId: string | null;
 
   @OneToMany(() => AssetDocument, (d) => d.activo)
   documentos: AssetDocument[];

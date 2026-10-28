@@ -7,6 +7,7 @@ import { unlink, writeFile } from 'fs/promises';
 import { join, resolve } from 'path';
 import { DataSource, EntityManager, In, Not, Repository } from 'typeorm';
 import { Asset } from '../assets/asset.entity';
+import { EquipmentModel } from '../equipment/equipment.entities';
 import { AuditService } from '../audit/audit.service';
 import { SessionUser } from '../common/auth.decorators';
 import { EstadoActivo, EstadoOrden, MomentoFoto, Prioridad, Rol, TipoMovimiento, TipoOrden, UnidadFrecuencia } from '../common/enums';
@@ -221,6 +222,8 @@ export class MaintenanceService {
 
     const momento = dto.reportadoEn ? new Date(dto.reportadoEn) : new Date();
     if (momento.getTime() > Date.now() + 5 * 60_000) throw new BadRequestException('La hora del reporte no puede estar en el futuro');
+    const repuestos = this.agrupar(dto.repuestos ?? []);
+    if (repuestos.length && ![Rol.ADMIN, Rol.TECNICO].includes(actor.rol)) throw new ForbiddenException('Solo mantenimiento planifica los materiales de una orden');
 
     return this.ds.transaction(async (em) => {
       const o = await em.getRepository(WorkOrder).save(
@@ -237,6 +240,11 @@ export class MaintenanceService {
         }),
       );
       await this.evento(em, o.id, actor, null, EstadoOrden.ABIERTA, dto.maquinaParada ? 'Falla reportada con máquina parada' : 'Falla reportada');
+      if (repuestos.length) {
+        await this.validarRepuestos(em, repuestos);
+        for (const r of repuestos) await em.getRepository(WorkOrderPart).save({ ordenId: o.id, repuestoId: r.repuestoId, cantidadPlanificada: r.cantidad });
+        await this.purchases.verificarFaltantes(em, o.id, actor);
+      }
       await this.recomputarEstadoActivo(em, activo.id, actor);
       // NOT-01 / MNT-01: la falla le llega a mantenimiento.
       await this.notif.notificar(em, { roles: [Rol.ADMIN, Rol.TECNICO], excluir: actor.id }, {
@@ -494,32 +502,36 @@ export class MaintenanceService {
   listPlanes(activoId?: string) {
     const qb = this.plans
       .createQueryBuilder('p')
-      .leftJoin('p.activo', 'a').addSelect(['a.id', 'a.codigo', 'a.nombre'])
+      .leftJoin('p.activo', 'a').addSelect(['a.id', 'a.codigo', 'a.nombre', 'a.area'])
+      .leftJoin('p.modeloEquipo', 'm').addSelect(['m.id', 'm.nombre'])
+      .leftJoin('m.categoria', 'mc').addSelect(['mc.id', 'mc.nombre'])
       .leftJoin('p.tecnico', 't').addSelect(['t.id', 't.nombre'])
       .leftJoinAndSelect('p.repuestos', 'pr')
       .leftJoin('pr.repuesto', 'r').addSelect(['r.id', 'r.codigo', 'r.descripcion', 'r.unidad'])
-      .orderBy('a.codigo').addOrderBy('p.nombre');
+      .orderBy('m.nombre', 'ASC', 'NULLS LAST').addOrderBy('a.codigo').addOrderBy('p.nombre');
     if (activoId) qb.where('p.activoId = :activoId', { activoId });
     return qb.getMany();
   }
 
+  /**
+   * Plan de una máquina, o plan por tipo de equipo (`modeloId`): este último crea el plan de cada equipo
+   * de ese modelo con su primera orden, y se aplica solo a los equipos que se agreguen después.
+   */
   async crearPlan(dto: CreatePlanDto, actor: SessionUser) {
-    const activo = await this.assets.findOne({ where: { id: dto.activoId } });
+    if (!!dto.activoId === !!dto.modeloId) throw new BadRequestException('Indique la máquina o el tipo de equipo del plan (uno de los dos)');
+    if (dto.tecnicoId) await this.validarTecnico(dto.tecnicoId);
+    if (dto.modeloId) return this.crearPlanPorTipo(dto, actor);
+
+    const activo = await this.assets.findOne({ where: { id: dto.activoId! } });
     if (!activo) throw new NotFoundException('Máquina no encontrada');
     if (activo.estado === EstadoActivo.DADO_DE_BAJA) throw new BadRequestException('La máquina está dada de baja');
-    if (dto.tecnicoId) await this.validarTecnico(dto.tecnicoId);
 
     return this.ds.transaction(async (em) => {
       await this.validarRepuestos(em, dto.repuestos);
       const plan = await em.getRepository(MaintenancePlan).save(
         em.getRepository(MaintenancePlan).create({
-          activoId: dto.activoId,
-          nombre: dto.nombre.trim(),
-          tareas: dto.tareas?.trim() || null,
-          frecuenciaValor: dto.frecuenciaValor,
-          frecuenciaUnidad: dto.frecuenciaUnidad,
-          diasAviso: dto.diasAviso ?? 7,
-          tecnicoId: dto.tecnicoId ?? null,
+          activoId: activo.id,
+          ...this.camposPlan(dto),
           repuestos: this.agrupar(dto.repuestos).map((r) => em.getRepository(PlanPart).create({ repuestoId: r.repuestoId, cantidad: r.cantidad })),
         }),
       );
@@ -529,9 +541,36 @@ export class MaintenanceService {
     });
   }
 
+  private async crearPlanPorTipo(dto: CreatePlanDto, actor: SessionUser) {
+    const modelo = await this.ds.getRepository(EquipmentModel).findOne({ where: { id: dto.modeloId! } });
+    if (!modelo) throw new NotFoundException('Tipo de equipo no encontrado');
+    return this.ds.transaction(async (em) => {
+      await this.validarRepuestos(em, dto.repuestos);
+      const plantilla = await em.getRepository(MaintenancePlan).save(
+        em.getRepository(MaintenancePlan).create({
+          modeloId: modelo.id,
+          primeraFecha: dto.primeraFecha,
+          ...this.camposPlan(dto),
+          repuestos: this.agrupar(dto.repuestos).map((r) => em.getRepository(PlanPart).create({ repuestoId: r.repuestoId, cantidad: r.cantidad })),
+        }),
+      );
+      const equipos = await em.getRepository(Asset).find({ where: { modeloId: modelo.id, estado: Not(EstadoActivo.DADO_DE_BAJA) }, order: { codigo: 'ASC' } });
+      const ordenes = [];
+      for (const a of equipos) ordenes.push(await this.crearPlanDeEquipo(em, plantilla, a, dto.primeraFecha, actor));
+      await this.audit.log({
+        usuarioId: actor.id, accion: 'PLAN_CREADO', entidad: 'plan', entidadId: plantilla.id,
+        detalle: { nombre: plantilla.nombre, tipo: modelo.nombre, equipos: equipos.map((a) => a.codigo) },
+      }, em);
+      return { plan: plantilla, equipos: equipos.length, primerasOrdenes: ordenes };
+    });
+  }
+
   async actualizarPlan(id: string, dto: UpdatePlanDto, actor: SessionUser) {
-    const plan = await this.plans.findOne({ where: { id } });
+    const plan = await this.plans.findOne({ where: { id }, relations: { plantilla: { modeloEquipo: true } } });
     if (!plan) throw new NotFoundException('Plan no encontrado');
+    if (plan.plantillaId) {
+      throw new BadRequestException(`Este plan viene del plan del tipo de equipo "${plan.plantilla?.modeloEquipo?.nombre ?? ''}": edítelo desde ese plan y se actualizan todos los equipos`);
+    }
     if (dto.tecnicoId) await this.validarTecnico(dto.tecnicoId);
     return this.ds.transaction(async (em) => {
       const cambios: Partial<MaintenancePlan> = {};
@@ -542,15 +581,78 @@ export class MaintenanceService {
       if (dto.diasAviso !== undefined) cambios.diasAviso = dto.diasAviso;
       if (dto.tecnicoId !== undefined) cambios.tecnicoId = dto.tecnicoId;
       if (dto.vigente !== undefined) cambios.vigente = dto.vigente;
-      if (Object.keys(cambios).length) await em.getRepository(MaintenancePlan).update(id, cambios);
-      if (dto.repuestos) {
-        await this.validarRepuestos(em, dto.repuestos);
-        await em.getRepository(PlanPart).delete({ planId: id });
-        for (const r of this.agrupar(dto.repuestos)) await em.getRepository(PlanPart).save({ planId: id, repuestoId: r.repuestoId, cantidad: r.cantidad });
+      if (dto.repuestos) await this.validarRepuestos(em, dto.repuestos);
+      // Un plan por tipo actualiza también el plan de cada uno de sus equipos.
+      const hijos = plan.modeloId ? (await em.getRepository(MaintenancePlan).find({ where: { plantillaId: id }, select: { id: true } })).map((h) => h.id) : [];
+      for (const pid of [id, ...hijos]) {
+        if (Object.keys(cambios).length) await em.getRepository(MaintenancePlan).update(pid, cambios);
+        if (dto.repuestos) {
+          await em.getRepository(PlanPart).delete({ planId: pid });
+          for (const r of this.agrupar(dto.repuestos)) await em.getRepository(PlanPart).save({ planId: pid, repuestoId: r.repuestoId, cantidad: r.cantidad });
+        }
       }
-      await this.audit.log({ usuarioId: actor.id, accion: 'PLAN_ACTUALIZADO', entidad: 'plan', entidadId: id, detalle: { ...cambios, repuestos: dto.repuestos ? 'actualizados' : undefined } as Record<string, unknown> }, em);
+      await this.audit.log({
+        usuarioId: actor.id, accion: 'PLAN_ACTUALIZADO', entidad: 'plan', entidadId: id,
+        detalle: { ...cambios, repuestos: dto.repuestos ? 'actualizados' : undefined, equipos: plan.modeloId ? hijos.length : undefined } as Record<string, unknown>,
+      }, em);
       return em.getRepository(MaintenancePlan).findOneOrFail({ where: { id }, relations: { repuestos: true } });
     });
+  }
+
+  /**
+   * Cuando una máquina entra a un tipo de equipo (nueva, cargada desde Excel o al cambiarle el tipo) recibe los
+   * planes vigentes de ese tipo. Su primer preventivo es la fecha del plan si aún no ha pasado; si ya pasó,
+   * una frecuencia después de hoy (D-18).
+   */
+  async aplicarPlanesDeTipo(em: EntityManager, activoIds: string[], actor: SessionUser) {
+    if (!activoIds.length) return 0;
+    const activos = await em.getRepository(Asset).find({ where: { id: In(activoIds), estado: Not(EstadoActivo.DADO_DE_BAJA) } });
+    const modelos = [...new Set(activos.map((a) => a.modeloId).filter((x): x is string => !!x))];
+    if (!modelos.length) return 0;
+    const plantillas = await em.getRepository(MaintenancePlan).find({ where: { modeloId: In(modelos), vigente: true }, relations: { repuestos: true } });
+    let creados = 0;
+    for (const a of activos) {
+      for (const t of plantillas.filter((x) => x.modeloId === a.modeloId)) {
+        if (await em.getRepository(MaintenancePlan).exists({ where: { plantillaId: t.id, activoId: a.id } })) continue;
+        const h = hoy();
+        const fecha = t.primeraFecha && t.primeraFecha >= h ? t.primeraFecha : sumarFrecuencia(h, t.frecuenciaValor, t.frecuenciaUnidad);
+        await this.crearPlanDeEquipo(em, t, a, fecha, actor);
+        creados++;
+      }
+    }
+    return creados;
+  }
+
+  /** Al quitarle o cambiarle el tipo a una máquina, sus planes del tipo anterior dejan de generar órdenes. */
+  async desvincularPlanesDeTipo(em: EntityManager, activoId: string, modeloAnterior: string) {
+    const plantillas = await em.getRepository(MaintenancePlan).find({ where: { modeloId: modeloAnterior }, select: { id: true } });
+    if (!plantillas.length) return;
+    await em.getRepository(MaintenancePlan).update({ activoId, plantillaId: In(plantillas.map((p) => p.id)) }, { vigente: false, plantillaId: null });
+  }
+
+  private async crearPlanDeEquipo(em: EntityManager, plantilla: MaintenancePlan, activo: Asset, fecha: string, actor: SessionUser) {
+    const plan = await em.getRepository(MaintenancePlan).save(
+      em.getRepository(MaintenancePlan).create({
+        activoId: activo.id,
+        plantillaId: plantilla.id,
+        nombre: plantilla.nombre, tareas: plantilla.tareas, frecuenciaValor: plantilla.frecuenciaValor, frecuenciaUnidad: plantilla.frecuenciaUnidad,
+        diasAviso: plantilla.diasAviso, tecnicoId: plantilla.tecnicoId, vigente: true,
+        repuestos: (plantilla.repuestos ?? []).map((r) => em.getRepository(PlanPart).create({ repuestoId: r.repuestoId, cantidad: r.cantidad })),
+      }),
+    );
+    const ot = await this.generarPreventivo(em, plan, fecha, actor);
+    return { activo: activo.codigo, ...ot };
+  }
+
+  private camposPlan(dto: CreatePlanDto) {
+    return {
+      nombre: dto.nombre.trim(),
+      tareas: dto.tareas?.trim() || null,
+      frecuenciaValor: dto.frecuenciaValor,
+      frecuenciaUnidad: dto.frecuenciaUnidad,
+      diasAviso: dto.diasAviso ?? 7,
+      tecnicoId: dto.tecnicoId ?? null,
+    };
   }
 
   // ======================= Internos =======================
@@ -613,6 +715,7 @@ export class MaintenanceService {
   }
 
   private async generarPreventivo(em: EntityManager, plan: MaintenancePlan, fecha: string, actor: SessionUser) {
+    if (!plan.activoId) throw new Error('Un plan por tipo de equipo no genera órdenes: las generan sus planes por máquina');
     const repuestos = plan.repuestos ?? (await em.getRepository(PlanPart).find({ where: { planId: plan.id } }));
     const estado = plan.tecnicoId ? EstadoOrden.ASIGNADA : EstadoOrden.ABIERTA;
     const o = await em.getRepository(WorkOrder).save(

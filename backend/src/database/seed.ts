@@ -8,8 +8,9 @@
  * se genera una aleatoria y se muestra una sola vez en consola.
  */
 import { randomBytes } from 'crypto';
-import { DataSource } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import { Asset } from '../assets/asset.entity';
+import { EquipmentCategory, EquipmentModel, EquipmentModelPart } from '../equipment/equipment.entities';
 import { EstadoActivo, EstadoOrden, OrigenCompra, Prioridad, Rol, TipoMovimiento, TipoOrden, UnidadFrecuencia } from '../common/enums';
 import { InventoryMovement } from '../inventory/inventory-movement.entity';
 import { SparePart } from '../inventory/spare-part.entity';
@@ -76,6 +77,43 @@ async function main() {
         motivo: 'Inventario inicial (datos de demostración)', usuarioId: admin.id,
       });
     }
+    // Tipos de equipo con su lista de materiales; aires acondicionados iguales en dos áreas.
+    if ((await ds.getRepository(EquipmentModel).count()) === 0) {
+      for (const r of [
+        { codigo: 'RP-FIL-MS12', descripcion: 'Filtro de aire mini split 12.000 BTU', unidad: 'UND', ubicacion: 'Estante C2', stockMinimo: 4, inicial: 8, costo: 35000 },
+        { codigo: 'RP-GAS-410', descripcion: 'Gas refrigerante R410A', unidad: 'KG', ubicacion: 'Bodega de gases', stockMinimo: 2, inicial: 5, costo: 68000 },
+      ]) {
+        if (await ds.getRepository(SparePart).exists({ where: { codigo: r.codigo } })) continue;
+        const { inicial, costo, ...datos } = r;
+        const saved = await ds.getRepository(SparePart).save({ ...datos, costoPromedio: costo });
+        await ds.getRepository(InventoryMovement).save({
+          repuestoId: saved.id, tipo: TipoMovimiento.ENTRADA_INICIAL, cantidad: inicial, costoUnitario: costo,
+          motivo: 'Saldo inicial (datos de demostración)', referencia: 'CARGA-INICIAL', usuarioId: admin.id,
+        });
+      }
+      const rep = async (codigo: string) => (await ds.getRepository(SparePart).findOneByOrFail({ codigo })).id;
+      const tipos: Array<{ categoria: string; nombre: string; fabricante: string; referencia: string; materiales: Array<[string, number]>; equipos: string[] }> = [
+        { categoria: 'Aire acondicionado', nombre: 'Mini split 12.000 BTU', fabricante: 'Samsung', referencia: 'AR12', materiales: [['RP-FIL-MS12', 2], ['RP-GAS-410', 0.5]], equipos: [] },
+        { categoria: 'Molino', nombre: 'Molino Javar M-32', fabricante: 'Javar', referencia: 'M-32', materiales: [['RP-CUCH-32', 1], ['RP-PLACA-8', 1], ['RP-ROD-6205', 2]], equipos: ['MOL-001'] },
+        { categoria: 'Embutidora', nombre: 'Embutidora Handtmann VF-608', fabricante: 'Handtmann', referencia: 'VF-608', materiales: [['RP-ROD-6205', 2], ['RP-ACE-GA', 1]], equipos: ['EMB-002'] },
+      ];
+      for (const t of tipos) {
+        const cat = await ds.getRepository(EquipmentCategory).save({ nombre: t.categoria });
+        const modelo = await ds.getRepository(EquipmentModel).save({
+          categoriaId: cat.id, nombre: t.nombre, fabricante: t.fabricante, referencia: t.referencia,
+          materiales: await Promise.all(t.materiales.map(async ([c, cantidad]) => ds.getRepository(EquipmentModelPart).create({ repuestoId: await rep(c), cantidad }))),
+        });
+        if (t.equipos.length) await ds.getRepository(Asset).update({ codigo: In(t.equipos) }, { modeloId: modelo.id });
+        if (t.categoria === 'Aire acondicionado') {
+          for (const [codigo, area, ubicacion] of [['AA-001', 'Bodega', 'Bodega de insumos'], ['AA-002', 'Bodega', 'Bodega de insumos'], ['AA-003', 'Bodega', 'Bodega de empaque'], ['AA-004', 'Oficinas', 'Oficina de producción']]) {
+            if (await ds.getRepository(Asset).exists({ where: { codigo } })) continue;
+            await ds.getRepository(Asset).save({ codigo, nombre: 'Aire acondicionado mini split', fabricante: 'Samsung', modelo: 'AR12', area, ubicacion, fechaCompra: '2024-02-10', modeloId: modelo.id });
+          }
+          await ds.query(`UPDATE activos SET creado_en = now() - interval '90 days' WHERE codigo LIKE 'AA-00_' AND creado_en > now() - interval '1 day'`);
+        }
+      }
+    }
+
     // Órdenes de ejemplo: una falla reportada sin asignar y un plan preventivo con su primera OT.
     if ((await ds.getRepository(WorkOrder).count()) === 0) {
       const emb = await ds.getRepository(Asset).findOneByOrFail({ codigo: 'EMB-002' });

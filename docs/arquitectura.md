@@ -29,6 +29,7 @@ En producción la API también entrega la app compilada (`FRONTEND_DIR`), así t
 | `notifications` | Bandeja, avisos al celular, preventivos próximos | NOT |
 | `kpi` | Indicadores y sus parámetros | KPI |
 | `import` | Carga masiva desde Excel | INT-01 |
+| `equipment` | Tipos de equipo (categoría y modelo), lista de materiales, conteo por tipo y área | ACT, MNT-08 |
 
 Reglas transversales:
 
@@ -45,18 +46,18 @@ Reglas transversales:
 
 ## Modelo de datos
 
-22 tablas. Todas las llaves son UUID (`gen_random_uuid()`), salvo `parametros`. Los consecutivos visibles (OT-000123, SC-000045) son columnas `numero` con secuencia.
+25 tablas. Todas las llaves son UUID (`gen_random_uuid()`), salvo `parametros`. Los consecutivos visibles (OT-000123, SC-000045) son columnas `numero` con secuencia.
 
 | Tabla | Contenido | Columnas principales |
 |---|---|---|
 | `usuarios` | Cuentas y roles (ADMIN, AUTORIZADOR, TECNICO, OPERARIO) | usuario, rol, password_hash / pin_hash, activo, intentos_fallidos, bloqueado_hasta |
 | `parametros` | Configuración (clave → valor) | autorizador de compras, tarifa por hora, horario y metas de indicadores |
 | `bitacora` 🔒 | Auditoría | usuario_id, accion, entidad, entidad_id, detalle (JSON) |
-| `activos` | Máquinas | codigo (único), codigo_sap, nombre, area, ubicacion, fechas de compra y garantía, estado |
+| `activos` | Máquinas | codigo (único), codigo_sap, nombre, area, ubicacion, modelo_id (tipo de equipo), fechas de compra y garantía, estado |
 | `activo_documentos` | Manuales y fichas | activo_id, archivo, mime, tamano_bytes, subido_por_id |
 | `repuestos` | Catálogo de repuestos | codigo (único), descripcion, unidad, stock_minimo, costo_promedio, activo |
 | `movimientos_inventario` 🔒 | Kárdex. **El stock es la suma de los movimientos** | repuesto_id, tipo, cantidad (con signo), costo_unitario, referencia, client_id |
-| `planes_mantenimiento`, `plan_repuestos` | Preventivos por frecuencia y su kit | activo_id, frecuencia_valor / unidad, dias_aviso, tecnico_id |
+| `planes_mantenimiento`, `plan_repuestos` | Preventivos por frecuencia y su kit | activo_id **o** modelo_id (plan por tipo), plantilla_id (plan de un equipo creado desde el del tipo), frecuencia_valor / unidad, dias_aviso, tecnico_id |
 | `ordenes_trabajo` | OT correctivas y preventivas | numero, tipo, estado, prioridad, activo_id, inicio_parada / fin_parada, costos congelados al cierre |
 | `ot_eventos` 🔒 | Historial de estados de cada OT | orden_id, estado_anterior → estado_nuevo, nota |
 | `ot_repuestos`, `ot_mano_obra`, `ot_fotos` | Repuestos planificados/usados, horas por técnico, fotos | orden_id, … |
@@ -66,6 +67,7 @@ Reglas transversales:
 | `plantillas_checklist` | Formatos HACCP/BPM | items (JSON), activo_id opcional |
 | `registros_checklist` 🔒 | Checklists llenos | respuestas (JSON), no_conformes, accion_correctiva |
 | `anulaciones_calidad` 🔒 | Anulación con motivo de un registro de calidad (no se borra) | tipo, registro_id, motivo |
+| `categorias_equipo`, `modelos_equipo`, `modelo_materiales` | Tipos de equipo y su lista de materiales | nombre de categoría; modelo (único), fabricante, referencia; repuesto y cantidad por mantenimiento |
 | `notificaciones` | Bandeja de cada usuario | usuario_id, tipo, titulo, enlace, leida_en, clave (evita duplicados) |
 | `suscripciones_push` | Celulares que reciben avisos | usuario_id, endpoint, claves |
 

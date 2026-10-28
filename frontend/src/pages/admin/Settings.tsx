@@ -17,6 +17,9 @@ const ACCION_LABEL: Record<string, string> = {
   ACTIVO_ACTUALIZADO: 'Modificó máquina',
   DOCUMENTO_ADJUNTADO: 'Adjuntó documento',
   DOCUMENTO_ELIMINADO: 'Eliminó documento',
+  MODELO_CREADO: 'Creó tipo de equipo',
+  MODELO_ACTUALIZADO: 'Modificó tipo de equipo',
+  MODELO_ELIMINADO: 'Eliminó tipo de equipo',
   FOTO_ELIMINADA: 'Eliminó foto de una orden',
   REPUESTO_CREADO: 'Registró repuesto',
   REPUESTO_ACTUALIZADO: 'Modificó repuesto',
@@ -44,7 +47,7 @@ const ACCION_LABEL: Record<string, string> = {
   PLAN_ACTUALIZADO: 'Modificó plan preventivo',
 };
 
-const ENTIDADES: Array<[string, string]> = [['', 'Todo'], ['usuario', 'Usuarios'], ['parametro', 'Parámetros'], ['activo', 'Máquinas'], ['repuesto', 'Repuestos'], ['orden', 'Órdenes'], ['plan', 'Planes'], ['compra', 'Compras'], ['calidad', 'Calidad']];
+const ENTIDADES: Array<[string, string]> = [['', 'Todo'], ['usuario', 'Usuarios'], ['parametro', 'Parámetros'], ['activo', 'Máquinas'], ['repuesto', 'Repuestos'], ['orden', 'Órdenes'], ['plan', 'Planes'], ['modelo', 'Tipos de equipo'], ['compra', 'Compras'], ['calidad', 'Calidad']];
 
 function resumen(d: Record<string, unknown> | null): string {
   if (!d) return '';

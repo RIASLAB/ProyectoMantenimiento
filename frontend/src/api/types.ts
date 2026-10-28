@@ -39,6 +39,9 @@ export interface Asset {
   fechaFinGarantia: string | null;
   estado: EstadoActivo;
   notas: string | null;
+  modeloId: string | null;
+  /** Tipo de equipo; en la ficha trae además la lista de materiales. */
+  modeloEquipo?: EquipmentModelRef | null;
   documentos?: AssetDocument[];
   creadoEn: string;
   actualizadoEn: string;
@@ -139,10 +142,44 @@ export interface OrdersSummary {
   maquinasParadas: number; preventivosVencidos: number; preventivosProximos: number;
 }
 
+export interface MaterialRef { id?: string; repuestoId: string; cantidad: number; repuesto: { id: string; codigo: string; descripcion: string; unidad: string } }
+
+export interface EquipmentModelRef {
+  id: string;
+  nombre: string;
+  categoriaId?: string;
+  categoria?: { id: string; nombre: string };
+  fabricante?: string | null;
+  referencia?: string | null;
+  materiales?: MaterialRef[];
+}
+
+export interface EquipmentModel extends EquipmentModelRef {
+  categoriaId: string;
+  categoria: { id: string; nombre: string };
+  fabricante: string | null;
+  referencia: string | null;
+  descripcion: string | null;
+  materiales: MaterialRef[];
+  equipos: number | Array<{ id: string; codigo: string; nombre: string; area: string; estado: EstadoActivo }>;
+}
+
+export interface ResumenEquipos {
+  total: number;
+  enUso: number;
+  filas: Array<{ categoriaId: string | null; categoria: string; modeloId: string | null; modelo: string | null; area: string; total: number; operativos: number; enMantenimiento: number; fueraDeServicio: number; dadosDeBaja: number }>;
+}
+
 export interface Plan {
   id: string;
-  activoId: string;
-  activo: { id: string; codigo: string; nombre: string };
+  /** Plan de una máquina, o plan por tipo de equipo (activo vacío y modeloEquipo lleno). */
+  activoId: string | null;
+  activo: { id: string; codigo: string; nombre: string; area: string } | null;
+  modeloId: string | null;
+  modeloEquipo: { id: string; nombre: string; categoria: { id: string; nombre: string } } | null;
+  /** Plan de un equipo creado desde el plan de su tipo. */
+  plantillaId: string | null;
+  primeraFecha: string | null;
   nombre: string;
   tareas: string | null;
   frecuenciaValor: number;

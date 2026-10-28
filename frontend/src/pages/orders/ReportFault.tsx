@@ -7,6 +7,7 @@ import { Button, ErrorBox, Field, Icon, PageHeader, Select, Spinner, Textarea } 
 import { useAuth } from '../../auth/AuthContext';
 import { PRIORIDAD_LABEL } from '../../format';
 import { comprimirFoto, enviarOEncolar } from '../../offline/outbox';
+import { PartRow, PartRows, rowsToPayload, useTipoEquipo } from '../../components/orders-shared';
 
 const MAX_MB = 20;
 
@@ -23,7 +24,10 @@ export function ReportFault() {
   const [fotoError, setFotoError] = useState('');
   const [clientId] = useState(() => uuid());
   const [fotoClientId] = useState(() => uuid());
-  const { user } = useAuth();
+  const { user, can } = useAuth();
+  // Mantenimiento puede dejar planificados los materiales desde el reporte; el operario solo reporta.
+  const planifica = can('ADMIN', 'TECNICO');
+  const [rows, setRows] = useState<PartRow[]>([]);
 
   const activos = useQuery({ queryKey: ['activos', '', '', ''], queryFn: () => api.get<Asset[]>('/activos') });
   const porArea = useMemo(() => {
@@ -31,6 +35,8 @@ export function ReportFault() {
     for (const a of activos.data ?? []) if (a.estado !== 'DADO_DE_BAJA') m.set(a.area, [...(m.get(a.area) ?? []), a]);
     return [...m];
   }, [activos.data]);
+  const elegido = activos.data?.find((a) => a.id === activoId);
+  const tipo = useTipoEquipo(planifica ? elegido?.modeloId : null);
 
   const m = useMutation({
     mutationFn: async () => {
@@ -43,7 +49,10 @@ export function ReportFault() {
         resumen: `${activo?.codigo ?? 'Máquina'}: ${descripcion.slice(0, 80)}${parada ? ' (máquina parada)' : ''}`,
         method: 'POST',
         path: '/ordenes',
-        body: { activoId, descripcion, maquinaParada: parada, prioridad: prioridad || undefined, clientId, reportadoEn: new Date().toISOString() },
+        body: {
+          activoId, descripcion, maquinaParada: parada, prioridad: prioridad || undefined, clientId, reportadoEn: new Date().toISOString(),
+          repuestos: planifica && rowsToPayload(rows).length ? rowsToPayload(rows) : undefined,
+        },
         foto: blob ? { blob, nombre: 'falla.jpg', momento: 'REPORTE', clientId: fotoClientId } : undefined,
       });
       return r;
@@ -74,7 +83,7 @@ export function ReportFault() {
         <Field label="Máquina *">
           {(i) =>
             activos.isPending ? <Spinner label="Cargando máquinas…" /> : (
-              <Select id={i} value={activoId} onChange={(e) => setActivoId(e.target.value)} required>
+              <Select id={i} value={activoId} onChange={(e) => { setActivoId(e.target.value); setRows([]); }} required>
                 <option value="" disabled>Seleccione la máquina…</option>
                 {porArea.map(([area, items]) => (
                   <optgroup key={area} label={area}>
@@ -103,6 +112,14 @@ export function ReportFault() {
             </Select>
           )}
         </Field>
+
+        {planifica && activoId ? (
+          <div>
+            <p className="subtle-head">Materiales que se van a necesitar (opcional)</p>
+            <PartRows rows={rows} onChange={setRows} sugeridos={tipo.data?.materiales}
+              tituloSugeridos={tipo.data ? `Lista de materiales · ${tipo.data.nombre}` : undefined} />
+          </div>
+        ) : null}
 
         <Field label="Foto (opcional)" error={fotoError || undefined}>
           {(i) => <input id={i} className="input" type="file" accept="image/jpeg,image/png" capture="environment" onChange={onFoto} />}
