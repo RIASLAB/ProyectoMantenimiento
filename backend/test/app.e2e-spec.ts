@@ -217,6 +217,23 @@ describe('ACT-01/02/03 · Máquinas', () => {
     expect(dl.headers['content-type']).toBe('application/pdf');
   });
 
+  it('el administrador elimina un documento; queda en la bitácora y el archivo se borra', async () => {
+    const up = await http.post(`/api/activos/${id}/documentos`).set(auth(admin)).attach('archivo', PDF, { filename: 'manual equivocado.pdf', contentType: 'application/pdf' });
+    expect(up.status).toBe(201);
+    await http.post('/api/usuarios').set(auth(admin)).send({ nombre: 'Técnico Docs', usuario: 'tecdocs', rol: 'TECNICO', credencial: '7351' }).expect(201);
+    const tec = (await http.post('/api/auth/login').send({ usuario: 'tecdocs', credencial: '7351' })).body.token;
+    expect((await http.delete(`/api/activos/documentos/${up.body.id}`).set(auth(tec))).status).toBe(403);
+
+    const r = await http.delete(`/api/activos/documentos/${up.body.id}`).set(auth(admin));
+    expect(r.status).toBe(200);
+    const ficha = await http.get(`/api/activos/${id}`).set(auth(admin));
+    expect(ficha.body.documentos.map((d: { nombreOriginal: string }) => d.nombreOriginal)).toEqual(['manual molino.pdf']);
+    expect((await http.get(`/api/activos/documentos/${up.body.id}/archivo`).set(auth(admin))).status).toBe(404);
+    const b = await http.get(`/api/bitacora?entidad=activo&entidadId=${id}`).set(auth(admin));
+    expect(b.body.items[0]).toMatchObject({ accion: 'DOCUMENTO_ELIMINADO', detalle: { documento: 'manual equivocado.pdf' } });
+    expect((await http.delete(`/api/activos/documentos/${up.body.id}`).set(auth(admin))).status).toBe(404);
+  });
+
   it('rechaza un archivo que dice ser PDF pero no lo es', async () => {
     const r = await http.post(`/api/activos/${id}/documentos`).set(auth(admin))
       .attach('archivo', Buffer.from('MZ ejecutable'), { filename: 'virus.pdf', contentType: 'application/pdf' });

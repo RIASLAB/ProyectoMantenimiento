@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { createReadStream, existsSync, mkdirSync } from 'fs';
-import { writeFile } from 'fs/promises';
+import { unlink, writeFile } from 'fs/promises';
 import { extname, join, resolve } from 'path';
 import { DataSource, Repository } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
@@ -124,6 +124,21 @@ export class AssetsService {
       const { archivo: _omit, ...publico } = doc;
       return publico;
     });
+  }
+
+  /** Elimina un documento adjuntado por error o reemplazado. Queda en la bitácora con su nombre. */
+  async deleteDocument(docId: string, actor: SessionUser) {
+    const doc = await this.docs.createQueryBuilder('d').addSelect('d.archivo').where('d.id = :docId', { docId }).getOne();
+    if (!doc) throw new NotFoundException('Documento no encontrado');
+    await this.ds.transaction(async (em) => {
+      await em.getRepository(AssetDocument).delete(doc.id);
+      await this.audit.log(
+        { usuarioId: actor.id, accion: 'DOCUMENTO_ELIMINADO', entidad: 'activo', entidadId: doc.activoId, detalle: { documento: doc.nombreOriginal } },
+        em,
+      );
+    });
+    await unlink(join(this.dir, doc.archivo)).catch(() => undefined);
+    return { ok: true };
   }
 
   async openDocument(docId: string) {

@@ -1,5 +1,5 @@
 import {
-  Body, Controller, Get, Param, ParseEnumPipe, ParseUUIDPipe, Patch, Post, Put, Query, Res, StreamableFile, UploadedFile, UseInterceptors,
+  Body, Controller, Delete, Get, Param, ParseEnumPipe, ParseUUIDPipe, Patch, Post, Put, Query, Res, StreamableFile, UploadedFile, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
@@ -32,6 +32,12 @@ export class WorkOrdersController {
     const { foto, stream } = await this.svc.abrirFoto(fotoId, actor);
     res.set({ 'Content-Type': foto.mime, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'private, max-age=3600' });
     return new StreamableFile(stream);
+  }
+
+  /** Quien subió la foto o un administrador, mientras la orden está abierta (lo valida el servicio). */
+  @Delete('fotos/:fotoId')
+  eliminarFoto(@Param('fotoId', ParseUUIDPipe) fotoId: string, @CurrentUser() actor: SessionUser) {
+    return this.svc.eliminarFoto(fotoId, actor);
   }
 
   @Get(':id')

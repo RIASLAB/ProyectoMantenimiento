@@ -87,9 +87,9 @@ cd backend
 npm run test:e2e
 ```
 
-Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **155 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
+Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **159 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
 
-Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**70 verificaciones**):
+Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**77 verificaciones**):
 
 | Script | Qué recorre |
 |---|---|
@@ -97,6 +97,7 @@ Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritori
 | `e2e/ordenes.py` | Operario reporta falla en el celular → admin asigna → técnico cierra con repuestos y horas → hoja de vida |
 | `e2e/compras.py` | Faltante automático → autorizador aprueba/rechaza → admin compra y recibe en bodega |
 | `e2e/calidad.py` | Temperatura fuera de rango, checklist con no conformidad, anulación, exportación, configuración |
+| `e2e/eliminar_adjuntos.py` | Eliminar fotos de una orden (quién puede y cuándo) y documentos de una máquina |
 | `e2e/carga_masiva.py` | Descarga la plantilla, la llena, la sube con errores (fila y columna), la corrige y carga máquinas y repuestos con stock inicial |
 | `e2e/avisos_indicadores.py` | Falla y temperatura fuera de rango → campana y bandeja del admin; asignación → aviso al técnico; indicadores en el celular; horario y metas |
 | `e2e/rendimiento.py` | Mide la carga de las pantallas principales con 4G lenta y sin caché (NFR-02); no cuenta verificaciones |
@@ -147,6 +148,8 @@ Todas las rutas van bajo `/api` y requieren `Authorization: Bearer <token>`, sal
 | `POST /notificaciones/:id/leida`, `POST /notificaciones/leidas` | Todos | Marcar una o todas como leídas |
 | `GET/POST /notificaciones/push`, `POST /notificaciones/push/baja` · `prueba` | Todos | Avisos al celular de este dispositivo |
 | `GET /importacion/:tipo/plantilla` | Admin | Plantilla de Excel (`maquinas` o `repuestos`) |
+| `DELETE /ordenes/fotos/:id` | Quien la subió o Admin | Eliminar una foto mientras la orden está abierta |
+| `DELETE /activos/documentos/:id` | Admin | Eliminar un documento de una máquina |
 | `POST /importacion/:tipo/validar` · `POST /importacion/:tipo` | Admin | Revisar el archivo (errores por fila) · cargarlo completo |
 | `GET /indicadores?desde=&hasta=` | Admin, Autorizador | KPI globales y por máquina del período (por defecto, últimos 30 días) |
 | `GET/PUT /indicadores/parametros` | Admin, Autorizador / Admin | Horario de producción y metas |

@@ -546,3 +546,8 @@ button.chip.chip-on { color: #fff; }
 .import-sum { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 @media (min-width: 900px) { .import-sum { grid-template-columns: repeat(3, 1fr); } }
 .import-errors td:last-child { color: var(--bad); }
+.doc-row { display: flex; align-items: stretch; gap: 6px; }
+.doc-row .doc { flex: 1; min-width: 0; }
+.doc-del { align-self: center; color: var(--muted); }
+.doc-del:hover { color: var(--bad); }
+.modal-foot .btn-ghost.text-bad { color: var(--bad); }

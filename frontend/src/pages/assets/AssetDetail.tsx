@@ -2,10 +2,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChangeEvent, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, openProtectedFile } from '../../api/client';
-import type { Asset, AssetHistory } from '../../api/types';
+import type { Asset, AssetDocument, AssetHistory } from '../../api/types';
 import { OrderStateBadge } from '../../components/orders-shared';
 import { useAuth } from '../../auth/AuthContext';
-import { Badge, Button, Empty, ErrorBox, Icon, KeyValue, PageHeader, Spinner } from '../../components/ui';
+import { Badge, Button, Empty, ErrorBox, Icon, KeyValue, Modal, PageHeader, Spinner } from '../../components/ui';
 import { date, dateTime, daysUntil, ESTADO_LABEL, ESTADO_TONE, fileSize, money, TIPO_LABEL } from '../../format';
 
 const MAX_MB = 20;
@@ -70,6 +70,7 @@ export function AssetDetail() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploadError, setUploadError] = useState('');
   const [openError, setOpenError] = useState('');
+  const [aBorrar, setABorrar] = useState<AssetDocument | null>(null);
 
   const q = useQuery({ queryKey: ['activo', id], queryFn: () => api.get<Asset>(`/activos/${id}`) });
 
@@ -82,6 +83,12 @@ export function AssetDetail() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['activo', id] }),
     onError: (e) => setUploadError(e.message),
   });
+
+  const borrar = useMutation({
+    mutationFn: (docId: string) => api.delete(`/activos/documentos/${docId}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['activo', id] }); setABorrar(null); },
+  });
+  const cerrarBorrar = () => { setABorrar(null); borrar.reset(); };
 
   const onFile = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -165,7 +172,7 @@ export function AssetDetail() {
           ) : (
             <ul className="docs">
               {docs.map((d) => (
-                <li key={d.id}>
+                <li key={d.id} className="doc-row">
                   <button
                     className="doc"
                     onClick={() => {
@@ -179,6 +186,11 @@ export function AssetDetail() {
                       {fileSize(d.tamanoBytes)} · {d.subidoPor?.nombre ?? '—'} · {dateTime(d.creadoEn)}
                     </span>
                   </button>
+                  {can('ADMIN') ? (
+                    <button type="button" className="icon-btn doc-del" aria-label={`Eliminar ${d.nombreOriginal}`} onClick={() => setABorrar(d)}>
+                      <Icon name="trash" />
+                    </button>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -189,6 +201,12 @@ export function AssetDetail() {
           <Historial activoId={a.id} />
         </section>
       </div>
+      <Modal open={!!aBorrar} title="Eliminar documento" onClose={cerrarBorrar}
+        footer={<><Button variant="ghost" onClick={cerrarBorrar}>Cancelar</Button><Button variant="danger" busy={borrar.isPending} onClick={() => aBorrar && borrar.mutate(aBorrar.id)}>Eliminar</Button></>}>
+        <p style={{ marginTop: 0 }}>¿Eliminar <strong>{aBorrar?.nombreOriginal}</strong> de esta máquina?</p>
+        <p className="muted small" style={{ margin: 0 }}>Quedará registrado en la bitácora.</p>
+        {borrar.isError ? <ErrorBox error={borrar.error} /> : null}
+      </Modal>
     </>
   );
 }

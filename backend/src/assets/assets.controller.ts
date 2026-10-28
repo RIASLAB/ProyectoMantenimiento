@@ -1,5 +1,5 @@
 import {
-  Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Res, StreamableFile, UploadedFile, UseInterceptors,
+  Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Res, StreamableFile, UploadedFile, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
@@ -33,6 +33,12 @@ export class AssetsController {
       'X-Content-Type-Options': 'nosniff',
     });
     return new StreamableFile(stream);
+  }
+
+  @Delete('documentos/:docId')
+  @Roles(Rol.ADMIN)
+  deleteDocument(@Param('docId', ParseUUIDPipe) docId: string, @CurrentUser() actor: SessionUser) {
+    return this.assets.deleteDocument(docId, actor);
   }
 
   @Get(':id')

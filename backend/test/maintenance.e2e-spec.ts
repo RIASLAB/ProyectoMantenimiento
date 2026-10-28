@@ -1,4 +1,6 @@
 /** Órdenes de trabajo y preventivos (MNT, ACT-03/04). */
+import { readdirSync } from 'fs';
+import { join } from 'path';
 import { DataSource } from 'typeorm';
 import { bootstrap } from './util';
 import { sumarFrecuencia, hoy } from '../src/maintenance/maintenance.service';
@@ -13,6 +15,7 @@ let tec2: { id: string; token: string };
 let activoId: string;
 let rodId: string;
 let otId: string;
+let fotoCerrada: string;
 
 const JPG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46, 0, 1]);
 
@@ -118,6 +121,43 @@ describe('MNT-03/04 · Ciclo de vida y permisos', () => {
   });
 });
 
+describe('MNT-11 · Eliminar fotos subidas por error', () => {
+  const subir = (token: string, momento: string) =>
+    c.http.post(`/api/ordenes/${otId}/fotos?momento=${momento}`).set(c.auth(token)).attach('archivo', JPG, { filename: 'f.jpg', contentType: 'image/jpeg' });
+  const archivos = () => readdirSync(join(process.env.UPLOADS_DIR!, 'ordenes')).length;
+
+  it('quien subió la foto la elimina: se borra el archivo y queda en el historial y la bitácora', async () => {
+    const f = await subir(tec1.token, 'ANTES');
+    expect(f.status).toBe(201);
+    const antes = archivos();
+    expect((await c.http.delete(`/api/ordenes/fotos/${f.body.id}`).set(c.auth(op1.token))).status).toBe(403);
+    expect((await c.http.delete(`/api/ordenes/fotos/${f.body.id}`).set(c.auth(tec2.token))).status).toBe(403);
+    const r = await c.http.delete(`/api/ordenes/fotos/${f.body.id}`).set(c.auth(tec1.token));
+    expect(r.status).toBe(200);
+    expect(archivos()).toBe(antes - 1);
+    const o = await c.http.get(`/api/ordenes/${otId}`).set(c.auth(c.admin));
+    expect(o.body.fotos.map((x: { id: string }) => x.id)).not.toContain(f.body.id);
+    expect(o.body.eventos.at(-1)).toMatchObject({ nota: 'Foto "Antes" eliminada', estadoNuevo: 'EN_EJECUCION', usuario: { id: tec1.id } });
+    expect(o.body.estado).toBe('EN_EJECUCION');
+    const b = await c.http.get(`/api/bitacora?entidad=orden&entidadId=${otId}`).set(c.auth(c.admin));
+    expect(b.body.items[0]).toMatchObject({ accion: 'FOTO_ELIMINADA', detalle: { momento: 'ANTES', subidaPor: tec1.id } });
+    expect((await c.http.get(`/api/ordenes/fotos/${f.body.id}/archivo`).set(c.auth(c.admin))).status).toBe(404);
+    expect((await c.http.delete(`/api/ordenes/fotos/${f.body.id}`).set(c.auth(tec1.token))).status).toBe(404);
+  });
+
+  it('el administrador puede eliminar la foto de otro (ej. la del reporte del operario)', async () => {
+    const o = await c.http.get(`/api/ordenes/${otId}`).set(c.auth(c.admin));
+    const reporte = o.body.fotos.find((x: { momento: string }) => x.momento === 'REPORTE');
+    expect((await c.http.delete(`/api/ordenes/fotos/${reporte.id}`).set(c.auth(c.admin))).status).toBe(200);
+  });
+
+  it('deja una foto "Después" para comprobar que al cerrar ya no se puede borrar', async () => {
+    const f = await subir(tec1.token, 'DESPUES');
+    fotoCerrada = f.body.id;
+    expect(f.status).toBe(201);
+  });
+});
+
 describe('MNT-09/10 · Cierre', () => {
   const cierre = (extra: object = {}) => ({
     trabajoRealizado: 'Cambio de rodamiento y lubricación',
@@ -158,6 +198,10 @@ describe('MNT-09/10 · Cierre', () => {
 
   it('una OT cerrada ya no admite cambios', async () => {
     expect((await c.http.post(`/api/ordenes/${otId}/cancelar`).set(c.auth(c.admin)).send({ motivo: 'Error' })).status).toBe(400);
+    // Las fotos de una OT cerrada son evidencia: ni el administrador las borra
+    const del = await c.http.delete(`/api/ordenes/fotos/${fotoCerrada}`).set(c.auth(c.admin));
+    expect(del.status).toBe(400);
+    expect(del.body.message).toContain('son evidencia del trabajo');
     expect((await c.http.put(`/api/ordenes/${otId}/repuestos`).set(c.auth(c.admin)).send({ repuestos: [] })).status).toBe(400);
   });
 

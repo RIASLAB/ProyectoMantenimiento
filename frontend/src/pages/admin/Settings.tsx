@@ -16,6 +16,8 @@ const ACCION_LABEL: Record<string, string> = {
   ACTIVO_CREADO: 'Registró máquina',
   ACTIVO_ACTUALIZADO: 'Modificó máquina',
   DOCUMENTO_ADJUNTADO: 'Adjuntó documento',
+  DOCUMENTO_ELIMINADO: 'Eliminó documento',
+  FOTO_ELIMINADA: 'Eliminó foto de una orden',
   REPUESTO_CREADO: 'Registró repuesto',
   REPUESTO_ACTUALIZADO: 'Modificó repuesto',
   AJUSTE_INVENTARIO: 'Ajuste de inventario',

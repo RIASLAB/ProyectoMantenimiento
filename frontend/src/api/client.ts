@@ -114,6 +114,9 @@ export const api = {
   async put<T>(path: string, body: Body): Promise<T> {
     return (await raw(path, { method: 'PUT', body })).json();
   },
+  async delete<T>(path: string): Promise<T> {
+    return (await raw(path, { method: 'DELETE' })).json();
+  },
   async send<T>(method: 'POST' | 'PUT', path: string, body?: Body): Promise<T> {
     return (await raw(path, { method, body })).json();
   },

@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { createReadStream, existsSync, mkdirSync } from 'fs';
-import { writeFile } from 'fs/promises';
+import { unlink, writeFile } from 'fs/promises';
 import { join, resolve } from 'path';
 import { DataSource, EntityManager, In, Not, Repository } from 'typeorm';
 import { Asset } from '../assets/asset.entity';
@@ -448,6 +448,33 @@ export class MaintenanceService {
     });
     const { archivo: _omit, ...publico } = foto;
     return publico;
+  }
+
+  /**
+   * Elimina una foto subida por error. Solo mientras la orden está abierta (cerrada, las fotos son evidencia
+   * del trabajo) y solo quien la subió o un administrador. Queda en el historial de la OT y en la bitácora.
+   */
+  async eliminarFoto(fotoId: string, actor: SessionUser) {
+    const f = await this.ds.getRepository(WorkOrderPhoto).createQueryBuilder('f').addSelect('f.archivo').where('f.id = :fotoId', { fotoId }).getOne();
+    if (!f) throw new NotFoundException('Foto no encontrada');
+    const o = await this.orders.findOne({ where: { id: f.ordenId } });
+    if (!o) throw new NotFoundException('Orden de trabajo no encontrada');
+    if (actor.rol !== Rol.ADMIN && f.subidoPorId !== actor.id) throw new ForbiddenException('Solo quien subió la foto o un administrador puede eliminarla');
+    if (!ABIERTAS.includes(o.estado)) {
+      throw new BadRequestException(`La orden está ${ETIQUETA_ESTADO[o.estado]}: sus fotos son evidencia del trabajo y ya no se pueden eliminar`);
+    }
+    const etiqueta = { [MomentoFoto.REPORTE]: 'del reporte', [MomentoFoto.ANTES]: '"Antes"', [MomentoFoto.DESPUES]: '"Después"' }[f.momento];
+    await this.ds.transaction(async (em) => {
+      await em.getRepository(WorkOrderPhoto).delete(f.id);
+      await this.evento(em, o.id, actor, o.estado, o.estado, `Foto ${etiqueta} eliminada`);
+      await this.audit.log({
+        usuarioId: actor.id, accion: 'FOTO_ELIMINADA', entidad: 'orden', entidadId: o.id,
+        detalle: { orden: numeroOT(o.numero), momento: f.momento, subidaPor: f.subidoPorId, subidaEn: f.creadoEn },
+      }, em);
+    });
+    // El archivo se borra después de confirmar el cambio en la base.
+    await unlink(join(this.dir, f.archivo)).catch(() => undefined);
+    return { ok: true };
   }
 
   async abrirFoto(fotoId: string, actor: SessionUser) {

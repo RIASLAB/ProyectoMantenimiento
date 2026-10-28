@@ -11,7 +11,7 @@ Estado al cierre del Sprint 2 frente a la matriz (`Matriz_Requisitos_CMMS_Nutria
 | ID | Requisito | API | Pantalla | Evidencia | Falta |
 |---|---|---|---|---|---|
 | ACT-01 | Ficha técnica | ✅ | ✅ | Código único normalizado, validaciones, operario recibe 403 | — |
-| ACT-02 | Documentos adjuntos | ✅ | ✅ | PDF validado por firma; quién y cuándo | Definir tamaño máximo (hoy 20 MB) |
+| ACT-02 | Documentos adjuntos | ✅ | ✅ | PDF validado por firma; quién y cuándo; el administrador puede eliminarlos (queda en bitácora) | Definir tamaño máximo (hoy 20 MB) |
 | ACT-03 | Hoja de vida | ✅ | ✅ | Historial de OT por máquina, filtrable desde la lista de OT | — |
 | ACT-04 | Costo acumulado (LCC) | ✅ | ✅ | Repuestos + mano de obra + externos; prueba: $300 + $30.000 + $50.000 = $80.300 | Confirmar D-03 |
 
@@ -28,7 +28,7 @@ Estado al cierre del Sprint 2 frente a la matriz (`Matriz_Requisitos_CMMS_Nutria
 | MNT-08 | Kit de repuestos | ✅ | ✅ | El plan copia el kit a cada OT; el técnico ajusta lo usado | — |
 | MNT-09 | Descuento automático | ✅ | ✅ | Solo lo usado; movimiento con referencia OT; sin stock no cierra ni descuenta | — |
 | MNT-10 | Mano de obra y externos | ✅ | ✅ | Horas por técnico × tarifa vigente; costos congelados al cierre | — |
-| MNT-11 | Fotos | ✅ | ✅ | Reporte, antes y después; JPG/PNG validados | — |
+| MNT-11 | Fotos | ✅ | ✅ | Reporte, antes y después; JPG/PNG validados; una foto equivocada se elimina mientras la OT está abierta (queda en el historial y la bitácora) | — |
 
 ## Inventario
 

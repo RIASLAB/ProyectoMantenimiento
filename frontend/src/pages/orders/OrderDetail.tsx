@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { api, uuid } from '../../api/client';
+import { api, ApiError, uuid } from '../../api/client';
 import type { MomentoFoto, PersonRef, Purchase, WorkOrderDetail } from '../../api/types';
 import { NewPurchaseModal } from '../purchases/NewPurchaseModal';
 import { db } from '../../offline/db';
@@ -215,13 +215,52 @@ function CloseModal({ o, open, onClose }: { o: WorkOrderDetail; open: boolean; o
   );
 }
 
-function Photo({ id, momento, onOpen }: { id: string; momento: MomentoFoto; onOpen: (url: string) => void }) {
+type Foto = WorkOrderDetail['fotos'][number];
+
+function Photo({ foto, onOpen }: { foto: Foto; onOpen: (v: { foto: Foto; url: string }) => void }) {
+  const { id, momento } = foto;
   const url = useProtectedImage(`/ordenes/fotos/${id}/archivo`);
   return (
-    <button type="button" className="photo" onClick={() => url && onOpen(url)} aria-label={`Foto ${MOMENTO_LABEL[momento]}`}>
+    <button type="button" className="photo" onClick={() => url && onOpen({ foto, url })} aria-label={`Foto ${MOMENTO_LABEL[momento]}`}>
       {url ? <img src={url} alt="" /> : <span className="spinner sm" />}
       <span><Badge tone="muted">{MOMENTO_LABEL[momento]}</Badge></span>
     </button>
+  );
+}
+
+/**
+ * Foto en grande. Quien la subió o un administrador puede eliminarla mientras la orden está abierta
+ * (cerrada, las fotos son evidencia del trabajo). La API valida lo mismo.
+ */
+function PhotoViewer({ o, visor, onClose }: { o: WorkOrderDetail; visor: { foto: Foto; url: string } | null; onClose: () => void }) {
+  const qc = useQueryClient();
+  const { user, can } = useAuth();
+  const [confirmar, setConfirmar] = useState(false);
+  const foto = visor?.foto;
+  const abierta = o.estado !== 'CERRADA' && o.estado !== 'CANCELADA';
+  const puede = !!foto && abierta && (can('ADMIN') || foto.subidoPor?.id === user?.id);
+  const m = useMutation({
+    mutationFn: () => api.delete(`/ordenes/fotos/${foto!.id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['orden', o.id] }); cerrar(); },
+  });
+  function cerrar() { setConfirmar(false); m.reset(); onClose(); }
+  const error = m.error instanceof ApiError && m.error.status === 0 ? new Error('Para eliminar la foto se necesita conexión.') : m.error;
+
+  return (
+    <Modal open={!!visor} title={foto ? `Foto · ${MOMENTO_LABEL[foto.momento]}` : 'Foto'} onClose={cerrar}
+      footer={puede ? (confirmar ? (
+        <>
+          <Button variant="ghost" onClick={() => setConfirmar(false)}>No, conservarla</Button>
+          <Button variant="danger" busy={m.isPending} onClick={() => m.mutate()}>Sí, eliminar</Button>
+        </>
+      ) : (
+        <Button variant="ghost" className="text-bad" onClick={() => setConfirmar(true)}><Icon name="trash" /> Eliminar foto</Button>
+      )) : undefined}>
+      {visor ? <img src={visor.url} alt="" style={{ width: '100%', borderRadius: 8 }} /> : null}
+      {foto ? <p className="muted small" style={{ margin: '8px 0 0' }}>{foto.subidoPor?.nombre ?? '—'} · {dateTime(foto.creadoEn)}</p> : null}
+      {confirmar ? <div className="alert alert-warn" style={{ marginTop: 10 }}>¿Eliminar esta foto? Quedará registrado en el historial de la orden.</div> : null}
+      {m.isError ? <ErrorBox error={error} /> : null}
+    </Modal>
   );
 }
 
@@ -233,7 +272,7 @@ export function OrderDetail() {
   const verCompras = can('ADMIN', 'AUTORIZADOR', 'TECNICO');
   const compras = useQuery({ queryKey: ['compras', 'orden', id], queryFn: () => api.get<Purchase[]>(`/compras?ordenId=${id}`), enabled: verCompras });
   const [modal, setModal] = useState<ModalKind>(null);
-  const [visor, setVisor] = useState<string | null>(null);
+  const [visor, setVisor] = useState<{ foto: Foto; url: string } | null>(null);
   const [momento, setMomento] = useState<MomentoFoto>('ANTES');
   const [fotoError, setFotoError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -415,7 +454,7 @@ export function OrderDetail() {
           </div>
           {fotoError ? <div className="alert alert-bad">{fotoError}</div> : null}
           {o.fotos.length === 0 ? <Empty title="Sin fotos" /> : (
-            <div className="photos">{o.fotos.map((f) => <Photo key={f.id} id={f.id} momento={f.momento} onOpen={setVisor} />)}</div>
+            <div className="photos">{o.fotos.map((f) => <Photo key={f.id} foto={f} onOpen={setVisor} />)}</div>
           )}
         </section>
 
@@ -438,9 +477,7 @@ export function OrderDetail() {
       <PlannedPartsModal o={o} open={modal === 'repuestos'} onClose={() => setModal(null)} />
       <CloseModal o={o} open={modal === 'cerrar'} onClose={() => setModal(null)} />
       <NewPurchaseModal open={modal === 'compra'} onClose={() => setModal(null)} ordenId={o.id} ordenCodigo={o.codigo} />
-      <Modal open={!!visor} title="Foto" onClose={() => setVisor(null)}>
-        {visor ? <img src={visor} alt="" style={{ width: '100%', borderRadius: 8 }} /> : null}
-      </Modal>
+      <PhotoViewer o={o} visor={visor} onClose={() => setVisor(null)} />
     </>
   );
 }
