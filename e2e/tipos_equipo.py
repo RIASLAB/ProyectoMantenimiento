@@ -79,6 +79,8 @@ with sync_playwright() as p:
 
     # 3) ¿Cuántos aires acondicionados hay en Bodega?
     a.get_by_role('link', name='Equipos por área').click()
+    expect(a).to_have_url(re.compile('/maquinas/por-area'))
+    expect(a.locator('.respuesta-n')).to_be_visible()
     a.get_by_label('Área').select_option('Bodega')
     elegir(a.get_by_label('Categoría'), 'Aire acondicionado')
     expect(a.locator('.respuesta-n')).to_have_text('6')

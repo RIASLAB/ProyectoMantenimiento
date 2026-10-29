@@ -91,7 +91,7 @@ npm run test:e2e
 
 Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **179 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
 
-Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**90 verificaciones**):
+Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**95 verificaciones**):
 
 | Script | Qué recorre |
 |---|---|
@@ -100,6 +100,7 @@ Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritori
 | `e2e/compras.py` | Faltante automático → autorizador aprueba/rechaza → admin compra y recibe en bodega |
 | `e2e/calidad.py` | Temperatura fuera de rango, checklist con no conformidad, anulación, exportación, configuración |
 | `e2e/equipos_en_bodega.py` | Inventario de equipos sin instalar: 5 molinos con 2 en bodega, instalar, conteo por área y guardar en bodega |
+| `e2e/lista_materiales.py` | Lista de materiales editable desde la ficha de la máquina: quitar, agregar y vaciar; el cambio aplica a todo el tipo |
 | `e2e/tipos_equipo.py` | Tipos de equipo con lista de materiales, 3 aires iguales de una vez, cuántos hay en Bodega, preventivo por tipo y materiales en correctivos |
 | `e2e/eliminar_adjuntos.py` | Eliminar fotos de una orden (quién puede y cuándo) y documentos de una máquina |
 | `e2e/carga_masiva.py` | Descarga la plantilla, la llena, la sube con errores (fila y columna), la corrige y carga máquinas y repuestos con stock inicial |

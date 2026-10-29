@@ -10,7 +10,7 @@ import { qty } from '../../format';
 import { AssetsTabs } from './AssetsList';
 
 /** Crear o editar un tipo de equipo (categoría + modelo) con su lista de materiales. */
-function TipoModal({ tipo, open, onClose }: { tipo: EquipmentModel | null; open: boolean; onClose: () => void }) {
+export function TipoModal({ tipo, open, onClose }: { tipo: EquipmentModel | null; open: boolean; onClose: () => void }) {
   const qc = useQueryClient();
   const categorias = useQuery({ queryKey: ['tipos-equipo', 'categorias'], queryFn: () => api.get<Array<{ id: string; nombre: string }>>('/tipos-equipo/categorias'), enabled: open });
   const [f, setF] = useState({ categoria: '', nombre: '', fabricante: '', referencia: '', descripcion: '' });
@@ -27,7 +27,7 @@ function TipoModal({ tipo, open, onClose }: { tipo: EquipmentModel | null; open:
       const body = { ...f, fabricante: f.fabricante || null, referencia: f.referencia || null, descripcion: f.descripcion || null, materiales: rowsToPayload(rows) };
       return tipo ? api.patch(`/tipos-equipo/${tipo.id}`, body) : api.post('/tipos-equipo', body);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tipos-equipo'] }); qc.invalidateQueries({ queryKey: ['tipo-equipo'] }); qc.invalidateQueries({ queryKey: ['bitacora'] }); onClose(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tipos-equipo'] }); qc.invalidateQueries({ queryKey: ['tipo-equipo'] }); qc.invalidateQueries({ queryKey: ['activo'] }); qc.invalidateQueries({ queryKey: ['bitacora'] }); onClose(); },
   });
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF((s) => ({ ...s, [k]: e.target.value }));
   const submit = (e: FormEvent) => { e.preventDefault(); m.mutate(); };

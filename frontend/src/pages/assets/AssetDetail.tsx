@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChangeEvent, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, openProtectedFile } from '../../api/client';
-import type { Asset, AssetDocument, AssetHistory } from '../../api/types';
+import type { Asset, AssetDocument, AssetHistory, EquipmentModel } from '../../api/types';
+import { TipoModal } from './EquipmentTypes';
 import { OrderStateBadge } from '../../components/orders-shared';
 import { InstallModal } from '../../components/InstallModal';
 import { useAuth } from '../../auth/AuthContext';
@@ -64,6 +65,12 @@ function Garantia({ fecha }: { fecha: string | null }) {
   return <>{date(fecha)} <Badge tone="ok">Vigente</Badge></>;
 }
 
+/** Edita la lista de materiales del tipo de la máquina sin salir de su ficha. */
+function ListaMaterialesModal({ modeloId, open, onClose }: { modeloId: string; open: boolean; onClose: () => void }) {
+  const t = useQuery({ queryKey: ['tipo-equipo', modeloId], queryFn: () => api.get<EquipmentModel>(`/tipos-equipo/${modeloId}`), enabled: open });
+  return <TipoModal tipo={t.data ?? null} open={open && !!t.data} onClose={onClose} />;
+}
+
 export function AssetDetail() {
   const { id } = useParams<{ id: string }>();
   const { can } = useAuth();
@@ -73,6 +80,7 @@ export function AssetDetail() {
   const [openError, setOpenError] = useState('');
   const [aBorrar, setABorrar] = useState<AssetDocument | null>(null);
   const [instalar, setInstalar] = useState(false);
+  const [editarLista, setEditarLista] = useState(false);
 
   const q = useQuery({ queryKey: ['activo', id], queryFn: () => api.get<Asset>(`/activos/${id}`) });
 
@@ -157,7 +165,10 @@ export function AssetDetail() {
           {a.notas ? <p className="notes">{a.notas}</p> : null}
           {a.modeloEquipo ? (
             <div className="materiales">
-              <p className="subtle-head">Lista de materiales del tipo</p>
+              <div className="materiales-head">
+                <p className="subtle-head">Lista de materiales · {a.modeloEquipo.nombre}</p>
+                {can('ADMIN') ? <Button variant="ghost" onClick={() => setEditarLista(true)}><Icon name="edit" /> Editar lista</Button> : null}
+              </div>
               {a.modeloEquipo.materiales?.length ? (
                 <ul>
                   {a.modeloEquipo.materiales.map((m) => (
@@ -165,8 +176,16 @@ export function AssetDetail() {
                   ))}
                 </ul>
               ) : <p className="muted small" style={{ margin: 0 }}>El tipo aún no tiene lista de materiales.</p>}
+              {can('ADMIN') ? <p className="muted small" style={{ margin: '.25rem 0 0' }}>Los cambios aplican a todas las máquinas de este tipo.</p> : null}
             </div>
-          ) : null}
+          ) : (
+            <div className="materiales">
+              <p className="subtle-head">Lista de materiales</p>
+              <p className="muted small" style={{ margin: 0 }}>
+                Esta máquina no tiene tipo de equipo.{can('ADMIN') ? <> Asígnele uno en <Link to={`/maquinas/${a.id}/editar`}>Editar</Link> para tener su lista de materiales.</> : null}
+              </p>
+            </div>
+          )}
         </section>
 
         <section className="card">
@@ -220,6 +239,7 @@ export function AssetDetail() {
         </section>
       </div>
       <InstallModal equipo={instalar ? a : null} onClose={() => setInstalar(false)} />
+      {a.modeloEquipo ? <ListaMaterialesModal modeloId={a.modeloEquipo.id} open={editarLista} onClose={() => setEditarLista(false)} /> : null}
       <Modal open={!!aBorrar} title="Eliminar documento" onClose={cerrarBorrar}
         footer={<><Button variant="ghost" onClick={cerrarBorrar}>Cancelar</Button><Button variant="danger" busy={borrar.isPending} onClick={() => aBorrar && borrar.mutate(aBorrar.id)}>Eliminar</Button></>}>
         <p style={{ marginTop: 0 }}>¿Eliminar <strong>{aBorrar?.nombreOriginal}</strong> de esta máquina?</p>
