@@ -68,6 +68,8 @@ with sync_playwright() as p:
     dlg = page.locator('dialog[open]')
     dlg.get_by_label('Trabajo realizado *').fill('Lubricación hecha en la sala sin señal')
     dlg.get_by_label('Horas').first.fill('1')
+    # Verificaciones de entrega del formato de OT (AC-PMT FR03).
+    for r_ in page.locator('dialog[open]').get_by_role('radio', name='Cumple', exact=True).all(): r_.click()
     page.get_by_role('button', name='Cerrar orden').last.click()
     expect(page.locator('dialog[open]')).to_have_count(0)
     expect(page.locator('.page-subtitle')).to_contain_text('Cerrada')

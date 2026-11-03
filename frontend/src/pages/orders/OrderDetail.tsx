@@ -9,7 +9,7 @@ import { comprimirFoto, enviarOEncolar, usePendientes } from '../../offline/outb
 import { useAuth } from '../../auth/AuthContext';
 import { OrderBadges, PartRow, PartRows, rowsToPayload, useProtectedImage, useTipoEquipo } from '../../components/orders-shared';
 import { Badge, Button, Empty, ErrorBox, Field, Icon, Input, KeyValue, Modal, PageHeader, Select, Spinner, Textarea } from '../../components/ui';
-import { COMPRA_ESTADO_LABEL, COMPRA_ESTADO_TONE, date, dateTime, duration, money, ORDEN_ESTADO_LABEL, PRIORIDAD_LABEL, qty, TIPO_LABEL, toLocalInput } from '../../format';
+import { COMPRA_ESTADO_LABEL, COMPRA_ESTADO_TONE, date, dateTime, duration, money, ORDEN_ESTADO_LABEL, PRIORIDAD_LABEL, qty, TIPO_LABEL, toLocalInput, VERIFICACIONES_CIERRE } from '../../format';
 
 type ModalKind = 'asignar' | 'esperar' | 'cerrar' | 'cancelar' | 'repuestos' | 'compra' | null;
 const MOMENTO_LABEL: Record<MomentoFoto, string> = { REPORTE: 'Reporte', ANTES: 'Antes', DESPUES: 'Después' };
@@ -150,6 +150,10 @@ function CloseModal({ o, open, onClose }: { o: WorkOrderDetail; open: boolean; o
   const [externos, setExternos] = useState('');
   const [fin, setFin] = useState('');
   const [finInicial, setFinInicial] = useState('');
+  const [verif, setVerif] = useState<Record<string, boolean>>({});
+  const [obsCierre, setObsCierre] = useState('');
+  const faltanVerif = VERIFICACIONES_CIERRE.filter((v) => verif[v.id] === undefined);
+  const noCumple = VERIFICACIONES_CIERRE.filter((v) => verif[v.id] === false);
 
   useEffect(() => {
     if (!open) return;
@@ -170,6 +174,8 @@ function CloseModal({ o, open, onClose }: { o: WorkOrderDetail; open: boolean; o
       // Si no se cambió la hora sugerida, se envía el momento exacto (con segundos).
       finParada: o.maquinaParada ? (fin === finInicial ? new Date() : new Date(fin)).toISOString() : undefined,
       cerradaEn: new Date().toISOString(),
+      verificaciones: VERIFICACIONES_CIERRE.map((v) => ({ id: v.id, cumple: verif[v.id] })),
+      observaciones: obsCierre.trim() || undefined,
       clientId,
     } }) };
 
@@ -177,7 +183,7 @@ function CloseModal({ o, open, onClose }: { o: WorkOrderDetail; open: boolean; o
 
   return (
     <Modal open={open} title={`Cerrar ${o.codigo}`} onClose={onClose}
-      footer={<><Button variant="ghost" type="button" onClick={onClose}>Cancelar</Button><Button type="submit" form="close-form" busy={m.isPending}>Cerrar orden</Button></>}>
+      footer={<><Button variant="ghost" type="button" onClick={onClose}>Cancelar</Button><Button type="submit" form="close-form" busy={m.isPending} disabled={faltanVerif.length > 0}>Cerrar orden</Button></>}>
       <form id="close-form" className="stack" onSubmit={submit}>
         <Field label="Trabajo realizado *">
           {(i) => <Textarea id={i} value={trabajo} onChange={(e) => setTrabajo(e.target.value)} required minLength={5} maxLength={4000} />}
@@ -211,6 +217,26 @@ function CloseModal({ o, open, onClose }: { o: WorkOrderDetail; open: boolean; o
         <Field label="Servicios externos (COP)" hint="Contratistas, mecanizado, etc.">
           {(i) => <Input id={i} type="number" inputMode="decimal" min="0" step="1" value={externos} onChange={(e) => setExternos(e.target.value)} />}
         </Field>
+        <div>
+          <p className="subtle-head">Verificaciones de entrega *</p>
+          <ul className="verif-list">
+            {VERIFICACIONES_CIERRE.map((v) => (
+              <li key={v.id} className={verif[v.id] === false ? 'nc' : ''}>
+                <span>{v.texto}</span>
+                <div className="seg" role="radiogroup" aria-label={v.texto}>
+                  {([true, false] as const).map((x) => (
+                    <button key={String(x)} type="button" role="radio" aria-checked={verif[v.id] === x} className={`seg-btn ${verif[v.id] === x ? (x ? 'on' : 'on esc-M') : ''}`}
+                      onClick={() => setVerif((s) => ({ ...s, [v.id]: x }))}>{x ? 'Cumple' : 'No cumple'}</button>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <Field label={noCumple.length ? 'Observaciones * (explique lo que no se cumple)' : 'Observaciones'}>
+          {(i) => <Textarea id={i} value={obsCierre} onChange={(e) => setObsCierre(e.target.value)} maxLength={4000} required={noCumple.length > 0} minLength={noCumple.length ? 5 : undefined} />}
+        </Field>
+        {faltanVerif.length ? <p className="muted small" style={{ margin: 0 }}>Responda las {faltanVerif.length} verificaciones pendientes para cerrar.</p> : null}
         {m.isError ? <ErrorBox error={m.error} /> : null}
       </form>
     </Modal>
@@ -320,6 +346,7 @@ export function OrderDetail() {
         back={back}
         title={`${o.codigo} · ${o.activo.nombre}`}
         subtitle={<OrderBadges o={o} />}
+        actions={<Link to={`/imprimir/ot/${o.id}`} className="btn btn-ghost"><Icon name="file" /> Formato</Link>}
       />
 
       {llegada?.reportada ? <div className="alert alert-ok">Falla reportada como {llegada.reportada}. El equipo de mantenimiento ya fue avisado.</div> : null}
@@ -399,6 +426,12 @@ export function OrderDetail() {
           <section className="card span-2">
             <h2>Cierre</h2>
             <p className="desc">{o.trabajoRealizado}</p>
+            {o.verificaciones?.length ? (
+              <ul className="answers">
+                {o.verificaciones.map((v) => <li key={v.id} className={v.cumple ? '' : 'text-bad'}>{v.cumple ? '✓' : '✗ No cumple:'} {v.texto}</li>)}
+              </ul>
+            ) : null}
+            {o.observaciones ? <p className="small"><strong>Observaciones:</strong> {o.observaciones}</p> : null}
             <div style={{ height: 14 }} />
             <div className="stats" style={{ marginBottom: 12 }}>
               <div className="stat"><span>Repuestos</span><strong>{money(o.costoRepuestos)}</strong></div>

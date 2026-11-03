@@ -26,15 +26,17 @@ export function AssetsTabs() {
 
 export function AssetsList() {
   const { can } = useAuth();
-  const [filters, set] = useUrlFilters(['q', 'area', 'estado', 'categoriaId', 'modeloId'] as const);
+  const [filters, set] = useUrlFilters(['q', 'area', 'estado', 'categoriaId', 'modeloId', 'clase'] as const);
   const { q, area, estado, categoriaId, modeloId } = filters;
+  // Por defecto solo equipos; las instalaciones (cuartos fríos, salas) se ven aparte.
+  const clase = filters.clase === 'TODAS' ? undefined : filters.clase || 'EQUIPO';
   const dq = useDebounced(q);
 
   const areas = useQuery({ queryKey: ['areas'], queryFn: () => api.get<string[]>('/activos/areas') });
   const tipos = useQuery({ queryKey: ['tipos-equipo'], queryFn: () => api.get<EquipmentModel[]>('/tipos-equipo') });
   const list = useQuery({
-    queryKey: ['activos', dq, area, estado, categoriaId, modeloId],
-    queryFn: () => api.get<Asset[]>(`/activos${qs({ q: dq, area, estado, categoriaId, modeloId })}`),
+    queryKey: ['activos', dq, area, estado, categoriaId, modeloId, clase ?? 'TODAS'],
+    queryFn: () => api.get<Asset[]>(`/activos${qs({ q: dq, area, estado, categoriaId, modeloId, clase })}`),
   });
   // Un solo selector para categoría o modelo: "c:<id>" o "m:<id>".
   const categorias = [...new Map((tipos.data ?? []).map((t) => [t.categoria.id, t.categoria.nombre])).entries()];
@@ -69,6 +71,11 @@ export function AssetsList() {
           <Icon name="search" />
           <Input type="search" placeholder="Buscar por código, nombre, modelo o fabricante" value={q} onChange={(e) => set('q', e.target.value)} aria-label="Buscar máquinas" />
         </div>
+        <Select value={filters.clase} onChange={(e) => set('clase', e.target.value)} aria-label="Equipos o instalaciones">
+          <option value="">Equipos</option>
+          <option value="INSTALACION">Instalaciones (locativo)</option>
+          <option value="TODAS">Equipos e instalaciones</option>
+        </Select>
         <Select value={area} onChange={(e) => set('area', e.target.value)} aria-label="Filtrar por área">
           <option value="">Todas las áreas</option>
           {areas.data?.map((a) => <option key={a} value={a}>{a}</option>)}

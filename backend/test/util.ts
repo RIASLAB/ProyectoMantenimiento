@@ -9,6 +9,11 @@ process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 process.env.UPLOADS_DIR = './uploads-test';
 
 /** Levanta la app contra una base de datos de pruebas limpia y devuelve un cliente HTTP con helpers. */
+import { VERIFICACIONES_CIERRE } from '../src/common/enums';
+
+/** Verificaciones de entrega del cierre de la OT, todas cumplidas. */
+export const VERIF_OK = { verificaciones: VERIFICACIONES_CIERRE.map((v) => ({ id: v.id, cumple: true })) };
+
 export async function bootstrap() {
   const { AppModule } = await import('../src/app.module');
   const { Rol } = await import('../src/common/enums');

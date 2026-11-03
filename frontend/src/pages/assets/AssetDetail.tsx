@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChangeEvent, useRef, useState } from 'react';
+import { ChangeEvent, ReactNode, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, openProtectedFile } from '../../api/client';
 import type { Asset, AssetDocument, AssetHistory, EquipmentModel } from '../../api/types';
@@ -137,6 +137,9 @@ export function AssetDetail() {
                 <Icon name="alert" /> Reportar falla
               </Link>
             ) : null}
+            <Link to={`/imprimir/hoja-de-vida/${a.id}`} className="btn btn-ghost">
+              <Icon name="file" /> Hoja de vida
+            </Link>
             {can('ADMIN') ? (
               <Link to={`/maquinas/${a.id}/editar`} className="btn btn-secondary">
                 <Icon name="edit" /> Editar
@@ -151,6 +154,7 @@ export function AssetDetail() {
           <h2>Ficha técnica</h2>
           <KeyValue
             items={[
+              ...(a.clase === 'INSTALACION' ? [['Clase', 'Instalación (mantenimiento locativo)'] as [string, ReactNode]] : []),
               ['Tipo de equipo', a.modeloEquipo ? <Link to={`/maquinas?modeloId=${a.modeloEquipo.id}`}>{a.modeloEquipo.categoria?.nombre} · {a.modeloEquipo.nombre}</Link> : 'Sin tipo'],
               ['Fabricante', a.fabricante],
               ['Modelo', a.modelo],
@@ -158,6 +162,8 @@ export function AssetDetail() {
               ['Código SAP', a.codigoSap],
               ['Área', a.area],
               ['Ubicación', a.ubicacion],
+              ...([['Voltaje', a.voltaje], ['Amperaje', a.amperaje], ['Capacidad', a.capacidad], ['Peso', a.peso], ['Ubicación del manual', a.ubicacionManual]] as Array<[string, string | null]>)
+                .filter(([, v]) => v) as Array<[string, ReactNode]>,
               ['Fecha de compra', date(a.fechaCompra)],
               ['Garantía hasta', <Garantia fecha={a.fechaFinGarantia} />],
             ]}

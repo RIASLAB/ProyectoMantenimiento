@@ -10,7 +10,7 @@ import { Asset } from '../assets/asset.entity';
 import { EquipmentModel } from '../equipment/equipment.entities';
 import { AuditService } from '../audit/audit.service';
 import { SessionUser } from '../common/auth.decorators';
-import { EstadoActivo, EstadoOrden, MomentoFoto, Prioridad, Rol, TipoMovimiento, TipoOrden, UnidadFrecuencia } from '../common/enums';
+import { EstadoActivo, EstadoOrden, MomentoFoto, Prioridad, Rol, TipoMovimiento, TipoOrden, UnidadFrecuencia, VERIFICACIONES_CIERRE } from '../common/enums';
 import { validateUpload } from '../common/files';
 import { InventoryService } from '../inventory/inventory.service';
 import { SparePart } from '../inventory/spare-part.entity';
@@ -302,6 +302,28 @@ export class MaintenanceService {
     return this.transicion(id, actor, EstadoOrden.ESPERANDO_REPUESTO, EstadoOrden.EN_EJECUCION, 'Trabajo reanudado');
   }
 
+  /**
+   * Verificaciones de entrega del formato AC-PMT FR03. Son obligatorias, salvo en un cierre hecho sin conexión
+   * con una versión anterior de la app. Si alguna no se cumple, hay que explicarlo en observaciones.
+   */
+  private verificacionesDeCierre(dto: CloseOrderDto, sinConexion: boolean) {
+    const observaciones = dto.observaciones?.trim() || null;
+    if (!dto.verificaciones?.length) {
+      if (sinConexion) return { verificaciones: null, observaciones };
+      throw new BadRequestException('Responda las verificaciones de entrega (cumple / no cumple)');
+    }
+    const porId = new Map(dto.verificaciones.map((v) => [v.id, v.cumple]));
+    const verificaciones = VERIFICACIONES_CIERRE.map((v) => {
+      const cumple = porId.get(v.id);
+      if (cumple === undefined) throw new BadRequestException(`Falta la verificación: ${v.texto}`);
+      return { id: v.id, texto: v.texto, cumple };
+    });
+    if (verificaciones.some((v) => !v.cumple) && (!observaciones || observaciones.length < 5)) {
+      throw new BadRequestException('Hay verificaciones que no se cumplen: explique en observaciones qué pasó y qué se hará');
+    }
+    return { verificaciones, observaciones };
+  }
+
   /** Cierre de la OT (MNT-02, MNT-09, MNT-10): descuenta repuestos, registra mano de obra y congela costos. */
   async cerrar(id: string, dto: CloseOrderDto, actor: SessionUser) {
     const tarifa = await this.settings.getTarifaHora();
@@ -315,6 +337,7 @@ export class MaintenanceService {
       this.exigirTransicion(o.estado, EstadoOrden.CERRADA);
 
       const sinConexion = !!dto.registradoSinConexion;
+      const { verificaciones, observaciones } = this.verificacionesDeCierre(dto, sinConexion);
       let cerradaEn = new Date();
       if (dto.cerradaEn) {
         cerradaEn = new Date(dto.cerradaEn);
@@ -377,6 +400,8 @@ export class MaintenanceService {
       await em.getRepository(WorkOrder).update(o.id, {
         estado: EstadoOrden.CERRADA,
         trabajoRealizado: dto.trabajoRealizado.trim(),
+        verificaciones,
+        observaciones,
         finParada,
         cerradaEn,
         cerradaPorId: actor.id,
@@ -387,6 +412,13 @@ export class MaintenanceService {
         costoServiciosExternos: dto.costoServiciosExternos ?? 0,
       });
       await this.evento(em, o.id, actor, o.estado, EstadoOrden.CERRADA, sinConexion ? 'Orden cerrada (sin conexión, sincronizada después)' : 'Orden cerrada');
+      const noCumple = verificaciones?.filter((v) => !v.cumple) ?? [];
+      if (noCumple.length) {
+        await this.audit.log({
+          usuarioId: actor.id, accion: 'OT_CERRADA_CON_NO_CUMPLE', entidad: 'orden', entidadId: o.id,
+          detalle: { codigo, noCumple: noCumple.map((v) => v.texto), observaciones },
+        }, em);
+      }
       await this.recomputarEstadoActivo(em, o.activoId, actor);
       // Quien reportó la falla se entera de que quedó atendida.
       if (o.tipo === TipoOrden.CORRECTIVO) {

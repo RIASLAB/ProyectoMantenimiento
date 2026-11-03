@@ -63,14 +63,20 @@ export class ChecklistItemDto {
   @IsString() @MinLength(3) @MaxLength(300)
   texto: string;
 
-  @IsIn(['SI_NO', 'NUMERO', 'TEXTO'])
-  tipo: 'SI_NO' | 'NUMERO' | 'TEXTO';
+  @IsIn(['SI_NO', 'NUMERO', 'TEXTO', 'ESCALA', 'SECCION'])
+  tipo: 'SI_NO' | 'NUMERO' | 'TEXTO' | 'ESCALA' | 'SECCION';
 
   @IsBoolean()
   obligatorio: boolean;
 
   @IsOptional() @IsIn(['SI', 'NO'])
   esperado?: 'SI' | 'NO';
+
+  @IsOptional() @IsIn(['SI_NO', 'C_NC', 'BUENO_MALO'])
+  etiqueta?: 'SI_NO' | 'C_NC' | 'BUENO_MALO';
+
+  @IsOptional() @IsBoolean()
+  permiteNA?: boolean;
 
   @IsOptional() @ValidateIf((_, v) => v !== null) @Type(() => Number) @IsNumber()
   minimo?: number | null;
@@ -92,9 +98,24 @@ export class CreateTemplateDto {
   @IsOptional() @IsString() @MaxLength(2000)
   descripcion?: string | null;
 
-  @IsArray() @ArrayMinSize(1, { message: 'La plantilla debe tener al menos una pregunta' }) @ArrayMaxSize(80)
+  @IsArray() @ArrayMinSize(1, { message: 'La plantilla debe tener al menos una pregunta' }) @ArrayMaxSize(150)
   @ValidateNested({ each: true }) @Type(() => ChecklistItemDto)
   items: ChecklistItemDto[];
+
+  @IsOptional() @IsString() @MaxLength(40)
+  codigo?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(20)
+  version?: string | null;
+
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsDateString()
+  fechaElaboracion?: string | null;
+
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsDateString()
+  fechaActualizacion?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(1000)
+  recomendacion?: string | null;
 }
 
 export class UpdateTemplateDto {
@@ -110,11 +131,26 @@ export class UpdateTemplateDto {
   @IsOptional() @IsString() @MaxLength(2000)
   descripcion?: string | null;
 
-  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(80) @ValidateNested({ each: true }) @Type(() => ChecklistItemDto)
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(150) @ValidateNested({ each: true }) @Type(() => ChecklistItemDto)
   items?: ChecklistItemDto[];
 
   @IsOptional() @IsBoolean()
   vigente?: boolean;
+
+  @IsOptional() @IsString() @MaxLength(40)
+  codigo?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(20)
+  version?: string | null;
+
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsDateString()
+  fechaElaboracion?: string | null;
+
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsDateString()
+  fechaActualizacion?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(1000)
+  recomendacion?: string | null;
 }
 
 export class AnswerDto {
@@ -123,6 +159,9 @@ export class AnswerDto {
 
   @IsOptional()
   valor?: string | number | null;
+
+  @IsOptional() @IsString() @MaxLength(500)
+  observacion?: string;
 }
 
 export class CreateChecklistDto {
@@ -132,7 +171,7 @@ export class CreateChecklistDto {
   @IsOptional() @IsUUID()
   activoId?: string;
 
-  @IsArray() @ArrayMaxSize(80) @ValidateNested({ each: true }) @Type(() => AnswerDto)
+  @IsArray() @ArrayMaxSize(150) @ValidateNested({ each: true }) @Type(() => AnswerDto)
   respuestas: AnswerDto[];
 
   @IsOptional() @IsString() @MaxLength(2000)
@@ -157,6 +196,19 @@ export class VoidDto {
 
   @IsString() @MinLength(5, { message: 'Explique el motivo de la anulación' }) @MaxLength(500)
   motivo: string;
+}
+
+export class PlanillaQuery {
+  @IsDateString()
+  fecha: string;
+
+  @IsString() @MinLength(2) @MaxLength(100)
+  area: string;
+}
+
+export class VerifyPlanillaDto extends PlanillaQuery {
+  @IsOptional() @IsString() @MaxLength(2000)
+  observaciones?: string;
 }
 
 export class RecordsQuery {

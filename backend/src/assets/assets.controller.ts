@@ -4,7 +4,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { CurrentUser, Roles, SessionUser } from '../common/auth.decorators';
-import { EstadoActivo, Rol } from '../common/enums';
+import { EstadoActivo, Rol, ClaseActivo } from '../common/enums';
 import { CreateAssetDto, CreateManyAssetsDto, InstallAssetDto, UpdateAssetDto } from './assets.dto';
 import { AssetsService } from './assets.service';
 
@@ -19,8 +19,9 @@ export class AssetsController {
     @Query('q') q?: string, @Query('estado') estado?: EstadoActivo, @Query('area') area?: string,
     @Query('modeloId', new ParseUUIDPipe({ optional: true })) modeloId?: string,
     @Query('categoriaId', new ParseUUIDPipe({ optional: true })) categoriaId?: string,
+    @Query('clase') clase?: ClaseActivo,
   ) {
-    return this.assets.list({ q, estado, area, modeloId, categoriaId });
+    return this.assets.list({ q, estado, area, modeloId, categoriaId, clase: clase && Object.values(ClaseActivo).includes(clase) ? clase : undefined });
   }
 
   @Get('areas')

@@ -96,7 +96,13 @@ export class TemperatureRecord {
   creadoEn: Date;
 }
 
-export type TipoItem = 'SI_NO' | 'NUMERO' | 'TEXTO';
+/**
+ * SI_NO: Sí/No (o Cumple/No cumple, Bueno/Malo según `etiqueta`); NUMERO: valor con rango; TEXTO: libre;
+ * ESCALA: B (bueno), R (regular), M (malo), NT (no tiene), NA (no aplica), como en los preoperacionales;
+ * SECCION: título que agrupa los ítems siguientes (no se responde).
+ */
+export type TipoItem = 'SI_NO' | 'NUMERO' | 'TEXTO' | 'ESCALA' | 'SECCION';
+export const VALORES_ESCALA = ['B', 'R', 'M', 'NT', 'NA'] as const;
 
 export interface ChecklistItem {
   id: string;
@@ -105,6 +111,10 @@ export interface ChecklistItem {
   obligatorio: boolean;
   /** SI_NO: respuesta conforme ("SI" por defecto). */
   esperado?: 'SI' | 'NO';
+  /** SI_NO: cómo se muestran las opciones (Sí/No, Cumple/No cumple o Bueno/Malo). */
+  etiqueta?: 'SI_NO' | 'C_NC' | 'BUENO_MALO';
+  /** SI_NO: admite "No aplica". */
+  permiteNA?: boolean;
   /** NUMERO: rango conforme. */
   minimo?: number | null;
   maximo?: number | null;
@@ -133,6 +143,23 @@ export class ChecklistTemplate {
   @Column({ type: 'text', nullable: true })
   descripcion: string | null;
 
+  /** Control documental del formato en papel (ej. AC-PMT-FR072, versión 3). */
+  @Column({ type: 'varchar', length: 40, nullable: true })
+  codigo: string | null;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  version: string | null;
+
+  @Column({ name: 'fecha_elaboracion', type: 'date', nullable: true })
+  fechaElaboracion: string | null;
+
+  @Column({ name: 'fecha_actualizacion', type: 'date', nullable: true })
+  fechaActualizacion: string | null;
+
+  /** Recomendación de seguridad que se muestra al llenarlo (ej. "Nunca meta las manos en el tanque…"). */
+  @Column({ type: 'text', nullable: true })
+  recomendacion: string | null;
+
   @Column({ type: 'jsonb' })
   items: ChecklistItem[];
 
@@ -152,6 +179,8 @@ export interface ChecklistAnswer {
   tipo: TipoItem;
   valor: string | number | null;
   conforme: boolean;
+  /** Observación del ítem (obligatoria cuando se califica R: regular). */
+  observacion?: string | null;
 }
 
 /** Checklist diligenciado (CAL-04). Inmutable; guarda una copia de las preguntas tal como se respondieron. */
@@ -234,4 +263,31 @@ export class QualityVoid {
   creadoEn: Date;
 }
 
-export const QUALITY_ENTITIES = [ControlPoint, TemperatureRecord, ChecklistTemplate, ChecklistRecord, QualityVoid];
+/** "Verificó" de la planilla diaria de temperaturas de un área o planta (formato AC-PMT-FR01/FR02). */
+@Entity('verificaciones_temperatura')
+@Index(['fecha', 'area'], { unique: true })
+export class TemperatureVerification {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ type: 'date' })
+  fecha: string;
+
+  @Column({ length: 100 })
+  area: string;
+
+  @Column({ type: 'text', nullable: true })
+  observaciones: string | null;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'usuario_id' })
+  usuario: User;
+
+  @Column({ name: 'usuario_id', type: 'uuid' })
+  usuarioId: string;
+
+  @CreateDateColumn({ name: 'creado_en', type: 'timestamptz' })
+  creadoEn: Date;
+}
+
+export const QUALITY_ENTITIES = [ControlPoint, TemperatureRecord, ChecklistTemplate, ChecklistRecord, QualityVoid, TemperatureVerification];

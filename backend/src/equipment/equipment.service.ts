@@ -115,7 +115,7 @@ export class EquipmentService {
    */
   async resumen(q: ResumenQuery) {
     const params: unknown[] = [];
-    const filtros: string[] = [];
+    const filtros: string[] = [`a.clase = 'EQUIPO'`];
     if (q.area) { params.push(q.area); filtros.push(`lower(a.area) = lower($${params.length})`); }
     if (q.categoriaId) { params.push(q.categoriaId); filtros.push(`m.categoria_id = $${params.length}`); }
     if (q.modeloId) { params.push(q.modeloId); filtros.push(`a.modelo_id = $${params.length}`); }
@@ -130,7 +130,7 @@ export class EquipmentService {
          FROM activos a
          LEFT JOIN modelos_equipo m ON m.id = a.modelo_id
          LEFT JOIN categorias_equipo c ON c.id = m.categoria_id
-        ${filtros.length ? `WHERE ${filtros.join(' AND ')}` : ''}
+        WHERE ${filtros.join(' AND ')}
         GROUP BY c.id, c.nombre, m.id, m.nombre, lower(a.area)
         ORDER BY (c.nombre IS NULL), c.nombre, m.nombre, lower(a.area)`,
       params,

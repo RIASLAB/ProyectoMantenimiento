@@ -5,7 +5,7 @@ import { api, openProtectedFile, qs } from '../../api/client';
 import type { ChecklistRecordInfo, ChecklistTemplateInfo, ControlPointInfo, QualitySummary, TemperatureRecordInfo } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { SavedOfflineNotice, Badge, Button, Empty, ErrorBox, Field, Icon, Input, Modal, PageHeader, Spinner, Textarea } from '../../components/ui';
-import { dateTime, hace, qty, rangoTexto } from '../../format';
+import { dateTime, hace, qty, rangoTexto, valorChecklist } from '../../format';
 import { useUrlFilters } from '../../hooks';
 
 function VoidModal({ target, onClose }: { target: { tipo: 'TEMPERATURA' | 'CHECKLIST'; id: string; resumen: string } | null; onClose: () => void }) {
@@ -62,6 +62,12 @@ export function QualityHome() {
   };
 
   const r = resumen.data;
+  const porArea = (() => {
+    const m = new Map<string, ControlPointInfo[]>();
+    for (const p of puntos.data ?? []) m.set(p.activo.area, [...(m.get(p.activo.area) ?? []), p]);
+    return [...m].sort((a, b) => a[0].localeCompare(b[0]));
+  })();
+  const etiquetas = new Map((plantillas.data ?? []).flatMap((t) => t.items.map((i) => [i.id, i.etiqueta] as const)));
   return (
     <>
       <PageHeader
@@ -73,7 +79,11 @@ export function QualityHome() {
 
       <div className="quick-actions">
         <Link to="/calidad/temperatura" className="quick"><Icon name="thermo" size={28} /><span>Registrar temperatura</span></Link>
+        <Link to="/calidad/ronda" className="quick"><Icon name="thermo" size={28} /><span>Ronda de temperaturas</span></Link>
         <a href="#checklists" className="quick"><Icon name="clipboard" size={28} /><span>Llenar checklist</span></a>
+        <Link to="/calidad/planilla" className="quick"><Icon name="file" size={28} /><span>Planilla de temperaturas</span></Link>
+        <Link to="/calidad/semana" className="quick"><Icon name="calendar" size={28} /><span>Preoperacional de la semana</span></Link>
+        <Link to="/calidad/iluminacion" className="quick"><Icon name="chart" size={28} /><span>Medición de iluminación</span></Link>
       </div>
 
       {r ? (
@@ -89,9 +99,16 @@ export function QualityHome() {
       <div className="grid-2">
         <section className="card">
           <h2>Puntos de control</h2>
-          {puntos.isPending ? <Spinner /> : !puntos.data?.length ? <Empty title="Sin puntos configurados" /> : (
+          {puntos.isPending ? <Spinner /> : !puntos.data?.length ? <Empty title="Sin puntos configurados" /> : porArea.map(([area, lista]) => (
+            <details key={area} className="area-group" open={porArea.length === 1}>
+              <summary>
+                <strong>{area}</strong>
+                <span className="muted small"> · {lista.length} punto{lista.length === 1 ? '' : 's'}</span>
+                {lista.some((p) => p.atrasado) ? <> <Badge tone="warn">{lista.filter((p) => p.atrasado).length} por registrar</Badge></> : null}
+                {lista.some((p) => p.ultimo?.fueraDeRango) ? <> <Badge tone="bad">{lista.filter((p) => p.ultimo?.fueraDeRango).length} fuera de rango</Badge></> : null}
+              </summary>
             <ul className="points">
-              {puntos.data.map((p) => (
+              {lista.map((p) => (
                 <li key={p.id}>
                   <Link to={`/calidad/temperatura?punto=${p.id}`} className="point">
                     <div>
@@ -111,7 +128,9 @@ export function QualityHome() {
                 </li>
               ))}
             </ul>
-          )}
+              <p className="area-links"><Link to={`/calidad/ronda?area=${encodeURIComponent(area)}`}>Registrar ronda</Link> · <Link to={`/calidad/planilla?area=${encodeURIComponent(area)}`}>Planilla del día</Link></p>
+            </details>
+          ))}
         </section>
 
         <section className="card" id="checklists">
@@ -123,7 +142,7 @@ export function QualityHome() {
                   <Link to={`/calidad/checklist/${t.id}`} className="point">
                     <div>
                       <strong>{t.nombre}</strong>
-                      <span className="muted small">{[t.area, t.activo?.codigo, `${t.items.length} preguntas`].filter(Boolean).join(' · ')}</span>
+                      <span className="muted small">{[t.area, t.activo?.codigo, t.codigo, `${t.items.filter((i) => i.tipo !== 'SECCION').length} preguntas`].filter(Boolean).join(' · ')}</span>
                     </div>
                     <span className="btn btn-secondary">Llenar</span>
                   </Link>
@@ -185,12 +204,19 @@ export function QualityHome() {
                     <span className="muted small" style={{ display: 'block' }}>{dateTime(c.registradoEn)} · {c.usuario.nombre}</span>
                   </summary>
                   <ul className="answers">
-                    {c.respuestas.map((a) => (
+                    {c.respuestas.map((a) => (a.tipo === 'SECCION' ? (
+                      <li key={a.itemId} className="answers-sec">{a.texto}</li>
+                    ) : (
                       <li key={a.itemId} className={a.conforme ? '' : 'text-bad'}>
-                        {a.conforme ? '' : '✗ '}{a.texto}: <strong>{a.valor === null ? '—' : a.valor === 'SI' ? 'Sí' : a.valor === 'NO' ? 'No' : String(a.valor)}</strong>
+                        {a.conforme ? '' : '✗ '}{a.texto}: <strong>{valorChecklist({ ...a, etiqueta: etiquetas.get(a.itemId) })}</strong>
+                        {a.observacion ? <span className="muted"> — {a.observacion}</span> : null}
                       </li>
-                    ))}
+                    )))}
                   </ul>
+                  <p className="small" style={{ display: 'flex', gap: 12 }}>
+                    <Link to={`/imprimir/checklist/${c.id}`}>Ver formato</Link>
+                    <Link to={`/calidad/semana?${new URLSearchParams({ plantilla: c.plantillaId, activo: c.activo?.id ?? '', semana: c.registradoEn.slice(0, 10) })}`}>Semana</Link>
+                  </p>
                   {c.accionCorrectiva ? <p className="small"><strong>Acción correctiva:</strong> {c.accionCorrectiva}</p> : null}
                   {c.observaciones ? <p className="small"><strong>Observaciones:</strong> {c.observaciones}</p> : null}
                 </details>

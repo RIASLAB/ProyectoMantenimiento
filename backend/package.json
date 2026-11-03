@@ -12,6 +12,7 @@
     "migration:run": "npm run typeorm -- migration:run",
     "migration:revert": "npm run typeorm -- migration:revert",
     "seed": "ts-node src/database/seed.ts",
+    "formatos:cargar": "ts-node src/database/cargar-formatos.ts",
     "test:e2e": "jest --config test/jest-e2e.json --runInBand --forceExit",
     "push:claves": "web-push generate-vapid-keys"
   },

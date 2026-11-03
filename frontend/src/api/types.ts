@@ -1,4 +1,5 @@
 export type Rol = 'ADMIN' | 'AUTORIZADOR' | 'TECNICO' | 'OPERARIO';
+export type ClaseActivo = 'EQUIPO' | 'INSTALACION';
 export type EstadoActivo = 'OPERATIVO' | 'EN_MANTENIMIENTO' | 'FUERA_DE_SERVICIO' | 'DADO_DE_BAJA' | 'EN_BODEGA';
 export type TipoMovimiento = 'ENTRADA_COMPRA' | 'ENTRADA_INICIAL' | 'ENTRADA_AJUSTE' | 'ENTRADA_DEVOLUCION' | 'SALIDA_CONSUMO' | 'SALIDA_AJUSTE';
 
@@ -40,6 +41,13 @@ export interface Asset {
   estado: EstadoActivo;
   notas: string | null;
   modeloId: string | null;
+  /** Equipo, o instalación para el mantenimiento locativo. */
+  clase: ClaseActivo;
+  voltaje: string | null;
+  amperaje: string | null;
+  capacidad: string | null;
+  peso: string | null;
+  ubicacionManual: string | null;
   /** Tipo de equipo; en la ficha trae además la lista de materiales. */
   modeloEquipo?: EquipmentModelRef | null;
   documentos?: AssetDocument[];
@@ -126,6 +134,8 @@ export interface WorkOrderDetail extends WorkOrderSummary {
   iniciadaEn: string | null;
   cerradaPor: PersonRef | null;
   trabajoRealizado: string | null;
+  verificaciones: Array<{ id: string; texto: string; cumple: boolean }> | null;
+  observaciones: string | null;
   motivoCancelacion: string | null;
   repuestos: Array<{
     id: string; repuestoId: string; cantidadPlanificada: number; cantidadUsada: number | null; costoUnitario: number | null;
@@ -264,8 +274,12 @@ export interface TemperatureRecordInfo {
   anulacion: QualityVoidInfo | null;
 }
 
-export type TipoItem = 'SI_NO' | 'NUMERO' | 'TEXTO';
-export interface ChecklistItemInfo { id: string; texto: string; tipo: TipoItem; obligatorio: boolean; esperado?: 'SI' | 'NO'; minimo?: number | null; maximo?: number | null }
+export type TipoItem = 'SI_NO' | 'NUMERO' | 'TEXTO' | 'ESCALA' | 'SECCION';
+export type EtiquetaSiNo = 'SI_NO' | 'C_NC' | 'BUENO_MALO';
+export interface ChecklistItemInfo {
+  id: string; texto: string; tipo: TipoItem; obligatorio: boolean; esperado?: 'SI' | 'NO'; etiqueta?: EtiquetaSiNo; permiteNA?: boolean;
+  minimo?: number | null; maximo?: number | null;
+}
 
 export interface ChecklistTemplateInfo {
   id: string;
@@ -274,15 +288,21 @@ export interface ChecklistTemplateInfo {
   activoId: string | null;
   activo: { id: string; codigo: string; nombre: string } | null;
   descripcion: string | null;
+  codigo: string | null;
+  version: string | null;
+  fechaElaboracion: string | null;
+  fechaActualizacion: string | null;
+  recomendacion: string | null;
   items: ChecklistItemInfo[];
   vigente: boolean;
 }
 
 export interface ChecklistRecordInfo {
   id: string;
+  plantillaId: string;
   plantillaNombre: string;
   activo: { id: string; codigo: string; nombre: string } | null;
-  respuestas: Array<{ itemId: string; texto: string; tipo: TipoItem; valor: string | number | null; conforme: boolean }>;
+  respuestas: Array<{ itemId: string; texto: string; tipo: TipoItem; valor: string | number | null; conforme: boolean; observacion?: string | null }>;
   noConformes: number;
   observaciones: string | null;
   accionCorrectiva: string | null;
@@ -290,6 +310,32 @@ export interface ChecklistRecordInfo {
   creadoEn: string;
   usuario: PersonRef;
   anulacion: QualityVoidInfo | null;
+}
+
+export interface FormatoDocumental { nombre: string; codigo: string; version: string; fechaElaboracion: string | null; fechaActualizacion: string | null }
+
+export interface PlanillaTemperaturas {
+  fecha: string;
+  area: string;
+  formato: FormatoDocumental | null;
+  puntos: Array<{ id: string; nombre: string; minimo: number | null; maximo: number | null; frecuenciaHoras: number | null; activo: { id: string; codigo: string; nombre: string; ubicacion: string | null } }>;
+  lecturas: Array<{ id: string; puntoId: string; valor: number; fueraDeRango: boolean; accionCorrectiva: string | null; registradoEn: string; hora: string; franja: number; usuario: string }>;
+  realizadoPor: string[];
+  verificacion: { usuario: string; creadoEn: string; observaciones: string | null } | null;
+}
+
+export interface LightingRoomType { id: string; nombre: string; minimo: number; promedio: number; maximo: number }
+export interface LightingPoint { id: string; nombre: string; recintoId: string; orden: number; vigente: boolean; recinto: LightingRoomType }
+export interface LightingSurvey {
+  id: string; fecha: string; empresa: string; lugar: string; evaluador: string; cargoEvaluador: string; observaciones: string | null;
+  puntosCumplen: number; puntosNoCumplen: number; usuario: PersonRef; creadoEn: string;
+}
+export interface LightingSurveyDetail extends LightingSurvey {
+  formato: FormatoDocumental | null;
+  lecturas: Array<{
+    id: string; orden: number; puntoNombre: string; recintoNombre: string; refMinimo: number; refPromedio: number; refMaximo: number;
+    medicion1: number; medicion2: number; medicion3: number; media: number; cumple: boolean; planAccion: string | null; observaciones: string | null;
+  }>;
 }
 
 export interface QualitySummary {

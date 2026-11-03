@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { api, qs } from '../../api/client';
-import type { AuditItem, KpiParams, User } from '../../api/types';
+import type { AuditItem, FormatoDocumental, KpiParams, User } from '../../api/types';
 import { Link } from 'react-router-dom';
-import { Button, Empty, ErrorBox, Field, Icon, Input, PageHeader, Select, Spinner } from '../../components/ui';
-import { dateTime } from '../../format';
+import { Button, Empty, ErrorBox, Field, Icon, Input, Modal, PageHeader, Select, Spinner } from '../../components/ui';
+import { date, dateTime } from '../../format';
 
 const ACCION_LABEL: Record<string, string> = {
   USUARIO_CREADO: 'Creó usuario',
@@ -46,9 +46,18 @@ const ACCION_LABEL: Record<string, string> = {
   ACTIVO_ESTADO_AUTOMATICO: 'Estado de máquina actualizado por una orden',
   PLAN_CREADO: 'Creó plan preventivo',
   PLAN_ACTUALIZADO: 'Modificó plan preventivo',
+  OT_CERRADA_CON_NO_CUMPLE: 'Cerró una orden con verificaciones que no se cumplen',
+  PLANILLA_TEMPERATURA_VERIFICADA: 'Verificó la planilla de temperaturas',
+  FORMATO_ACTUALIZADO: 'Cambió el código o la versión de un formato',
+  FORMATOS_CARGADOS: 'Cargó los formatos de la planta',
+  RECINTO_ILUMINACION_CREADO: 'Creó tipo de recinto de iluminación',
+  RECINTO_ILUMINACION_ACTUALIZADO: 'Modificó tipo de recinto de iluminación',
+  PUNTO_ILUMINACION_CREADO: 'Creó punto de medición de iluminación',
+  PUNTO_ILUMINACION_ACTUALIZADO: 'Modificó punto de medición de iluminación',
+  MEDICION_ILUMINACION_REGISTRADA: 'Registró medición de iluminación',
 };
 
-const ENTIDADES: Array<[string, string]> = [['', 'Todo'], ['usuario', 'Usuarios'], ['parametro', 'Parámetros'], ['activo', 'Máquinas'], ['repuesto', 'Repuestos'], ['orden', 'Órdenes'], ['plan', 'Planes'], ['modelo', 'Tipos de equipo'], ['compra', 'Compras'], ['calidad', 'Calidad']];
+const ENTIDADES: Array<[string, string]> = [['', 'Todo'], ['usuario', 'Usuarios'], ['parametro', 'Parámetros'], ['activo', 'Máquinas'], ['repuesto', 'Repuestos'], ['orden', 'Órdenes'], ['plan', 'Planes'], ['modelo', 'Tipos de equipo'], ['compra', 'Compras'], ['calidad', 'Calidad'], ['iluminacion', 'Iluminación']];
 
 function resumen(d: Record<string, unknown> | null): string {
   if (!d) return '';
@@ -252,6 +261,52 @@ function Bitacora() {
   );
 }
 
+/** Control documental de los formatos impresos: código, versión y fechas que salen en el encabezado. */
+function Formatos() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['parametros', 'formatos'], queryFn: () => api.get<Record<string, FormatoDocumental>>('/parametros/formatos') });
+  const [edit, setEdit] = useState<{ clave: string; f: FormatoDocumental } | null>(null);
+  const m = useMutation({
+    mutationFn: () => api.put(`/parametros/formatos/${encodeURIComponent(edit!.clave)}`, { ...edit!.f, fechaElaboracion: edit!.f.fechaElaboracion || null, fechaActualizacion: edit!.f.fechaActualizacion || null }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['parametros', 'formatos'] }); qc.invalidateQueries({ queryKey: ['bitacora'] }); setEdit(null); },
+  });
+  const set = (k: keyof FormatoDocumental) => (e: { target: { value: string } }) => setEdit((s) => (s ? { ...s, f: { ...s.f, [k]: e.target.value } } : s));
+  return (
+    <section className="card">
+      <h2>Formatos impresos</h2>
+      <p className="muted" style={{ marginTop: 0 }}>Código, versión y fechas del control documental que salen en el encabezado de cada formato. Los de los checklists se editan en cada plantilla (Calidad → Configuración).</p>
+      {q.isPending ? <Spinner /> : q.isError ? <ErrorBox error={q.error} /> : (
+        <ul className="list">
+          {Object.entries(q.data).sort((a, b) => a[0].localeCompare(b[0])).map(([clave, f]) => (
+            <li key={clave} className="list-row static">
+              <div className="list-main">
+                <strong>{f.nombre}</strong>
+                <span className="muted">{f.codigo} · versión {f.version}{f.fechaActualizacion ? ` · actualizado ${date(f.fechaActualizacion)}` : ''}</span>
+              </div>
+              <div className="list-meta"><Button variant="ghost" onClick={() => { m.reset(); setEdit({ clave, f: { ...f, fechaElaboracion: f.fechaElaboracion ?? '', fechaActualizacion: f.fechaActualizacion ?? '' } }); }}>Editar</Button></div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Modal open={!!edit} title="Editar formato" onClose={() => setEdit(null)}
+        footer={<><Button variant="ghost" type="button" onClick={() => setEdit(null)}>Cancelar</Button><Button type="submit" form="formato-form" busy={m.isPending}>Guardar</Button></>}>
+        {edit ? (
+          <form id="formato-form" className="stack" onSubmit={(e) => { e.preventDefault(); m.mutate(); }}>
+            <Field label="Nombre *">{(i) => <Input id={i} value={edit.f.nombre} onChange={set('nombre')} required minLength={3} maxLength={150} />}</Field>
+            <div className="form-grid">
+              <Field label="Código *">{(i) => <Input id={i} value={edit.f.codigo} onChange={set('codigo')} required minLength={2} maxLength={40} />}</Field>
+              <Field label="Versión *">{(i) => <Input id={i} value={edit.f.version} onChange={set('version')} required maxLength={20} />}</Field>
+              <Field label="Fecha de elaboración">{(i) => <Input id={i} type="date" value={edit.f.fechaElaboracion ?? ''} onChange={set('fechaElaboracion')} />}</Field>
+              <Field label="Fecha de actualización">{(i) => <Input id={i} type="date" value={edit.f.fechaActualizacion ?? ''} onChange={set('fechaActualizacion')} />}</Field>
+            </div>
+            {m.isError ? <ErrorBox error={m.error} /> : null}
+          </form>
+        ) : null}
+      </Modal>
+    </section>
+  );
+}
+
 export function Settings() {
   return (
     <>
@@ -274,6 +329,7 @@ export function Settings() {
         <Autorizador />
         <TarifaHora />
         <ParametrosIndicadores />
+        <Formatos />
         <Bitacora />
       </div>
     </>

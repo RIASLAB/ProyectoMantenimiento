@@ -79,6 +79,7 @@ with sync_playwright() as p:
     ficha(a, 'MOL-001')
     a.locator('.materiales').get_by_role('button', name='Editar lista').click()
     d = a.locator('dialog[open]')
+    expect(d.locator('.part-row')).to_have_count(3)
     while d.locator('.part-row').count():
         d.locator('.part-row').first.get_by_role('button', name='Quitar repuesto').click()
     d.get_by_role('button', name='Guardar').click()

@@ -1,7 +1,7 @@
 /** Notificaciones por evento y bandeja (NOT-01, NOT-02), incluidos los avisos al celular (Web Push). */
 import { createECDH, randomBytes } from 'crypto';
 import * as webpush from 'web-push';
-import { bootstrap } from './util';
+import { bootstrap, VERIF_OK } from './util';
 
 // Claves de avisos solo para esta prueba: con ellas el servidor activa el envío al celular.
 const vapid = webpush.generateVAPIDKeys();
@@ -138,7 +138,7 @@ describe('MNT-04 · Asignación → técnico', () => {
     expect(n.cuerpo).toMatch(/máquina parada/);
 
     await c.http.post(`/api/ordenes/${otId}/iniciar`).set(c.auth(tec.token)).expect(201);
-    await c.http.post(`/api/ordenes/${otId}/cerrar`).set(c.auth(tec.token)).send({ trabajoRealizado: 'Se cambió el rodamiento', repuestosUsados: [], manoObra: [], finParada: new Date().toISOString() }).expect(201);
+    await c.http.post(`/api/ordenes/${otId}/cerrar`).set(c.auth(tec.token)).send({ ...VERIF_OK, trabajoRealizado: 'Se cambió el rodamiento', repuestosUsados: [], manoObra: [], finParada: new Date().toISOString() }).expect(201);
     expect((await nuevas(op.token))[0]).toMatchObject({ tipo: 'FALLA_ATENDIDA', titulo: 'Falla atendida: EMB-1 · Embutidora' });
   });
 
@@ -235,7 +235,7 @@ describe('NOT-01 · Calidad e inventario', () => {
       codigos.push(o.codigo);
       await c.http.post(`/api/ordenes/${o.id}/asignar`).set(c.auth(tec.token)).send({ tecnicoId: tec.id }).expect(201);
       await c.http.post(`/api/ordenes/${o.id}/iniciar`).set(c.auth(tec.token)).expect(201);
-      await c.http.post(`/api/ordenes/${o.id}/cerrar`).set(c.auth(tec.token)).send({ trabajoRealizado: 'Cambio de rodamiento', repuestosUsados: [{ repuestoId: rodId, cantidad }], manoObra: [] }).expect(201);
+      await c.http.post(`/api/ordenes/${o.id}/cerrar`).set(c.auth(tec.token)).send({ ...VERIF_OK, trabajoRealizado: 'Cambio de rodamiento', repuestosUsados: [{ repuestoId: rodId, cantidad }], manoObra: [] }).expect(201);
     };
     await salida(5);
     expect((await nuevas(c.admin)).filter((n) => n.tipo.startsWith('STOCK'))).toHaveLength(0);

@@ -8,7 +8,7 @@ import { extname, join, resolve } from 'path';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
 import { SessionUser } from '../common/auth.decorators';
-import { EstadoActivo } from '../common/enums';
+import { ClaseActivo, EstadoActivo } from '../common/enums';
 import { validateUpload } from '../common/files';
 import { AssetDocument } from './asset-document.entity';
 import { Asset } from './asset.entity';
@@ -34,7 +34,7 @@ export class AssetsService {
     if (!existsSync(this.dir)) mkdirSync(this.dir, { recursive: true });
   }
 
-  list(f: { q?: string; estado?: EstadoActivo; area?: string; modeloId?: string; categoriaId?: string }) {
+  list(f: { q?: string; estado?: EstadoActivo; area?: string; modeloId?: string; categoriaId?: string; clase?: ClaseActivo }) {
     const qb = this.repo.createQueryBuilder('a')
       .leftJoin('a.modeloEquipo', 'm').addSelect(['m.id', 'm.nombre', 'm.categoriaId'])
       .leftJoin('m.categoria', 'mc').addSelect(['mc.id', 'mc.nombre'])
@@ -47,6 +47,7 @@ export class AssetsService {
       });
     }
     if (f.estado) qb.andWhere('a.estado = :estado', { estado: f.estado });
+    if (f.clase) qb.andWhere('a.clase = :clase', { clase: f.clase });
     if (f.area) qb.andWhere('lower(a.area) = lower(:area)', { area: f.area });
     return qb.getMany();
   }

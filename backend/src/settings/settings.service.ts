@@ -1,12 +1,12 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
 import { SessionUser } from '../common/auth.decorators';
 import { Rol } from '../common/enums';
 import { User } from '../users/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
-import { PARAM_AUTORIZADOR_COMPRAS, PARAM_TARIFA_HORA, Setting } from './setting.entity';
+import { FORMATOS_POR_DEFECTO, FormatoDocumental, PARAM_AUTORIZADOR_COMPRAS, PARAM_FORMATOS, PARAM_TARIFA_HORA, Setting } from './setting.entity';
 
 @Injectable()
 export class SettingsService {
@@ -81,5 +81,43 @@ export class SettingsService {
       );
     });
     return { tarifaHora: valor };
+  }
+
+  /** Formatos documentales: los por defecto más los configurados (las planillas de temperatura pueden ser por planta: "TEMPERATURA:Planta Pollo"). */
+  async getFormatos(): Promise<Record<string, FormatoDocumental>> {
+    const s = await this.repo.findOne({ where: { clave: PARAM_FORMATOS } });
+    let guardados: Record<string, FormatoDocumental> = {};
+    try {
+      guardados = s?.valor ? JSON.parse(s.valor) : {};
+    } catch {
+      guardados = {};
+    }
+    return { ...FORMATOS_POR_DEFECTO, ...guardados };
+  }
+
+  /** El formato de una clave, o el general de su tipo ("TEMPERATURA:Planta X" → "TEMPERATURA"). */
+  async getFormato(clave: string): Promise<FormatoDocumental | null> {
+    const todos = await this.getFormatos();
+    return todos[clave] ?? todos[clave.split(':')[0]] ?? null;
+  }
+
+  async setFormato(clave: string, f: FormatoDocumental, actor: SessionUser, em?: EntityManager) {
+    const run = async (m: EntityManager) => {
+      const r = m.getRepository(Setting);
+      const s = await r.findOne({ where: { clave: PARAM_FORMATOS }, lock: { mode: 'pessimistic_write' } });
+      let guardados: Record<string, FormatoDocumental> = {};
+      try {
+        guardados = s?.valor ? JSON.parse(s.valor) : {};
+      } catch {
+        guardados = {};
+      }
+      const anterior = guardados[clave] ?? FORMATOS_POR_DEFECTO[clave] ?? null;
+      guardados[clave] = f;
+      await r.save({ clave: PARAM_FORMATOS, valor: JSON.stringify(guardados) });
+      await this.audit.log({ usuarioId: actor.id, accion: 'FORMATO_ACTUALIZADO', entidad: 'parametro', entidadId: clave, detalle: { anterior, nuevo: f } }, m);
+    };
+    if (em) await run(em);
+    else await this.ds.transaction(run);
+    return this.getFormatos();
   }
 }

@@ -7,12 +7,13 @@ import { AuditService } from '../audit/audit.service';
 import { SessionUser } from '../common/auth.decorators';
 import { EstadoActivo, Rol } from '../common/enums';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SettingsService } from '../settings/settings.service';
 import {
-  ChecklistItemDto, CreateChecklistDto, CreateControlPointDto, CreateTemperatureDto, CreateTemplateDto, RecordsQuery,
+  ChecklistItemDto, CreateChecklistDto, CreateControlPointDto, CreateTemperatureDto, CreateTemplateDto, PlanillaQuery, RecordsQuery, VerifyPlanillaDto,
   UpdateControlPointDto, UpdateTemplateDto, VoidDto,
 } from './quality.dto';
 import {
-  ChecklistAnswer, ChecklistItem, ChecklistRecord, ChecklistTemplate, ControlPoint, QualityVoid, TemperatureRecord,
+  ChecklistAnswer, ChecklistItem, ChecklistRecord, ChecklistTemplate, ControlPoint, QualityVoid, TemperatureRecord, TemperatureVerification, VALORES_ESCALA,
 } from './quality.entities';
 
 const TOLERANCIA_FUTURO_MS = 5 * 60_000;
@@ -38,6 +39,7 @@ export class QualityService {
     private readonly ds: DataSource,
     private readonly audit: AuditService,
     private readonly notif: NotificationsService,
+    private readonly settings: SettingsService,
   ) {}
 
   // ======================= Puntos de control =======================
@@ -171,6 +173,80 @@ export class QualityService {
     return entities.map((t, i) => ({ ...t, activo: { id: raw[i].a_id, codigo: raw[i].a_codigo, nombre: raw[i].a_nombre } }));
   }
 
+  // ======================= Planilla diaria de temperaturas =======================
+
+  /** Áreas o plantas que tienen puntos de control (cada una lleva su planilla diaria). */
+  async areasPlanilla(): Promise<string[]> {
+    const rows: Array<{ area: string }> = await this.ds.query(
+      `SELECT min(a.area) AS area FROM puntos_control p JOIN activos a ON a.id = p.activo_id WHERE p.vigente GROUP BY lower(a.area) ORDER BY 1`,
+    );
+    return rows.map((r) => r.area);
+  }
+
+  /**
+   * Planilla del día de un área (formato AC-PMT-FR01/FR02): los puntos del área, sus lecturas del día en la hora local,
+   * quiénes las registraron (Realizó) y quién la verificó.
+   */
+  async planilla(q: PlanillaQuery) {
+    const tz = process.env.APP_TZ ?? 'America/Bogota';
+    const fecha = q.fecha.slice(0, 10);
+    const puntos: Array<Record<string, unknown>> = await this.ds.query(
+      `SELECT p.id, p.nombre, p.minimo, p.maximo, p.frecuencia_horas, a.id AS activo_id, a.codigo, a.nombre AS activo_nombre, a.ubicacion
+         FROM puntos_control p JOIN activos a ON a.id = p.activo_id
+        WHERE lower(a.area) = lower($1)
+          AND (p.vigente OR EXISTS (SELECT 1 FROM registros_temperatura t WHERE t.punto_id = p.id AND (t.registrado_en AT TIME ZONE $3)::date = $2::date))
+        ORDER BY a.codigo, p.nombre`,
+      [q.area, fecha, tz],
+    );
+    const lecturas: Array<Record<string, unknown>> = puntos.length ? await this.ds.query(
+      `SELECT t.id, t.punto_id, t.valor, t.fuera_de_rango, t.accion_correctiva, t.registrado_en,
+              to_char(t.registrado_en AT TIME ZONE $3, 'HH24:MI') AS hora, extract(hour FROM t.registrado_en AT TIME ZONE $3)::int AS h, u.nombre AS usuario
+         FROM registros_temperatura t JOIN usuarios u ON u.id = t.usuario_id
+        WHERE t.punto_id = ANY($1::uuid[]) AND (t.registrado_en AT TIME ZONE $3)::date = $2::date
+          AND NOT EXISTS (SELECT 1 FROM anulaciones_calidad n WHERE n.tipo = 'TEMPERATURA' AND n.registro_id = t.id)
+        ORDER BY t.registrado_en`,
+      [puntos.map((p) => p.id), fecha, tz],
+    ) : [];
+    const v = await this.ds.getRepository(TemperatureVerification).createQueryBuilder('v').leftJoinAndSelect('v.usuario', 'u')
+      .where('v.fecha = :fecha AND lower(v.area) = lower(:area)', { fecha, area: q.area }).getOne();
+    const num = (x: unknown) => (x === null || x === undefined ? null : Number(x));
+    return {
+      fecha, area: q.area,
+      formato: await this.settings.getFormato(`TEMPERATURA:${q.area}`),
+      puntos: puntos.map((p) => ({
+        id: p.id, nombre: p.nombre, minimo: num(p.minimo), maximo: num(p.maximo), frecuenciaHoras: num(p.frecuencia_horas),
+        activo: { id: p.activo_id, codigo: p.codigo, nombre: p.activo_nombre, ubicacion: p.ubicacion },
+      })),
+      // Franja de 3 horas del formato en papel (00:00, 03:00 … 21:00) a la que corresponde cada lectura.
+      lecturas: lecturas.map((l) => ({
+        id: l.id, puntoId: l.punto_id, valor: Number(l.valor), fueraDeRango: l.fuera_de_rango, accionCorrectiva: l.accion_correctiva,
+        registradoEn: l.registrado_en, hora: l.hora, franja: Math.floor(Number(l.h) / 3) * 3, usuario: l.usuario,
+      })),
+      realizadoPor: [...new Set(lecturas.map((l) => l.usuario as string))],
+      verificacion: v ? { usuario: v.usuario.nombre, creadoEn: v.creadoEn, observaciones: v.observaciones } : null,
+    };
+  }
+
+  /** "Verificó": el jefe revisa la planilla del día. Una sola vez por día y área; queda en bitácora. */
+  async verificarPlanilla(dto: VerifyPlanillaDto, actor: SessionUser) {
+    const tz = process.env.APP_TZ ?? 'America/Bogota';
+    const fecha = dto.fecha.slice(0, 10);
+    const hoyLocal = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
+    if (fecha > hoyLocal) throw new BadRequestException('No se puede verificar un día que no ha pasado');
+    const p = await this.planilla({ fecha, area: dto.area });
+    if (!p.lecturas.length) throw new BadRequestException('La planilla de ese día no tiene lecturas para verificar');
+    if (p.verificacion) throw new ConflictException(`La planilla ya fue verificada por ${p.verificacion.usuario}`);
+    const area = (await this.areasPlanilla()).find((a) => a.toLowerCase() === dto.area.toLowerCase()) ?? dto.area.trim();
+    return this.ds.transaction(async (em) => {
+      const v = await em.getRepository(TemperatureVerification).save({ fecha, area, observaciones: dto.observaciones?.trim() || null, usuarioId: actor.id });
+      await this.audit.log({
+        usuarioId: actor.id, accion: 'PLANILLA_TEMPERATURA_VERIFICADA', entidad: 'calidad', entidadId: v.id,
+        detalle: { fecha, area, lecturas: p.lecturas.length, fueraDeRango: p.lecturas.filter((l) => l.fueraDeRango).length },
+      }, em);
+      return v;
+    });
+  }
+
   // ======================= Checklists =======================
 
   listPlantillas(incluirInactivas = false) {
@@ -190,6 +266,8 @@ export class QualityService {
     return this.ds.transaction(async (em) => {
       const p = await em.getRepository(ChecklistTemplate).save({
         nombre: dto.nombre.trim(), area: dto.area?.trim() || null, activoId: dto.activoId ?? null, descripcion: dto.descripcion?.trim() || null,
+        codigo: dto.codigo?.trim() || null, version: dto.version?.trim() || null, fechaElaboracion: dto.fechaElaboracion || null,
+        fechaActualizacion: dto.fechaActualizacion || null, recomendacion: dto.recomendacion?.trim() || null,
         items: this.normalizarItems(dto.items),
       });
       await this.audit.log({ usuarioId: actor.id, accion: 'PLANTILLA_CREADA', entidad: 'calidad', entidadId: p.id, detalle: { nombre: p.nombre, preguntas: p.items.length } }, em);
@@ -205,6 +283,11 @@ export class QualityService {
     if (dto.activoId !== undefined) cambios.activoId = dto.activoId;
     if (dto.descripcion !== undefined) cambios.descripcion = dto.descripcion?.trim() || null;
     if (dto.vigente !== undefined) cambios.vigente = dto.vigente;
+    if (dto.codigo !== undefined) cambios.codigo = dto.codigo?.trim() || null;
+    if (dto.version !== undefined) cambios.version = dto.version?.trim() || null;
+    if (dto.fechaElaboracion !== undefined) cambios.fechaElaboracion = dto.fechaElaboracion || null;
+    if (dto.fechaActualizacion !== undefined) cambios.fechaActualizacion = dto.fechaActualizacion || null;
+    if (dto.recomendacion !== undefined) cambios.recomendacion = dto.recomendacion?.trim() || null;
     if (dto.items) cambios.items = this.normalizarItems(dto.items);
     await this.ds.transaction(async (em) => {
       await em.getRepository(ChecklistTemplate).update(id, cambios as never);
@@ -232,17 +315,26 @@ export class QualityService {
     }
     const registradoEn = this.momento(dto.registradoEn);
     const porItem = new Map(dto.respuestas.map((r) => [r.itemId, r.valor]));
+    const obsPorItem = new Map(dto.respuestas.map((r) => [r.itemId, r.observacion?.trim() || null]));
     const desconocida = dto.respuestas.find((r) => !p.items.some((i) => i.id === r.itemId));
     if (desconocida) throw new BadRequestException('Una respuesta no corresponde a la plantilla (¿se modificó mientras la llenaba?)');
 
     const respuestas: ChecklistAnswer[] = p.items.map((item) => {
+      // Los títulos de sección se copian para conservar la estructura del formato; no se responden.
+      if (item.tipo === 'SECCION') return { itemId: item.id, texto: item.texto, tipo: item.tipo, valor: null, conforme: true };
       const v = porItem.get(item.id);
+      const observacion = obsPorItem.get(item.id) ?? null;
       const vacio = v === undefined || v === null || v === '';
       if (vacio) {
         if (item.obligatorio) throw new BadRequestException(`Falta responder: ${item.texto}`);
-        return { itemId: item.id, texto: item.texto, tipo: item.tipo, valor: null, conforme: true };
+        return { itemId: item.id, texto: item.texto, tipo: item.tipo, valor: null, conforme: true, ...(observacion ? { observacion } : {}) };
       }
-      return { itemId: item.id, texto: item.texto, tipo: item.tipo, ...this.evaluar(item, v) };
+      const r = this.evaluar(item, v);
+      // D-20 (asumido): "Regular" es conforme, pero hay que decir qué está regular.
+      if (item.tipo === 'ESCALA' && r.valor === 'R' && (!observacion || observacion.length < 3)) {
+        throw new BadRequestException(`Escriba la observación de lo calificado como Regular: ${item.texto}`);
+      }
+      return { itemId: item.id, texto: item.texto, tipo: item.tipo, ...r, ...(observacion ? { observacion } : {}) };
     });
     const noConformes = respuestas.filter((r) => !r.conforme).length;
     const accion = dto.accionCorrectiva?.trim() || null;
@@ -286,6 +378,19 @@ export class QualityService {
     if (q.plantillaId) qb.andWhere('c.plantillaId = :plantillaId', { plantillaId: q.plantillaId });
     if (q.soloDesviaciones === 'true') qb.andWhere('c.noConformes > 0');
     return qb.getMany();
+  }
+
+  /** Un checklist diligenciado con su plantilla (para imprimirlo en el formato). */
+  async getChecklist(id: string) {
+    const c = await this.checks.createQueryBuilder('c')
+      .leftJoin('c.activo', 'a').addSelect(['a.id', 'a.codigo', 'a.nombre', 'a.area', 'a.ubicacion', 'a.fabricante', 'a.modelo', 'a.serie'])
+      .leftJoin('c.usuario', 'u').addSelect(['u.id', 'u.nombre'])
+      .leftJoinAndMapOne('c.anulacion', QualityVoid, 'n', `n.tipo = 'CHECKLIST' AND n.registroId = c.id`)
+      .where('c.id = :id', { id })
+      .getOne();
+    if (!c) throw new NotFoundException('Checklist no encontrado');
+    const plantilla = await this.plantillas.findOne({ where: { id: c.plantillaId } });
+    return { ...c, plantilla };
   }
 
   // ======================= Anulación, resumen y exportación =======================
@@ -337,7 +442,8 @@ export class QualityService {
       header = ['Fecha registro', 'Recibido en servidor', 'Checklist', 'Máquina', 'Usuario', 'No conformes', 'Respuestas', 'Acción correctiva', 'Observaciones', 'Anulado', 'Motivo anulación'];
       lines = items.map((c) => {
         const n = (c as unknown as { anulacion?: QualityVoid }).anulacion;
-        const resp = c.respuestas.map((r) => `${r.conforme ? '' : '[NC] '}${r.texto}: ${r.valor ?? '—'}`).join(' | ');
+        const resp = c.respuestas.filter((r) => r.tipo !== 'SECCION')
+          .map((r) => `${r.conforme ? '' : '[NC] '}${r.texto}: ${r.valor ?? '—'}${r.observacion ? ` (${r.observacion})` : ''}`).join(' | ');
         return [fecha(c.registradoEn), fecha(c.creadoEn), c.plantillaNombre, c.activo ? `${c.activo.codigo} ${c.activo.nombre}` : '', c.usuario?.nombre, c.noConformes, resp, c.accionCorrectiva, c.observaciones, n ? 'Sí' : 'No', n?.motivo].map(esc).join(';');
       });
     } else {
@@ -383,8 +489,8 @@ export class QualityService {
       ids.add(id);
       if (i.tipo === 'NUMERO') this.validarLimites(i.minimo, i.maximo);
       return {
-        id, texto: i.texto.trim(), tipo: i.tipo, obligatorio: i.obligatorio,
-        ...(i.tipo === 'SI_NO' ? { esperado: i.esperado ?? 'SI' } : {}),
+        id, texto: i.texto.trim(), tipo: i.tipo, obligatorio: i.tipo === 'SECCION' ? false : i.obligatorio,
+        ...(i.tipo === 'SI_NO' ? { esperado: i.esperado ?? 'SI', etiqueta: i.etiqueta ?? 'SI_NO', permiteNA: !!i.permiteNA } : {}),
         ...(i.tipo === 'NUMERO' ? { minimo: i.minimo ?? null, maximo: i.maximo ?? null } : {}),
       };
     });
@@ -393,8 +499,15 @@ export class QualityService {
   private evaluar(item: ChecklistItem, v: string | number | null | undefined): { valor: string | number; conforme: boolean } {
     if (item.tipo === 'SI_NO') {
       const s = String(v).toUpperCase();
-      if (s !== 'SI' && s !== 'NO') throw new BadRequestException(`Responda Sí o No: ${item.texto}`);
+      if (s === 'NA' && item.permiteNA) return { valor: s, conforme: true };
+      if (s !== 'SI' && s !== 'NO') throw new BadRequestException(`Responda Sí o No${item.permiteNA ? ' o No aplica' : ''}: ${item.texto}`);
       return { valor: s, conforme: s === (item.esperado ?? 'SI') };
+    }
+    if (item.tipo === 'ESCALA') {
+      const s = String(v).toUpperCase();
+      if (!(VALORES_ESCALA as readonly string[]).includes(s)) throw new BadRequestException(`Califique B, R, M, No tiene o NA: ${item.texto}`);
+      // M (malo) y NT (no tiene) son no conformes; B, R y NA son conformes (D-20).
+      return { valor: s, conforme: s !== 'M' && s !== 'NT' };
     }
     if (item.tipo === 'NUMERO') {
       const n = Number(v);

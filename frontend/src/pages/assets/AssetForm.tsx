@@ -2,19 +2,21 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
-import type { Asset, EquipmentModel, EstadoActivo } from '../../api/types';
+import type { Asset, ClaseActivo, EquipmentModel, EstadoActivo } from '../../api/types';
 import { OpcionesTipos } from '../orders/Plans';
 import { Button, ErrorBox, Field, Icon, Input, PageHeader, Select, Spinner, Textarea } from '../../components/ui';
 import { ESTADO_LABEL } from '../../format';
 
 type FormState = Record<
-  'codigo' | 'codigoSap' | 'nombre' | 'modelo' | 'fabricante' | 'serie' | 'area' | 'ubicacion' | 'fechaCompra' | 'fechaFinGarantia' | 'notas' | 'modeloId' | 'cantidad' | 'enBodega',
+  'codigo' | 'codigoSap' | 'nombre' | 'modelo' | 'fabricante' | 'serie' | 'area' | 'ubicacion' | 'fechaCompra' | 'fechaFinGarantia' | 'notas' | 'modeloId' | 'cantidad' | 'enBodega'
+  | 'voltaje' | 'amperaje' | 'capacidad' | 'peso' | 'ubicacionManual',
   string
-> & { estado: EstadoActivo };
+> & { estado: EstadoActivo; clase: ClaseActivo };
 
 const EMPTY: FormState = {
   codigo: '', codigoSap: '', nombre: '', modelo: '', fabricante: '', serie: '', area: '', ubicacion: '',
   fechaCompra: '', fechaFinGarantia: '', notas: '', estado: 'OPERATIVO', modeloId: '', cantidad: '1', enBodega: '0',
+  clase: 'EQUIPO', voltaje: '', amperaje: '', capacidad: '', peso: '', ubicacionManual: '',
 };
 
 /** Códigos que se crearán al registrar varios equipos iguales (AA-001 → AA-001…AA-010). */
@@ -44,6 +46,7 @@ export function AssetForm() {
       codigo: a.codigo, codigoSap: a.codigoSap ?? '', nombre: a.nombre, modelo: a.modelo ?? '', fabricante: a.fabricante ?? '',
       serie: a.serie ?? '', area: a.area, ubicacion: a.ubicacion ?? '', fechaCompra: a.fechaCompra ?? '',
       fechaFinGarantia: a.fechaFinGarantia ?? '', notas: a.notas ?? '', estado: a.estado, modeloId: a.modeloId ?? '', cantidad: '1', enBodega: '0',
+      clase: a.clase, voltaje: a.voltaje ?? '', amperaje: a.amperaje ?? '', capacidad: a.capacidad ?? '', peso: a.peso ?? '', ubicacionManual: a.ubicacionManual ?? '',
     });
   }, [current.data]);
 
@@ -52,7 +55,7 @@ export function AssetForm() {
       // Los campos vacíos se envían como null para poder borrarlos al editar.
       const { cantidad, enBodega, ...resto } = f;
       const body: Record<string, unknown> = { ...resto };
-      for (const k of ['codigoSap', 'modelo', 'fabricante', 'serie', 'ubicacion', 'fechaCompra', 'fechaFinGarantia', 'notas', 'modeloId']) {
+      for (const k of ['codigoSap', 'modelo', 'fabricante', 'serie', 'ubicacion', 'fechaCompra', 'fechaFinGarantia', 'notas', 'modeloId', 'voltaje', 'amperaje', 'capacidad', 'peso', 'ubicacionManual']) {
         if (body[k] === '') body[k] = editing ? null : undefined;
       }
       if (!editing && Number(cantidad) > 1) {
@@ -110,6 +113,14 @@ export function AssetForm() {
             {(i) => <Input id={i} {...bind('codigo')} required pattern="[A-Za-z0-9._\/\-]{2,40}" title="Letras, números, punto, guion o barra (2 a 40)" />}
           </Field>
           <Field label="Nombre *">{(i) => <Input id={i} {...bind('nombre')} required minLength={2} maxLength={150} />}</Field>
+          <Field label="Clase" hint={f.clase === 'INSTALACION' ? 'Cuarto frío, sala, tablero eléctrico… recibe mantenimiento locativo.' : 'Máquina o equipo.'}>
+            {(i) => (
+              <Select id={i} {...bind('clase')}>
+                <option value="EQUIPO">Equipo o máquina</option>
+                <option value="INSTALACION">Instalación (mantenimiento locativo)</option>
+              </Select>
+            )}
+          </Field>
           <Field label="Tipo de equipo" hint={tipos.data?.length ? 'Define su lista de materiales y sus preventivos por tipo.' : 'Créelos en Máquinas → Tipos de equipo.'}>
             {(i) => (
               <Select id={i} value={f.modeloId} onChange={(e) => {
@@ -154,7 +165,12 @@ export function AssetForm() {
               </Select>
             )}
           </Field>
-          <Field label="Notas" full>{(i) => <Textarea id={i} {...bind('notas')} maxLength={4000} />}</Field>
+          <Field label="Voltaje" hint="Ej. 220 V">{(i) => <Input id={i} {...bind('voltaje')} maxLength={40} />}</Field>
+          <Field label="Amperaje" hint="Ej. 15 A">{(i) => <Input id={i} {...bind('amperaje')} maxLength={40} />}</Field>
+          <Field label="Capacidad" hint="Ej. 300 kg/h">{(i) => <Input id={i} {...bind('capacidad')} maxLength={60} />}</Field>
+          <Field label="Peso" hint="Ej. 180 kg">{(i) => <Input id={i} {...bind('peso')} maxLength={40} />}</Field>
+          <Field label="Ubicación del manual" hint="Si el manual está en papel. Los PDF se adjuntan en la ficha." full>{(i) => <Input id={i} {...bind('ubicacionManual')} maxLength={150} />}</Field>
+          <Field label="Descripción / notas" full>{(i) => <Textarea id={i} {...bind('notas')} maxLength={4000} />}</Field>
         </div>
         {localError ? <div className="alert alert-bad">{localError}</div> : null}
         {save.isError ? <ErrorBox error={save.error} /> : null}

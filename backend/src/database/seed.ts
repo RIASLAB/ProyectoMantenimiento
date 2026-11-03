@@ -22,6 +22,7 @@ import { MaintenancePlan, PlanPart, WorkOrder, WorkOrderEvent, WorkOrderPart } f
 import { hashCredencial } from '../users/credentials';
 import { User } from '../users/user.entity';
 import dataSource from './data-source';
+import { cargarFormatos } from './formatos/cargar';
 
 async function crearUsuario(ds: DataSource, nombre: string, usuario: string, rol: Rol, credencial: string) {
   const r = ds.getRepository(User);
@@ -187,6 +188,9 @@ async function main() {
       } as never);
     }
 
+    // Los formatos reales de la planta (preoperacionales, hojas diarias, cuartos fríos, iluminación).
+    const formatos = await cargarFormatos(ds, admin.id);
+    console.log(`Formatos de la planta: ${formatos.plantillas} plantillas, ${formatos.instalaciones} cuartos fríos, ${formatos.puntosIluminacion} puntos de iluminación`);
     console.log('Datos de demostración cargados. Usuarios: autorizador / Autoriza2026, tecnico / PIN 4826, operario / PIN 7391');
   }
 

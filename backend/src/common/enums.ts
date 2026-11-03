@@ -5,6 +5,20 @@ export enum Rol {
   OPERARIO = 'OPERARIO',
 }
 
+/** Máquina o equipo, o instalación locativa (cuarto frío, sala, tablero eléctrico): ambas reciben mantenimiento. */
+export enum ClaseActivo {
+  EQUIPO = 'EQUIPO',
+  INSTALACION = 'INSTALACION',
+}
+
+/** Verificaciones de entrega del formato de orden de trabajo (AC-PMT FR03). */
+export const VERIFICACIONES_CIERRE = [
+  { id: 'especificaciones', texto: 'Los trabajos de mantenimiento se ejecutaron de acuerdo con las especificaciones técnicas y en el plazo establecido' },
+  { id: 'piezas', texto: 'El equipo quedó en óptimas condiciones y con sus piezas completas tras la intervención' },
+  { id: 'herramientas', texto: 'Se retiró toda herramienta o material que pueda afectar la inocuidad del producto, el funcionamiento del equipo o la seguridad del trabajador' },
+  { id: 'limpieza', texto: 'Se reportó el equipo a limpieza y desinfección para garantizar su correcta limpieza' },
+] as const;
+
 export enum EstadoActivo {
   OPERATIVO = 'OPERATIVO',
   EN_MANTENIMIENTO = 'EN_MANTENIMIENTO',

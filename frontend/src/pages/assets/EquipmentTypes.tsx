@@ -21,7 +21,9 @@ export function TipoModal({ tipo, open, onClose }: { tipo: EquipmentModel | null
       ? { categoria: tipo.categoria.nombre, nombre: tipo.nombre, fabricante: tipo.fabricante ?? '', referencia: tipo.referencia ?? '', descripcion: tipo.descripcion ?? '' }
       : { categoria: '', nombre: '', fabricante: '', referencia: '', descripcion: '' });
     setRows(tipo ? tipo.materiales.map((m) => ({ repuestoId: m.repuestoId, cantidad: String(m.cantidad) })) : []);
-  }, [open, tipo]);
+    // Solo al abrir (o al cambiar de tipo): una recarga en segundo plano no debe borrar lo que se está editando.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, tipo?.id]);
   const m = useMutation({
     mutationFn: () => {
       const body = { ...f, fabricante: f.fabricante || null, referencia: f.referencia || null, descripcion: f.descripcion || null, materiales: rowsToPayload(rows) };

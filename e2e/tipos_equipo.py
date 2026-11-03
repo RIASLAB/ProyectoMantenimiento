@@ -154,6 +154,8 @@ with sync_playwright() as p:
     d.get_by_label('Trabajo realizado *').fill('Se cambiaron filtros y se recargó gas')
     d.get_by_label('Horas').first.fill('1')
     t.screenshot(path=f'{SP}/tipo-08-cierre-tecnico.png', full_page=True)
+    # Verificaciones de entrega del formato de OT (AC-PMT FR03).
+    for r_ in t.locator('dialog[open]').get_by_role('radio', name='Cumple', exact=True).all(): r_.click()
     t.locator('dialog[open]').get_by_role('button', name='Cerrar orden').click()
     expect(t.locator('.page-subtitle')).to_contain_text('Cerrada')
     ok('técnico: al reportar y al cerrar el correctivo se despliega la lista de materiales del equipo')

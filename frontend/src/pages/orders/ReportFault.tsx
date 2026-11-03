@@ -87,7 +87,7 @@ export function ReportFault() {
                 <option value="" disabled>Seleccione la máquina…</option>
                 {porArea.map(([area, items]) => (
                   <optgroup key={area} label={area}>
-                    {items.map((a) => <option key={a.id} value={a.id}>{a.codigo} · {a.nombre}</option>)}
+                    {items.map((a) => <option key={a.id} value={a.id}>{a.codigo} · {a.nombre}{a.clase === 'INSTALACION' ? ' (instalación)' : ''}</option>)}
                   </optgroup>
                 ))}
               </Select>

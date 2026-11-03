@@ -63,9 +63,9 @@ Estado al cierre del Sprint 2 frente a la matriz (`Matriz_Requisitos_CMMS_Nutria
 | CAL-01 | Registro de temperaturas | ✅ | ✅ | Hora de lectura y de llegada al servidor; usuario; numérico validado | — |
 | CAL-02 | Límites y alerta | ✅ | ✅ | Fuera de rango en rojo, en el resumen y en bitácora; los límites quedan congelados en cada registro | Notificación a calidad (Sprint 3); límites reales (D-06) |
 | CAL-03 | Acción correctiva obligatoria | ✅ | ✅ | No guarda sin acción si está fuera de rango | — |
-| CAL-04 | Checklists configurables | ✅ | ✅ | Sí/No, número y texto; no conformidades resaltadas; copia de las preguntas | Preguntas con foto |
+| CAL-04 | Checklists configurables | ✅ | ✅ | Sí/No (o C/NC, Bueno/Malo, con NA), B/R/M/No tiene/NA, número, texto y secciones; observación por ítem; no conformidades resaltadas; copia de las preguntas; código y versión del formato; los 17 formatos de la planta cargados | Preguntas con foto |
 | CAL-05 | Registros inalterables | ✅ | ✅ | Trigger en base de datos; anulación con motivo que no borra | — |
-| CAL-06 | Consulta y exportación | ✅ | ✅ | Filtros por fecha y desviaciones; CSV con anulaciones | PDF; retención (D-07) |
+| CAL-06 | Consulta y exportación | ✅ | ✅ | Filtros por fecha y desviaciones; CSV con anulaciones; impresión / PDF en los formatos de la planta (checklist, preoperacional semanal, planilla diaria de temperaturas con Realizó/Verificó, iluminación) | Retención (D-07) |
 | CAL-07 | Registros faltantes | 🟡 | ✅ | Puntos marcados "Toca registrar" según frecuencia | Recordatorio activo (Sprint 3) |
 
 ## Seguridad y transversales

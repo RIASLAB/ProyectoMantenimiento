@@ -1,7 +1,7 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { Type } from 'class-transformer';
 import { IsDateString, IsEnum, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
-import { EstadoActivo } from '../common/enums';
+import { ClaseActivo, EstadoActivo } from '../common/enums';
 
 export class CreateAssetDto {
   @IsString() @Matches(/^[A-Za-z0-9._/-]{2,40}$/, { message: 'Código inválido: use letras, números, punto, guion o barra (2 a 40)' })
@@ -43,6 +43,26 @@ export class CreateAssetDto {
   /** Tipo de equipo (modelo). */
   @IsOptional() @IsUUID()
   modeloId?: string | null;
+
+  /** Equipo o instalación (mantenimiento locativo). */
+  @IsOptional() @IsEnum(ClaseActivo)
+  clase?: ClaseActivo;
+
+  // Datos técnicos de la hoja de vida.
+  @IsOptional() @IsString() @MaxLength(40)
+  voltaje?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(40)
+  amperaje?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(60)
+  capacidad?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(40)
+  peso?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(150)
+  ubicacionManual?: string | null;
 }
 
 export class UpdateAssetDto extends PartialType(CreateAssetDto) {}

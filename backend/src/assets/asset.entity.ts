@@ -1,5 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
-import { EstadoActivo } from '../common/enums';
+import { ClaseActivo, EstadoActivo } from '../common/enums';
 import { EquipmentModel } from '../equipment/equipment.entities';
 import { AssetDocument } from './asset-document.entity';
 
@@ -45,6 +45,27 @@ export class Asset {
 
   @Column({ type: 'text', nullable: true })
   notas: string | null;
+
+  /** Equipo, o instalación para el mantenimiento locativo (formato AC-PMT FR03: clase de mantenimiento). */
+  @Column({ type: 'enum', enum: ClaseActivo, enumName: 'clase_activo', default: ClaseActivo.EQUIPO })
+  clase: ClaseActivo;
+
+  /** Datos técnicos de la hoja de vida (formato AC-PMT-FR05). Texto libre con su unidad, ej. "220 V", "15 A", "300 kg/h". */
+  @Column({ type: 'varchar', length: 40, nullable: true })
+  voltaje: string | null;
+
+  @Column({ type: 'varchar', length: 40, nullable: true })
+  amperaje: string | null;
+
+  @Column({ type: 'varchar', length: 60, nullable: true })
+  capacidad: string | null;
+
+  @Column({ type: 'varchar', length: 40, nullable: true })
+  peso: string | null;
+
+  /** Dónde está el manual en papel (ej. "Oficina de mantenimiento, archivador 2"). */
+  @Column({ name: 'ubicacion_manual', type: 'varchar', length: 150, nullable: true })
+  ubicacionManual: string | null;
 
   /** Tipo de equipo (categoría y modelo): define su lista de materiales y los preventivos por tipo. */
   @ManyToOne(() => EquipmentModel, { nullable: true })

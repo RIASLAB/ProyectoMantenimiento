@@ -189,6 +189,13 @@ export class WorkOrder {
   @Column({ name: 'trabajo_realizado', type: 'text', nullable: true })
   trabajoRealizado: string | null;
 
+  /** Verificaciones de entrega del formato AC-PMT FR03 (cumple / no cumple), con el texto con que se respondieron. */
+  @Column({ type: 'jsonb', nullable: true })
+  verificaciones: Array<{ id: string; texto: string; cumple: boolean }> | null;
+
+  @Column({ type: 'text', nullable: true })
+  observaciones: string | null;
+
   @Column({ name: 'costo_servicios_externos', type: 'numeric', precision: 14, scale: 2, default: 0, transformer: numeric })
   costoServiciosExternos: number;
 

@@ -2,7 +2,7 @@
 import { readdirSync } from 'fs';
 import { join } from 'path';
 import { DataSource } from 'typeorm';
-import { bootstrap } from './util';
+import { bootstrap, VERIF_OK } from './util';
 import { sumarFrecuencia, hoy } from '../src/maintenance/maintenance.service';
 import { UnidadFrecuencia } from '../src/common/enums';
 
@@ -105,7 +105,7 @@ describe('MNT-03/04 · Ciclo de vida y permisos', () => {
   });
 
   it('rechaza transiciones inválidas (cerrar sin iniciar)', async () => {
-    const r = await c.http.post(`/api/ordenes/${otId}/cerrar`).set(c.auth(tec1.token)).send({ trabajoRealizado: 'Cambio de rodamiento', repuestosUsados: [], manoObra: [] });
+    const r = await c.http.post(`/api/ordenes/${otId}/cerrar`).set(c.auth(tec1.token)).send({ ...VERIF_OK, trabajoRealizado: 'Cambio de rodamiento', repuestosUsados: [], manoObra: [] });
     expect(r.status).toBe(400);
   });
 
@@ -165,6 +165,7 @@ describe('MNT-09/10 · Cierre', () => {
     manoObra: [{ tecnicoId: tec1.id, horas: 1.5 }],
     costoServiciosExternos: 50000,
     finParada: new Date().toISOString(),
+    ...VERIF_OK,
     ...extra,
   });
 
@@ -224,7 +225,7 @@ describe('MNT-02 · Hora de puesta en marcha', () => {
     await c.http.post(`/api/ordenes/${o.id}/asignar`).set(c.auth(c.admin)).send({ tecnicoId: tec1.id }).expect(201);
     await c.http.post(`/api/ordenes/${o.id}/iniciar`).set(c.auth(tec1.token)).expect(201);
     const fin = new Date(inicio.getTime() - 30_000); // el formulario redondea al minuto
-    const r = await c.http.post(`/api/ordenes/${o.id}/cerrar`).set(c.auth(tec1.token)).send({ trabajoRealizado: 'Se destrabó la tolva', repuestosUsados: [], manoObra: [], finParada: fin.toISOString() });
+    const r = await c.http.post(`/api/ordenes/${o.id}/cerrar`).set(c.auth(tec1.token)).send({ ...VERIF_OK, trabajoRealizado: 'Se destrabó la tolva', repuestosUsados: [], manoObra: [], finParada: fin.toISOString() });
     expect(r.status).toBe(201);
     const d = (await c.http.get(`/api/ordenes/${o.id}`).set(c.auth(c.admin))).body;
     expect(new Date(d.finParada).getTime()).toBe(new Date(d.inicioParada).getTime());
@@ -234,7 +235,7 @@ describe('MNT-02 · Hora de puesta en marcha', () => {
     const o = (await c.http.post('/api/ordenes').set(c.auth(op1.token)).send({ activoId, descripcion: 'Atasco en la tolva 2', maquinaParada: true })).body;
     await c.http.post(`/api/ordenes/${o.id}/asignar`).set(c.auth(c.admin)).send({ tecnicoId: tec1.id }).expect(201);
     await c.http.post(`/api/ordenes/${o.id}/iniciar`).set(c.auth(tec1.token)).expect(201);
-    const r = await c.http.post(`/api/ordenes/${o.id}/cerrar`).set(c.auth(tec1.token)).send({ trabajoRealizado: 'Se destrabó la tolva', repuestosUsados: [], manoObra: [], finParada: new Date(Date.now() - 3_600_000).toISOString() });
+    const r = await c.http.post(`/api/ordenes/${o.id}/cerrar`).set(c.auth(tec1.token)).send({ ...VERIF_OK, trabajoRealizado: 'Se destrabó la tolva', repuestosUsados: [], manoObra: [], finParada: new Date(Date.now() - 3_600_000).toISOString() });
     expect(r.status).toBe(400);
     await c.http.post(`/api/ordenes/${o.id}/cancelar`).set(c.auth(c.admin)).send({ motivo: 'Prueba' }).expect(201);
   });
@@ -281,7 +282,7 @@ describe('OFF · Sincronización de acciones hechas sin señal', () => {
     await c.http.post(`/api/ordenes/${o2.id}/asignar`).set(c.auth(c.admin)).send({ tecnicoId: tec1.id }).expect(201);
     await c.http.post(`/api/ordenes/${o2.id}/iniciar`).set(c.auth(tec1.token)).expect(201);
     await c.http.post(`/api/ordenes/${o2.id}/cancelar`).set(c.auth(c.admin)).send({ motivo: 'Duplicada' }).expect(201);
-    const r = await c.http.post(`/api/ordenes/${o2.id}/cerrar`).set(c.auth(tec1.token)).send({
+    const r = await c.http.post(`/api/ordenes/${o2.id}/cerrar`).set(c.auth(tec1.token)).send({ ...VERIF_OK,
       trabajoRealizado: 'Trabajo hecho sin señal', repuestosUsados: [{ repuestoId: repId, cantidad: 1 }], manoObra: [], clientId: '9a1d1f8e-0b2a-4c3d-8e4f-444444444444', registradoSinConexion: true,
     });
     expect(r.status).toBe(400);
@@ -336,7 +337,7 @@ describe('MNT-05/06/08 · Preventivos', () => {
 
   it('al cerrar el preventivo se programa el siguiente con el mismo kit', async () => {
     await c.http.post(`/api/ordenes/${otPrev}/iniciar`).set(c.auth(tec2.token)).expect(201);
-    const r = await c.http.post(`/api/ordenes/${otPrev}/cerrar`).set(c.auth(tec2.token)).send({
+    const r = await c.http.post(`/api/ordenes/${otPrev}/cerrar`).set(c.auth(tec2.token)).send({ ...VERIF_OK,
       trabajoRealizado: 'Lubricación realizada', repuestosUsados: [{ repuestoId: rodId, cantidad: 1 }], manoObra: [],
     });
     expect(r.status).toBe(201);

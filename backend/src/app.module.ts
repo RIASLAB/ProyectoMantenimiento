@@ -26,6 +26,8 @@ import { NotificationsController } from './notifications/notifications.controlle
 import { NotificationsService } from './notifications/notifications.service';
 import { PurchasesController } from './purchases/purchases.controller';
 import { PurchasesService } from './purchases/purchases.service';
+import { LightingController } from './lighting/lighting.controller';
+import { LightingService } from './lighting/lighting.service';
 import { QualityController } from './quality/quality.controller';
 import { QualityService } from './quality/quality.service';
 import { SettingsController } from './settings/settings.controller';
@@ -64,11 +66,11 @@ class HealthController {
   ],
   controllers: [
     HealthController, AuthController, UsersController, SettingsController, AuditController,
-    AssetHistoryController, AssetsController, SparePartsController, InventoryController, WorkOrdersController, PlansController, PurchasesController, QualityController, NotificationsController, KpiController, ImportController, EquipmentController,
+    AssetHistoryController, AssetsController, SparePartsController, InventoryController, WorkOrdersController, PlansController, PurchasesController, QualityController, NotificationsController, KpiController, ImportController, EquipmentController, LightingController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: AuthGuard },
-    AuthService, UsersService, SettingsService, AuditService, AssetsService, InventoryService, MaintenanceService, PurchasesService, QualityService, NotificationsService, KpiService, ImportService, EquipmentService,
+    AuthService, UsersService, SettingsService, AuditService, AssetsService, InventoryService, MaintenanceService, PurchasesService, QualityService, NotificationsService, KpiService, ImportService, EquipmentService, LightingService,
   ],
 })
 export class AppModule {}

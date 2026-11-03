@@ -3,8 +3,8 @@ import type { Response } from 'express';
 import { CurrentUser, Roles, SessionUser } from '../common/auth.decorators';
 import { Rol } from '../common/enums';
 import {
-  CreateChecklistDto, CreateControlPointDto, CreateTemperatureDto, CreateTemplateDto, RecordsQuery, UpdateControlPointDto, UpdateTemplateDto,
-  VoidDto,
+  CreateChecklistDto, CreateControlPointDto, CreateTemperatureDto, CreateTemplateDto, PlanillaQuery, RecordsQuery, UpdateControlPointDto, UpdateTemplateDto,
+  VerifyPlanillaDto, VoidDto,
 } from './quality.dto';
 import { QualityService } from './quality.service';
 
@@ -45,6 +45,22 @@ export class QualityController {
     return this.svc.registrarTemperatura(dto, actor);
   }
 
+  @Get('planilla/areas')
+  areasPlanilla() {
+    return this.svc.areasPlanilla();
+  }
+
+  @Get('planilla')
+  planilla(@Query() q: PlanillaQuery) {
+    return this.svc.planilla(q);
+  }
+
+  @Post('planilla/verificar')
+  @Roles(Rol.ADMIN, Rol.AUTORIZADOR)
+  verificarPlanilla(@Body() dto: VerifyPlanillaDto, @CurrentUser() actor: SessionUser) {
+    return this.svc.verificarPlanilla(dto, actor);
+  }
+
   @Get('plantillas')
   plantillas(@Query('incluirInactivas') inc?: string) {
     return this.svc.listPlantillas(inc === 'true');
@@ -70,6 +86,11 @@ export class QualityController {
   @Get('checklists')
   checklists(@Query() q: RecordsQuery) {
     return this.svc.listChecklists(q);
+  }
+
+  @Get('checklists/:id')
+  checklist(@Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.getChecklist(id);
   }
 
   @Post('checklists')

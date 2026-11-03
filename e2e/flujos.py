@@ -81,7 +81,7 @@ with sync_playwright() as p:
     page.screenshot(path=SP + '/03-ficha.png', full_page=True)
 
     page.get_by_role('link', name='Editar').click()
-    page.get_by_label('Ubicación').fill('Sala de molienda 2')
+    page.get_by_label('Ubicación', exact=True).fill('Sala de molienda 2')
     page.get_by_role('button', name='Guardar cambios').click()
     expect(page.get_by_text('Sala de molienda 2').first).to_be_visible()
     ok('editar ficha')

@@ -92,6 +92,8 @@ with sync_playwright() as p:
     dlg.get_by_label('Cantidad', exact=True).last.fill('1')
     dlg.get_by_label('Horas').first.fill('2')
     tp.screenshot(path=f'{SP}/ot-04-cerrar-movil.png')
+    # Verificaciones de entrega del formato de OT (AC-PMT FR03).
+    for r_ in tp.locator('dialog[open]').get_by_role('radio', name='Cumple', exact=True).all(): r_.click()
     tp.get_by_role('button', name='Cerrar orden').last.click()
     expect(tp.locator('dialog[open]')).to_have_count(0)
     expect(tp.locator('.page-subtitle')).to_contain_text('Cerrada')

@@ -46,6 +46,9 @@ docker compose -f docker-compose.prod.yml --env-file .env.produccion up -d --bui
 # 4. Crear el administrador (una sola vez). Muestra la contraseña si no se define SEED_ADMIN_PASSWORD.
 docker compose -f docker-compose.prod.yml --env-file .env.produccion run --rm app node dist/database/seed.js
 
+# 4b. Cargar los formatos de la planta (preoperacionales, hojas diarias, cuartos fríos, iluminación). Se puede repetir.
+docker compose -f docker-compose.prod.yml --env-file .env.produccion run --rm app node dist/database/cargar-formatos.js
+
 # 5. Comprobar
 docker compose -f docker-compose.prod.yml --env-file .env.produccion ps
 curl https://<DOMINIO>/api/salud          # {"estado":"ok"}

@@ -1,4 +1,4 @@
-import type { EstadoActivo, EstadoCompra, EstadoOrden, Prioridad, Rol, TipoMovimiento, TipoOrden, UnidadFrecuencia } from './api/types';
+import type { ClaseActivo, EstadoActivo, EstadoCompra, EstadoOrden, EtiquetaSiNo, Prioridad, Rol, TipoItem, TipoMovimiento, TipoOrden, UnidadFrecuencia } from './api/types';
 
 export const ROL_LABEL: Record<Rol, string> = {
   ADMIN: 'Administrador',
@@ -144,3 +144,44 @@ export function hace(iso: string) {
   if (h < 48) return `hace ${h} h`;
   return `hace ${Math.round(h / 24)} días`;
 }
+
+/** Opciones de un Sí/No según cómo lo muestra el formato (Sí/No, C/NC de los preoperatorios, Bueno/Malo de los tableros). */
+export const ETIQUETAS_SI_NO: Record<EtiquetaSiNo, { SI: string; NO: string; corto: { SI: string; NO: string } }> = {
+  SI_NO: { SI: 'Sí', NO: 'No', corto: { SI: 'Sí', NO: 'No' } },
+  C_NC: { SI: 'Cumple', NO: 'No cumple', corto: { SI: 'C', NO: 'NC' } },
+  BUENO_MALO: { SI: 'Sí / Bueno', NO: 'No / Malo', corto: { SI: 'Sí', NO: 'No' } },
+};
+
+/** Calificación de los preoperacionales por máquina. */
+export const ESCALA: Array<{ v: 'B' | 'R' | 'M' | 'NT' | 'NA'; corto: string; largo: string }> = [
+  { v: 'B', corto: 'B', largo: 'Bueno' },
+  { v: 'R', corto: 'R', largo: 'Regular' },
+  { v: 'M', corto: 'M', largo: 'Malo' },
+  { v: 'NT', corto: 'No', largo: 'No tiene' },
+  { v: 'NA', corto: 'NA', largo: 'No aplica' },
+];
+
+/** Texto de una respuesta de checklist tal como se ve en el formato. */
+export function valorChecklist(a: { tipo: TipoItem; valor: string | number | null; etiqueta?: EtiquetaSiNo }, corto = false): string {
+  if (a.valor === null || a.valor === undefined || a.valor === '') return '—';
+  if (a.valor === 'NA') return corto ? 'NA' : 'No aplica';
+  if (a.tipo === 'SI_NO') {
+    const e = ETIQUETAS_SI_NO[a.etiqueta ?? 'SI_NO'];
+    return a.valor === 'SI' ? (corto ? e.corto.SI : e.SI) : a.valor === 'NO' ? (corto ? e.corto.NO : e.NO) : String(a.valor);
+  }
+  if (a.tipo === 'ESCALA') {
+    const x = ESCALA.find((e) => e.v === a.valor);
+    return x ? (corto ? x.corto : x.largo) : String(a.valor);
+  }
+  return typeof a.valor === 'number' ? qty(a.valor) : String(a.valor);
+}
+
+/** Verificaciones de entrega del formato de orden de trabajo (AC-PMT FR03); las mismas que valida la API. */
+export const VERIFICACIONES_CIERRE = [
+  { id: 'especificaciones', texto: 'Los trabajos de mantenimiento se ejecutaron de acuerdo con las especificaciones técnicas y en el plazo establecido' },
+  { id: 'piezas', texto: 'El equipo quedó en óptimas condiciones y con sus piezas completas tras la intervención' },
+  { id: 'herramientas', texto: 'Se retiró toda herramienta o material que pueda afectar la inocuidad del producto, el funcionamiento del equipo o la seguridad del trabajador' },
+  { id: 'limpieza', texto: 'Se reportó el equipo a limpieza y desinfección para garantizar su correcta limpieza' },
+] as const;
+
+export const CLASE_LABEL: Record<ClaseActivo, string> = { EQUIPO: 'Equipo', INSTALACION: 'Instalación (locativo)' };

@@ -100,6 +100,8 @@ with sync_playwright() as p:
     d = t.locator('dialog[open]')
     d.get_by_label('Trabajo realizado *').fill('Lubricación general')
     d.get_by_label('Horas').first.fill('1')
+    # Verificaciones de entrega del formato de OT (AC-PMT FR03).
+    for r_ in t.locator('dialog[open]').get_by_role('radio', name='Cumple', exact=True).all(): r_.click()
     t.get_by_role('button', name='Cerrar orden').last.click()
     expect(t.locator('.page-subtitle')).to_contain_text('Cerrada')
     a.reload()

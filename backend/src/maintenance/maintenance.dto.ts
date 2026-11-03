@@ -1,9 +1,9 @@
 import { Type } from 'class-transformer';
 import {
-  ArrayMaxSize, IsArray, IsBoolean, IsDateString, IsEnum, IsInt, IsNumber, IsOptional, IsPositive, IsString, IsUUID, Max, MaxLength, Min,
+  ArrayMaxSize, IsArray, IsBoolean, IsDateString, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsPositive, IsString, IsUUID, Max, MaxLength, Min,
   MinLength, ValidateNested,
 } from 'class-validator';
-import { EstadoOrden, Prioridad, TipoOrden, UnidadFrecuencia } from '../common/enums';
+import { EstadoOrden, Prioridad, TipoOrden, UnidadFrecuencia, VERIFICACIONES_CIERRE } from '../common/enums';
 
 export class ReportFaultDto {
   @IsUUID()
@@ -61,6 +61,14 @@ export class LaborDto {
   horas: number;
 }
 
+export class VerificationDto {
+  @IsIn(VERIFICACIONES_CIERRE.map((v) => v.id))
+  id: string;
+
+  @IsBoolean()
+  cumple: boolean;
+}
+
 export class CloseOrderDto {
   @IsString() @MinLength(5, { message: 'Describa el trabajo realizado' }) @MaxLength(4000)
   trabajoRealizado: string;
@@ -89,6 +97,13 @@ export class CloseOrderDto {
 
   @IsOptional() @IsDateString()
   cerradaEn?: string;
+
+  /** Verificaciones de entrega del formato (cumple / no cumple). */
+  @IsOptional() @IsArray() @ArrayMaxSize(10) @ValidateNested({ each: true }) @Type(() => VerificationDto)
+  verificaciones?: VerificationDto[];
+
+  @IsOptional() @IsString() @MaxLength(4000)
+  observaciones?: string;
 }
 
 export class PlannedPartsDto {

@@ -27,6 +27,8 @@ Sistema de mantenimiento e inventario de repuestos: hoja de vida de máquinas, m
 | Carga masiva de máquinas y repuestos desde Excel, con validación por fila | ✅ Sprint 3 |
 | Tipos de equipo (categoría y modelo) con lista de materiales; equipos iguales; preventivo por tipo; conteo por área | ✅ |
 | Inventario de equipos: máquinas compradas en bodega sin instalar, instalar desde el inventario | ✅ |
+| Formatos de la planta: preoperacionales B/R/M/NA (13 máquinas) y hojas diarias C/NC por planta, ronda y planilla de temperaturas de 55 cuartos fríos con su verificación, verificaciones de entrega de la OT, mantenimiento locativo, hoja de vida completa y medición de iluminación | ✅ |
+| Impresión / PDF de los formatos con logo, código y versión (OT, hoja de vida, preoperacional semanal, checklist, planilla de temperaturas, iluminación) | ✅ |
 | Producción con Docker y HTTPS, respaldos diarios cifrados con prueba de restauración | ✅ Sprint 3 |
 
 El detalle requisito por requisito está en [docs/trazabilidad.md](docs/trazabilidad.md).
@@ -54,7 +56,8 @@ cp .env.example .env        # ajustar JWT_SECRET y DATABASE_URL si aplica
 npm install
 npm run migration:run
 npm run seed                # crea el usuario "admin" y muestra su contraseña
-# npm run seed -- --demo    # opcional: usuarios, máquinas, repuestos, órdenes, compras y calidad de prueba
+# npm run seed -- --demo    # opcional: usuarios, máquinas, repuestos, órdenes, compras y calidad de prueba (incluye los formatos de la planta)
+npm run formatos:cargar     # carga los formatos de la planta: preoperacionales, hojas diarias, cuartos fríos, iluminación (se puede repetir)
 npm run start:dev           # API en http://localhost:3000/api
 
 # 3. Frontend (otra terminal)
@@ -89,9 +92,9 @@ cd backend
 npm run test:e2e
 ```
 
-Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **179 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
+Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **197 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
 
-Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**95 verificaciones**):
+Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**103 verificaciones**):
 
 | Script | Qué recorre |
 |---|---|
@@ -100,6 +103,7 @@ Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritori
 | `e2e/compras.py` | Faltante automático → autorizador aprueba/rechaza → admin compra y recibe en bodega |
 | `e2e/calidad.py` | Temperatura fuera de rango, checklist con no conformidad, anulación, exportación, configuración |
 | `e2e/equipos_en_bodega.py` | Inventario de equipos sin instalar: 5 molinos con 2 en bodega, instalar, conteo por área y guardar en bodega |
+| `e2e/formatos_planta.py` | Formatos de la planta: preoperacional B/R/M y su semana, hoja diaria C/NC, ronda y planilla de temperaturas con verificación, cierre de OT con verificaciones de entrega (celular), hoja de vida, iluminación y versión del formato en el PDF |
 | `e2e/lista_materiales.py` | Lista de materiales editable desde la ficha de la máquina: quitar, agregar y vaciar; el cambio aplica a todo el tipo |
 | `e2e/tipos_equipo.py` | Tipos de equipo con lista de materiales, 3 aires iguales de una vez, cuántos hay en Bodega, preventivo por tipo y materiales en correctivos |
 | `e2e/eliminar_adjuntos.py` | Eliminar fotos de una orden (quién puede y cuándo) y documentos de una máquina |
@@ -143,10 +147,15 @@ Todas las rutas van bajo `/api` y requieren `Authorization: Bearer <token>`, sal
 | `POST /compras/:id/aprobar` · `rechazar` | Autorizador vigente | Decisión (nunca sobre una propia) |
 | `POST /compras/:id/comprar` · `recibir` | Admin | Compra y entrada a bodega |
 | `GET/PUT /parametros/tarifa-hora` | Admin | Tarifa de mano de obra |
+| `GET /parametros/formatos`, `PUT /parametros/formatos/:clave` | Todos / Admin | Código, versión y fechas de los formatos impresos |
 | `GET /calidad/puntos`, `POST/PATCH` | Todos / Admin | Puntos de control y límites |
 | `GET/POST /calidad/temperaturas` | Todos | Registros de temperatura |
 | `GET/POST /calidad/plantillas`, `PATCH` | Todos / Admin | Plantillas de checklist |
-| `GET/POST /calidad/checklists` | Todos | Checklists diligenciados |
+| `GET/POST /calidad/checklists`, `GET /calidad/checklists/:id` | Todos | Checklists diligenciados (B/R/M/NA, C/NC, observación por ítem) |
+| `GET /calidad/planilla`, `GET /calidad/planilla/areas` | Todos | Planilla diaria de temperaturas de una planta (franjas de 3 horas, Realizó/Verificó) |
+| `POST /calidad/planilla/verificar` | Admin, Autorizador | "Verificó" de la planilla del día |
+| `GET /iluminacion/recintos` · `puntos`, `POST/PATCH` | Todos / Admin | Tipos de recinto (lux mín.-prom.-máx.) y puntos de medición |
+| `GET/POST /iluminacion/mediciones`, `GET /iluminacion/mediciones/:id` | Todos / Admin, Técnico | Mediciones de iluminación |
 | `POST /calidad/anulaciones` | Admin | Anular un registro con motivo |
 | `GET /calidad/exportar/temperaturas` · `checklists` | Admin, Autorizador | CSV para auditoría |
 | `GET /notificaciones`, `GET /notificaciones/contador` | Todos | Bandeja propia y número sin leer |
