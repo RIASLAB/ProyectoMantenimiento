@@ -65,20 +65,22 @@ with sync_playwright() as p:
     ok('operario reporta máquina parada y temperatura de 7,2 °C; él no recibe sus propios avisos')
 
     # 3) Al admin le llegan sin recargar (el contador se consulta cada 30 s; NOT-01 < 1 min)
-    expect(adm.locator('.topbar .bell .nav-badge')).to_have_text('2', timeout=40000)
+    # Además llegan los avisos automáticos del servidor (calibraciones y hojas diarias pendientes de los datos de
+    # demostración), así que se revisa que estén estos dos, no el total.
+    expect(adm.locator('.topbar .bell .nav-badge')).to_have_count(1, timeout=65000)
     adm.screenshot(path=f'{SP}/not-01-campana.png')
-    expect(adm.locator('.notif.unread')).to_have_count(2, timeout=35000)
+    expect(adm.locator('.notif.unread', has_text='Máquina parada: EMB-002')).to_be_visible(timeout=65000)
     expect(adm.locator('.notif.unread.urgent', has_text='Máquina parada: EMB-002')).to_be_visible()
     expect(adm.locator('.notif.unread.urgent', has_text='Temperatura fuera de rango: CF-001 · 7,2 °C')).to_be_visible()
     adm.screenshot(path=f'{SP}/not-02-bandeja-pc.png', full_page=True)
-    ok('admin: la campana muestra 2 sin abrir la página y la bandeja los marca como urgentes (NOT-01/02)')
+    ok('admin: la campana muestra los avisos sin abrir la página y la bandeja los marca como urgentes (NOT-01/02)')
 
     # 4) Abrir el aviso lleva a la orden y lo marca como leído
     adm.locator('.notif', has_text='Máquina parada: EMB-002').click()
     expect(adm).to_have_url(re.compile(r'/ordenes/[0-9a-f-]{36}'))
     expect(adm.get_by_text('La embutidora no arranca')).to_be_visible()
-    expect(adm.locator('.topbar .bell .nav-badge')).to_have_text('1')
     adm.goto(BASE + '/notificaciones')
+    expect(adm.locator('.notif', has_text='Máquina parada: EMB-002')).not_to_have_class(re.compile('unread'))
     adm.get_by_role('button', name='Marcar todas como leídas').click()
     expect(adm.locator('.notif.unread')).to_have_count(0)
     expect(adm.locator('.topbar .bell .nav-badge')).to_have_count(0)

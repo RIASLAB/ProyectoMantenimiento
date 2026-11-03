@@ -7,6 +7,19 @@ import { SessionUser } from '../common/auth.decorators';
 import { Rol } from '../common/enums';
 import { User } from '../users/user.entity';
 import { Notification, PushSubscription } from './notification.entities';
+import { PARAM_INDICADORES, PARAMETROS_POR_DEFECTO, ParametrosKpi } from '../kpi/kpi.service';
+import { Setting } from '../settings/setting.entity';
+
+/** Fecha, hora y día de la semana (1 = lunes) en la hora de la planta. */
+function localPlanta(d: Date) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone: process.env.APP_TZ ?? 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, weekday: 'short',
+  }).formatToParts(d).map((x) => [x.type, x.value]));
+  const hora = Number(p.hour) % 24;
+  const dias: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+  return { fecha: `${p.year}-${p.month}-${p.day}`, hora, minutos: hora * 60 + Number(p.minute), dia: dias[p.weekday as string] };
+}
+const aMinutos = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
 
 export interface Aviso {
   tipo: string;
@@ -85,6 +98,9 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     // Preventivos próximos/vencidos y limpieza: al arrancar y cada hora.
     const tareas = () => void this.tareasPeriodicas().catch((e) => this.log.error(e));
     this.timers.push(setTimeout(tareas, 10_000), setInterval(tareas, 3_600_000));
+    // Rondas de temperatura y checklists diarios no hechos: cada 15 minutos (cada aviso llega una sola vez).
+    const calidad = () => void this.revisarCalidad().catch((e) => this.log.error(e));
+    this.timers.push(setTimeout(calidad, 20_000), setInterval(calidad, 15 * 60_000));
   }
 
   onModuleDestroy() {
@@ -155,9 +171,96 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     return enviados;
   }
 
+  /**
+   * Registros de calidad que no se hicieron a tiempo, dentro del horario de producción (Ajustes → Indicadores):
+   * - Ronda de temperaturas: un aviso por planta y por franja de 3 horas si hay cuartos atrasados (más de su frecuencia + 30 min).
+   * - Checklists diarios (los que tienen "recordar a las HH"): un aviso por día si a esa hora no se han llenado.
+   * Llegan al jefe (administradores) y a mantenimiento (técnicos).
+   */
+  async revisarCalidad(ahora = new Date()) {
+    const s = await this.ds.getRepository(Setting).findOne({ where: { clave: PARAM_INDICADORES } });
+    let horario: ParametrosKpi = PARAMETROS_POR_DEFECTO;
+    try {
+      if (s?.valor) horario = { ...PARAMETROS_POR_DEFECTO, ...JSON.parse(s.valor) };
+    } catch { /* se usa el horario por defecto */ }
+    const l = localPlanta(ahora);
+    if (!horario.dias.includes(l.dia) || l.minutos < aMinutos(horario.horaInicio) || l.minutos >= aMinutos(horario.horaFin)) return 0;
+    let enviados = 0;
+    const destino = { roles: [Rol.ADMIN, Rol.TECNICO] };
+
+    const atrasados: Array<{ area: string; nombre: string }> = await this.ds.query(
+      `SELECT a.area, a.nombre
+         FROM puntos_control p JOIN activos a ON a.id = p.activo_id
+         LEFT JOIN LATERAL (
+           SELECT max(t.registrado_en) AS ultimo FROM registros_temperatura t
+            WHERE t.punto_id = p.id AND NOT EXISTS (SELECT 1 FROM anulaciones_calidad n WHERE n.tipo = 'TEMPERATURA' AND n.registro_id = t.id)
+         ) u ON true
+        WHERE p.vigente AND p.frecuencia_horas IS NOT NULL AND a.estado NOT IN ('DADO_DE_BAJA', 'EN_BODEGA')
+          AND coalesce(u.ultimo, p.creado_en) < $1::timestamptz - make_interval(hours => p.frecuencia_horas) - interval '30 minutes'
+        ORDER BY a.area, a.codigo`,
+      [ahora.toISOString()],
+    );
+    const porArea = new Map<string, string[]>();
+    for (const x of atrasados) porArea.set(x.area, [...(porArea.get(x.area) ?? []), x.nombre]);
+    const franja = Math.floor(l.hora / 3) * 3;
+    for (const [area, cuartos] of porArea) {
+      enviados += await this.notificar(null, destino, {
+        tipo: 'RONDA_ATRASADA',
+        titulo: `Ronda de temperaturas pendiente: ${area}`,
+        cuerpo: `${cuartos.length} punto${cuartos.length === 1 ? '' : 's'} sin registro a tiempo: ${cuartos.slice(0, 5).join(', ')}${cuartos.length > 5 ? '…' : ''}`,
+        enlace: `/calidad/ronda?area=${encodeURIComponent(area)}`,
+        clave: `ronda-atrasada:${area.toLowerCase()}:${l.fecha}:${franja}`,
+      });
+    }
+
+    const pendientes: Array<{ id: string; nombre: string }> = await this.ds.query(
+      `SELECT c.id, c.nombre FROM plantillas_checklist c
+        WHERE c.vigente AND c.recordar_hora IS NOT NULL AND c.recordar_hora <= $1
+          AND NOT EXISTS (
+            SELECT 1 FROM registros_checklist r
+             WHERE r.plantilla_id = c.id AND (r.registrado_en AT TIME ZONE $3)::date = $2::date
+               AND NOT EXISTS (SELECT 1 FROM anulaciones_calidad n WHERE n.tipo = 'CHECKLIST' AND n.registro_id = r.id))`,
+      [l.hora, l.fecha, process.env.APP_TZ ?? 'America/Bogota'],
+    );
+    for (const c of pendientes) {
+      enviados += await this.notificar(null, destino, {
+        tipo: 'CHECKLIST_PENDIENTE',
+        titulo: `Falta llenar: ${c.nombre}`,
+        cuerpo: 'El formato de hoy todavía no se ha diligenciado.',
+        enlace: `/calidad/checklist/${c.id}`,
+        clave: `checklist-pendiente:${c.id}:${l.fecha}`,
+      });
+    }
+    return enviados;
+  }
+
+  /** Calibraciones de instrumentos por vencer (30 días antes) y vencidas: un aviso por vencimiento al jefe. */
+  async revisarCalibraciones(hoyStr: string) {
+    const filas: Array<{ id: string; codigo: string; nombre: string; vence: string }> = await this.ds.query(
+      `SELECT i.id, i.codigo, i.nombre, to_char(c.vence_en, 'YYYY-MM-DD') AS vence
+         FROM instrumentos i
+         JOIN LATERAL (SELECT vence_en, resultado FROM calibraciones WHERE instrumento_id = i.id ORDER BY fecha DESC, creado_en DESC LIMIT 1) c ON true
+        WHERE i.vigente AND c.resultado = 'APTO' AND c.vence_en <= $1::date + 30`,
+      [hoyStr],
+    );
+    let enviados = 0;
+    for (const f of filas) {
+      const vencida = f.vence < hoyStr;
+      enviados += await this.notificar(null, { roles: [Rol.ADMIN] }, {
+        tipo: vencida ? 'CALIBRACION_VENCIDA' : 'CALIBRACION_POR_VENCER',
+        titulo: vencida ? `Calibración vencida: ${f.codigo} · ${f.nombre}` : `Calibración por vencer: ${f.codigo} · ${f.nombre}`,
+        cuerpo: `${vencida ? 'Venció' : 'Vence'} el ${fechaCorta(f.vence)}. Programe la calibración con el laboratorio.`,
+        enlace: `/calidad/instrumentos/${f.id}`,
+        clave: `calibracion:${f.id}:${f.vence}:${vencida ? 'vencida' : 'por-vencer'}`,
+      });
+    }
+    return enviados;
+  }
+
   private async tareasPeriodicas() {
     const hoyStr = new Intl.DateTimeFormat('en-CA', { timeZone: process.env.APP_TZ ?? 'America/Bogota' }).format(new Date());
     await this.revisarPreventivos(hoyStr);
+    await this.revisarCalibraciones(hoyStr);
     // La bandeja guarda 90 días de lo leído y 180 de lo no leído.
     await this.repo.delete({ leidaEn: LessThan(new Date(Date.now() - 90 * 86_400_000)) });
     await this.repo.delete({ creadoEn: LessThan(new Date(Date.now() - 180 * 86_400_000)) });

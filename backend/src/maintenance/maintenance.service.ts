@@ -105,6 +105,10 @@ export class MaintenanceService {
     else if (vista === 'cerradas') qb.andWhere('o.estado IN (:...estados)', { estados: [EstadoOrden.CERRADA, EstadoOrden.CANCELADA] });
     if (q.tipo) qb.andWhere('o.tipo = :tipo', { tipo: q.tipo });
     if (q.activoId) qb.andWhere('o.activoId = :activoId', { activoId: q.activoId });
+    if (q.area) qb.andWhere('lower(a.area) = lower(:area)', { area: q.area });
+    const tz = process.env.APP_TZ ?? 'America/Bogota';
+    if (q.cerradaDesde) qb.andWhere('(o.cerrada_en AT TIME ZONE :tz)::date >= :cd', { tz, cd: q.cerradaDesde.slice(0, 10) });
+    if (q.cerradaHasta) qb.andWhere('(o.cerrada_en AT TIME ZONE :tz)::date <= :ch', { tz, ch: q.cerradaHasta.slice(0, 10) });
 
     // El operario solo ve lo que él reportó; "mías" para el técnico = asignadas a él o reportadas por él.
     if (actor.rol === Rol.OPERARIO) qb.andWhere('o.reportadoPorId = :me', { me: actor.id });

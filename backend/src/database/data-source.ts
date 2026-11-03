@@ -12,12 +12,14 @@ import { NOTIFICATION_ENTITIES } from '../notifications/notification.entities';
 import { PurchaseRequest } from '../purchases/purchase-request.entity';
 import { QUALITY_ENTITIES } from '../quality/quality.entities';
 import { LIGHTING_ENTITIES } from '../lighting/lighting.entities';
+import { INSTRUMENT_ENTITIES } from '../instruments/instrument.entities';
+import { Signature } from '../signatures/signature.entity';
 import { Setting } from '../settings/setting.entity';
 import { User } from '../users/user.entity';
 
 dotenv.config();
 
-export const ENTITIES = [User, AuditLog, Setting, Asset, AssetDocument, SparePart, InventoryMovement, ...MAINTENANCE_ENTITIES, PurchaseRequest, ...QUALITY_ENTITIES, ...NOTIFICATION_ENTITIES, ...EQUIPMENT_ENTITIES, ...LIGHTING_ENTITIES];
+export const ENTITIES = [User, AuditLog, Setting, Asset, AssetDocument, SparePart, InventoryMovement, ...MAINTENANCE_ENTITIES, PurchaseRequest, ...QUALITY_ENTITIES, ...NOTIFICATION_ENTITIES, ...EQUIPMENT_ENTITIES, ...LIGHTING_ENTITIES, ...INSTRUMENT_ENTITIES, Signature];
 
 export function dataSourceOptions(url = process.env.DATABASE_URL): DataSourceOptions {
   return {

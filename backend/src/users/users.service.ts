@@ -44,6 +44,8 @@ export class UsersService {
         email: dto.email ?? null,
         rol: dto.rol,
         ...(await hashCredencial(dto.rol, dto.credencial)),
+        // La credencial la puso el administrador: el usuario la cambia al ingresar.
+        debeCambiarCredencial: true,
       });
       const saved = await em.getRepository(User).save(user);
       await this.audit.log(
@@ -83,7 +85,7 @@ export class UsersService {
       if (dto.activo !== undefined) cambios.activo = dto.activo;
       if (dto.credencial) {
         validarCredencial(nuevoRol, dto.credencial);
-        Object.assign(cambios, await hashCredencial(nuevoRol, dto.credencial), { intentosFallidos: 0, bloqueadoHasta: null });
+        Object.assign(cambios, await hashCredencial(nuevoRol, dto.credencial), { intentosFallidos: 0, bloqueadoHasta: null, debeCambiarCredencial: id !== actor.id });
       }
       await em.getRepository(User).update(id, cambios);
 

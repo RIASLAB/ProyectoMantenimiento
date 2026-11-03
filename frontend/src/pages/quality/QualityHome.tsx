@@ -84,6 +84,8 @@ export function QualityHome() {
         <Link to="/calidad/planilla" className="quick"><Icon name="file" size={28} /><span>Planilla de temperaturas</span></Link>
         <Link to="/calidad/semana" className="quick"><Icon name="calendar" size={28} /><span>Preoperacional de la semana</span></Link>
         <Link to="/calidad/iluminacion" className="quick"><Icon name="chart" size={28} /><span>Medición de iluminación</span></Link>
+        <Link to="/calidad/instrumentos" className="quick"><Icon name="settings" size={28} /><span>Calibración de instrumentos</span></Link>
+        <Link to="/calidad/paquete" className="quick"><Icon name="download" size={28} /><span>Paquete mensual para auditoría</span></Link>
       </div>
 
       {r ? (

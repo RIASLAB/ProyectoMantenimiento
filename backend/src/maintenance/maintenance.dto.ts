@@ -127,6 +127,17 @@ export class ListOrdersQuery {
 
   @IsOptional() @IsString()
   mias?: string;
+
+  /** Cerradas entre estas fechas (AAAA-MM-DD, en la hora de la planta), para el paquete mensual. */
+  @IsOptional() @IsDateString()
+  cerradaDesde?: string;
+
+  @IsOptional() @IsDateString()
+  cerradaHasta?: string;
+
+  /** Área o planta de la máquina. */
+  @IsOptional() @IsString() @MaxLength(100)
+  area?: string;
 }
 
 export class CreatePlanDto {

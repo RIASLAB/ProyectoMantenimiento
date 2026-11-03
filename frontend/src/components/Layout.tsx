@@ -74,10 +74,10 @@ export function Layout() {
         </nav>
         <ConnectionStatus />
         <div className="sidebar-user">
-          <div>
+          <NavLink to="/cuenta" className="sidebar-user-link" title="Cambiar contraseña o PIN">
             <strong>{user?.nombre}</strong>
             <span>{user ? ROL_LABEL[user.rol] : ''}</span>
-          </div>
+          </NavLink>
           <button className="icon-btn" onClick={pedirSalida} aria-label="Cerrar sesión" title="Cerrar sesión">
             <Icon name="logout" />
           </button>
@@ -91,7 +91,7 @@ export function Layout() {
         </div>
         <ConnectionStatus compact />
         <div className="topbar-user">
-          <span>{user?.nombre.split(' ')[0]} · {user ? ROL_LABEL[user.rol] : ''}</span>
+          <NavLink to="/cuenta" className="topbar-name">{user?.nombre.split(' ')[0]} · {user ? ROL_LABEL[user.rol] : ''}</NavLink>
           <NavLink to="/notificaciones" className="icon-btn bell" aria-label={noLeidas ? `Notificaciones: ${noLeidas} sin leer` : 'Notificaciones'}>
             <Icon name="bell" />
             {noLeidas > 0 ? <span className="nav-badge" aria-hidden>{noLeidas > 99 ? '99+' : noLeidas}</span> : null}

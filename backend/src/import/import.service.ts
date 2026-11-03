@@ -5,7 +5,7 @@ import { DataSource, In } from 'typeorm';
 import { Asset } from '../assets/asset.entity';
 import { AuditService } from '../audit/audit.service';
 import { SessionUser } from '../common/auth.decorators';
-import { EstadoActivo, TipoMovimiento } from '../common/enums';
+import { ClaseActivo, EstadoActivo, TipoMovimiento } from '../common/enums';
 import { EquipmentModel } from '../equipment/equipment.entities';
 import { InventoryService } from '../inventory/inventory.service';
 import { MaintenanceService } from '../maintenance/maintenance.service';
@@ -113,6 +113,10 @@ const ESTADOS: Record<string, EstadoActivo> = {
   'en bodega': EstadoActivo.EN_BODEGA, bodega: EstadoActivo.EN_BODEGA, 'sin instalar': EstadoActivo.EN_BODEGA,
   'dado de baja': EstadoActivo.DADO_DE_BAJA, 'dada de baja': EstadoActivo.DADO_DE_BAJA, baja: EstadoActivo.DADO_DE_BAJA,
 };
+const CLASES: Record<string, ClaseActivo> = {
+  equipo: ClaseActivo.EQUIPO, maquina: ClaseActivo.EQUIPO,
+  instalacion: ClaseActivo.INSTALACION, 'instalacion (locativo)': ClaseActivo.INSTALACION, locativo: ClaseActivo.INSTALACION,
+};
 const sinTildes = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[*:]/g, '').replace(/\s+/g, ' ').trim();
 
 // ---------- Columnas de cada plantilla ----------
@@ -139,6 +143,20 @@ const COLUMNAS: Record<TipoCarga, Columna[]> = {
     },
     { clave: 'notas', titulo: 'Notas', ancho: 30, ayuda: '', leer: (v) => texto(v, 4000) },
     { clave: 'tipoEquipo', titulo: 'Tipo de equipo', ancho: 26, ayuda: 'Opcional. Nombre exacto del tipo creado en Máquinas → Tipos de equipo (ej. Mini split 12.000 BTU)', leer: (v) => texto(v, 120) },
+    {
+      clave: 'clase', titulo: 'Clase', ancho: 22, ayuda: 'Equipo (si se deja vacío) o Instalación (locativo): cuarto frío, sala, tablero eléctrico…',
+      leer: (v) => {
+        const s = texto(v, 40);
+        if (s === null) return ClaseActivo.EQUIPO;
+        return CLASES[sinTildes(s)] ?? falla(`"${s}" no es una clase válida: use Equipo o Instalación`);
+      },
+    },
+    // Datos técnicos de la hoja de vida (formato AC-PMT-FR05), texto con su unidad.
+    { clave: 'voltaje', titulo: 'Voltaje', ancho: 12, ayuda: 'Ej. 220 V', leer: (v) => texto(v, 40) },
+    { clave: 'amperaje', titulo: 'Amperaje', ancho: 12, ayuda: 'Ej. 15 A', leer: (v) => texto(v, 40) },
+    { clave: 'capacidad', titulo: 'Capacidad', ancho: 14, ayuda: 'Ej. 300 kg/h', leer: (v) => texto(v, 60) },
+    { clave: 'peso', titulo: 'Peso', ancho: 12, ayuda: 'Ej. 180 kg', leer: (v) => texto(v, 40) },
+    { clave: 'ubicacionManual', titulo: 'Ubicación del manual', ancho: 26, ayuda: 'Dónde está el manual en papel, ej. Oficina de mantenimiento', leer: (v) => texto(v, 150) },
   ],
   repuestos: [
     { clave: 'codigo', titulo: 'Código', obligatoria: true, ancho: 16, ayuda: 'Código interno único, ej. RP-ROD-6205. Sin espacios.', leer: codigo },
@@ -158,6 +176,7 @@ export interface FilaMaquina {
   fila: number; codigo: string; nombre: string; area: string; ubicacion: string | null; fabricante: string | null; modelo: string | null;
   serie: string | null; codigoSap: string | null; fechaCompra: string | null; fechaFinGarantia: string | null; estado: EstadoActivo; notas: string | null;
   modeloId: string | null;
+  clase: ClaseActivo; voltaje: string | null; amperaje: string | null; capacidad: string | null; peso: string | null; ubicacionManual: string | null;
 }
 export interface FilaRepuesto {
   fila: number; codigo: string; descripcion: string; unidad: string; ubicacion: string | null; codigoSap: string | null;
@@ -194,6 +213,7 @@ export class ImportService {
       cols.forEach((c, i) => {
         const cell = ws.getRow(r).getCell(i + 1);
         if (c.clave === 'estado') cell.dataValidation = { type: 'list', allowBlank: true, formulae: ['"Operativo,En bodega,Dado de baja"'] };
+        if (c.clave === 'clase') cell.dataValidation = { type: 'list', allowBlank: true, formulae: ['"Equipo,Instalación"'] };
         if (c.clave.startsWith('fecha')) cell.numFmt = 'dd/mm/yyyy';
         if (c.clave === 'codigo') cell.numFmt = '@';
       });
@@ -368,7 +388,10 @@ export class ImportService {
     if (tipo === 'maquinas') {
       const porArea: Record<string, number> = {};
       filas.forEach((f) => { porArea[f.area as string] = (porArea[f.area as string] ?? 0) + 1; });
-      return { registros: filas.length, porArea, dadasDeBaja: filas.filter((f) => f.estado === EstadoActivo.DADO_DE_BAJA).length };
+      return {
+        registros: filas.length, porArea, dadasDeBaja: filas.filter((f) => f.estado === EstadoActivo.DADO_DE_BAJA).length,
+        instalaciones: filas.filter((f) => f.clase === ClaseActivo.INSTALACION).length,
+      };
     }
     const r2 = (n: number) => Math.round(n * 100) / 100;
     return {

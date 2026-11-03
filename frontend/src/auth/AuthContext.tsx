@@ -12,6 +12,8 @@ interface AuthState {
   login: (usuario: string, credencial: string) => Promise<void>;
   logout: () => void;
   can: (...roles: Rol[]) => boolean;
+  /** Tras cambiar la contraseña o el PIN. */
+  credencialCambiada: () => void;
 }
 
 const Ctx = createContext<AuthState | null>(null);
@@ -60,8 +62,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const can = (...roles: Rol[]) => !!user && roles.includes(user.rol);
+  const credencialCambiada = () => setUser((u) => (u ? { ...u, debeCambiarCredencial: false } : u));
 
-  return <Ctx.Provider value={{ user, loading, expired, login, logout, can }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ user, loading, expired, login, logout, can, credencialCambiada }}>{children}</Ctx.Provider>;
 }
 
 export function useAuth() {

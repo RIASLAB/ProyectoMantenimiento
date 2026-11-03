@@ -46,6 +46,8 @@ export async function bootstrap() {
   const usuario = async (usuario: string, rol: string, credencial: string) => {
     const r = await http.post('/api/usuarios').set(auth(admin)).send({ nombre: `Usuario ${usuario}`, usuario, rol, credencial });
     if (r.status !== 201) throw new Error(`crear ${usuario}: ${JSON.stringify(r.body)}`);
+    // En las pruebas se omite el cambio obligatorio de credencial del primer ingreso (se prueba aparte).
+    await app.get(DataSource).query('UPDATE usuarios SET debe_cambiar_credencial = false WHERE id = $1', [r.body.id]);
     return { id: r.body.id as string, token: await login(usuario, credencial) };
   };
 

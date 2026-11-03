@@ -59,7 +59,7 @@ const toDraft = (i: ChecklistItemInfo): ItemDraft => ({
   minimo: i.minimo?.toString() ?? '', maximo: i.maximo?.toString() ?? '',
 });
 const nuevoItem = (tipo: TipoItem = 'SI_NO'): ItemDraft => ({ texto: '', tipo, obligatorio: tipo !== 'SECCION', esperado: 'SI', etiqueta: 'SI_NO', permiteNA: false, minimo: '', maximo: '' });
-const docVacio = { codigo: '', version: '', fechaElaboracion: '', fechaActualizacion: '', recomendacion: '' };
+const docVacio = { codigo: '', version: '', fechaElaboracion: '', fechaActualizacion: '', recomendacion: '', recordarHora: '' };
 
 function TemplateModal({ plantilla, open, onClose }: { plantilla: ChecklistTemplateInfo | null; open: boolean; onClose: () => void }) {
   const qc = useQueryClient();
@@ -75,6 +75,7 @@ function TemplateModal({ plantilla, open, onClose }: { plantilla: ChecklistTempl
     setDoc(plantilla ? {
       codigo: plantilla.codigo ?? '', version: plantilla.version ?? '', fechaElaboracion: plantilla.fechaElaboracion ?? '',
       fechaActualizacion: plantilla.fechaActualizacion ?? '', recomendacion: plantilla.recomendacion ?? '',
+      recordarHora: plantilla.recordarHora === null ? '' : String(plantilla.recordarHora),
     } : docVacio);
     setItems(plantilla ? plantilla.items.map(toDraft) : [nuevoItem()]);
   }, [open, plantilla]);
@@ -84,6 +85,7 @@ function TemplateModal({ plantilla, open, onClose }: { plantilla: ChecklistTempl
         nombre, area: area || null, descripcion: descripcion || null,
         codigo: doc.codigo || null, version: doc.version || null, fechaElaboracion: doc.fechaElaboracion || null,
         fechaActualizacion: doc.fechaActualizacion || null, recomendacion: doc.recomendacion || null,
+        recordarHora: doc.recordarHora === '' ? null : Number(doc.recordarHora),
         items: items.map((i) => ({
           id: i.id, texto: i.texto, tipo: i.tipo, obligatorio: i.tipo === 'SECCION' ? false : i.obligatorio,
           ...(i.tipo === 'SI_NO' ? { esperado: i.esperado, etiqueta: i.etiqueta, permiteNA: i.permiteNA } : {}),
@@ -116,6 +118,14 @@ function TemplateModal({ plantilla, open, onClose }: { plantilla: ChecklistTempl
           <Field label="Versión">{(i) => <Input id={i} value={doc.version} onChange={(e) => setDoc({ ...doc, version: e.target.value })} maxLength={20} />}</Field>
           <Field label="Fecha de elaboración">{(i) => <Input id={i} type="date" value={doc.fechaElaboracion} onChange={(e) => setDoc({ ...doc, fechaElaboracion: e.target.value })} />}</Field>
           <Field label="Fecha de actualización">{(i) => <Input id={i} type="date" value={doc.fechaActualizacion} onChange={(e) => setDoc({ ...doc, fechaActualizacion: e.target.value })} />}</Field>
+          <Field label="Se llena todos los días" hint="Si a esa hora no se ha llenado, se avisa al jefe y a mantenimiento">
+            {(i) => (
+              <Select id={i} value={doc.recordarHora} onChange={(e) => setDoc({ ...doc, recordarHora: e.target.value })}>
+                <option value="">No avisar</option>
+                {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>Avisar si a las {String(h).padStart(2, '0')}:00 no se ha llenado</option>)}
+              </Select>
+            )}
+          </Field>
         </div>
         <p className="subtle-head" style={{ marginBottom: 0 }}>Preguntas</p>
         {items.map((it, k) => (

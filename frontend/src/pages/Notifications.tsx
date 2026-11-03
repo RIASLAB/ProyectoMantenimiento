@@ -14,7 +14,7 @@ const ICONO: Array<[RegExp, string]> = [
   [/^FALLA|^OT_/, 'wrench'], [/^COMPRA|^AUTORIZADOR/, 'cart'], [/^TEMPERATURA/, 'thermo'], [/^CHECKLIST/, 'clipboard'],
   [/^STOCK/, 'box'], [/^PREVENTIVO/, 'calendar'],
 ];
-const URGENTE = /^(FALLA_REPORTADA|TEMPERATURA_FUERA_DE_RANGO|STOCK_NEGATIVO|PREVENTIVO_VENCIDO)$/;
+const URGENTE = /^(FALLA_REPORTADA|TEMPERATURA_FUERA_DE_RANGO|STOCK_NEGATIVO|PREVENTIVO_VENCIDO|RONDA_ATRASADA|CALIBRACION_VENCIDA)$/;
 const icono = (tipo: string) => ICONO.find(([r]) => r.test(tipo))?.[1] ?? 'bell';
 
 /** Marca una notificación como leída sin esperar al servidor (también se usa al abrir un aviso del celular). */

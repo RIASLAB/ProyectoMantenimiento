@@ -13,6 +13,7 @@ import { PartDetail } from './pages/inventory/PartDetail';
 import { PartForm } from './pages/inventory/PartForm';
 import { PartsList } from './pages/inventory/PartsList';
 import { Login } from './pages/Login';
+import { ChangeCredential } from './pages/ChangeCredential';
 import { Pending } from './pages/Pending';
 import { Notifications } from './pages/Notifications';
 import { Indicators } from './pages/Indicators';
@@ -32,11 +33,13 @@ import { QualitySetup } from './pages/quality/QualitySetup';
 import { RecordTemperature } from './pages/quality/RecordTemperature';
 import { TemperatureRound } from './pages/quality/TemperatureRound';
 import { LightingList, LightingNew } from './pages/quality/Lighting';
+import { InstrumentDetailPage, InstrumentsList } from './pages/quality/Instruments';
 import { PrintAssetSheet } from './pages/print/PrintAssetSheet';
 import { PrintChecklist, PrintChecklistWeek } from './pages/print/PrintChecklist';
 import { PrintLighting } from './pages/print/PrintLighting';
 import { PrintOrder } from './pages/print/PrintOrder';
 import { PrintTemperatures } from './pages/print/PrintTemperatures';
+import { PrintMonthly } from './pages/print/PrintMonthly';
 
 /** Página de inicio según el rol: el autorizador llega directo a las compras por aprobar. */
 function Home() {
@@ -49,6 +52,8 @@ function RequireAuth({ children }: { children: ReactNode }) {
   const location = useLocation();
   if (loading) return <Spinner label="Verificando sesión…" />;
   if (!user) return <Navigate to="/ingresar" replace state={{ from: location.pathname }} />;
+  // Con la credencial que puso un administrador, primero se cambia (la API tampoco deja hacer nada más).
+  if (user.debeCambiarCredencial) return <ChangeCredential obligatorio />;
   return <>{children}</>;
 }
 
@@ -68,6 +73,7 @@ export function App() {
       <Route path="/imprimir/checklist/:id" element={<RequireAuth><PrintChecklist /></RequireAuth>} />
       <Route path="/calidad/semana" element={<RequireAuth><PrintChecklistWeek /></RequireAuth>} />
       <Route path="/calidad/planilla" element={<RequireAuth><PrintTemperatures /></RequireAuth>} />
+      <Route path="/calidad/paquete" element={<RequireAuth><PrintMonthly /></RequireAuth>} />
       <Route path="/calidad/iluminacion/:id" element={<RequireAuth><PrintLighting /></RequireAuth>} />
       <Route
         element={
@@ -79,6 +85,7 @@ export function App() {
         <Route index element={<Home />} />
         <Route path="pendientes" element={<Pending />} />
         <Route path="notificaciones" element={<Notifications />} />
+        <Route path="cuenta" element={<ChangeCredential />} />
         <Route path="compras" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><PurchasesList /></OnlyRoles>} />
         <Route path="compras/:id" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><PurchaseDetail /></OnlyRoles>} />
         <Route path="ordenes" element={<OrdersList />} />
@@ -89,6 +96,8 @@ export function App() {
         <Route path="calidad/temperatura" element={<RecordTemperature />} />
         <Route path="calidad/ronda" element={<TemperatureRound />} />
         <Route path="calidad/iluminacion" element={<LightingList />} />
+        <Route path="calidad/instrumentos" element={<InstrumentsList />} />
+        <Route path="calidad/instrumentos/:id" element={<InstrumentDetailPage />} />
         <Route path="calidad/iluminacion/nueva" element={<OnlyRoles roles={['ADMIN', 'TECNICO']}><LightingNew /></OnlyRoles>} />
         <Route path="calidad/checklist/:id" element={<FillChecklist />} />
         <Route path="calidad/configuracion" element={<OnlyRoles roles={['ADMIN']}><QualitySetup /></OnlyRoles>} />

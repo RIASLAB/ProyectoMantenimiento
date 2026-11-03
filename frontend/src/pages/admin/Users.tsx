@@ -76,8 +76,8 @@ function UserModal({ user, open, onClose }: { user: User | null; open: boolean; 
           label={`${pin ? 'PIN' : 'Contraseña'}${!editing || cambiaTipo ? ' *' : ''}`}
           hint={
             editing && !cambiaTipo
-              ? `Déjelo vacío para no cambiarlo. Si lo cambia, se desbloquea el usuario.`
-              : pin ? 'De 4 a 6 dígitos, no consecutivos ni repetidos.' : 'Mínimo 8 caracteres, con letras y números.'
+              ? `Déjelo vacío para no cambiarlo. Si lo cambia, se desbloquea el usuario y deberá cambiarlo al ingresar.`
+              : `${pin ? 'De 4 a 6 dígitos, no consecutivos ni repetidos.' : 'Mínimo 8 caracteres, con letras y números.'} Es temporal: la persona lo cambia al ingresar por primera vez.`
           }
         >
           {(i) => (

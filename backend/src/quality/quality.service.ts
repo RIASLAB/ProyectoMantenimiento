@@ -268,6 +268,7 @@ export class QualityService {
         nombre: dto.nombre.trim(), area: dto.area?.trim() || null, activoId: dto.activoId ?? null, descripcion: dto.descripcion?.trim() || null,
         codigo: dto.codigo?.trim() || null, version: dto.version?.trim() || null, fechaElaboracion: dto.fechaElaboracion || null,
         fechaActualizacion: dto.fechaActualizacion || null, recomendacion: dto.recomendacion?.trim() || null,
+        recordarHora: dto.recordarHora ?? null,
         items: this.normalizarItems(dto.items),
       });
       await this.audit.log({ usuarioId: actor.id, accion: 'PLANTILLA_CREADA', entidad: 'calidad', entidadId: p.id, detalle: { nombre: p.nombre, preguntas: p.items.length } }, em);
@@ -288,6 +289,7 @@ export class QualityService {
     if (dto.fechaElaboracion !== undefined) cambios.fechaElaboracion = dto.fechaElaboracion || null;
     if (dto.fechaActualizacion !== undefined) cambios.fechaActualizacion = dto.fechaActualizacion || null;
     if (dto.recomendacion !== undefined) cambios.recomendacion = dto.recomendacion?.trim() || null;
+    if (dto.recordarHora !== undefined) cambios.recordarHora = dto.recordarHora;
     if (dto.items) cambios.items = this.normalizarItems(dto.items);
     await this.ds.transaction(async (em) => {
       await em.getRepository(ChecklistTemplate).update(id, cambios as never);

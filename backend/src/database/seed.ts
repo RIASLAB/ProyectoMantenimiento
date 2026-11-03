@@ -22,13 +22,14 @@ import { MaintenancePlan, PlanPart, WorkOrder, WorkOrderEvent, WorkOrderPart } f
 import { hashCredencial } from '../users/credentials';
 import { User } from '../users/user.entity';
 import dataSource from './data-source';
+import { Calibration, Instrument } from '../instruments/instrument.entities';
 import { cargarFormatos } from './formatos/cargar';
 
-async function crearUsuario(ds: DataSource, nombre: string, usuario: string, rol: Rol, credencial: string) {
+async function crearUsuario(ds: DataSource, nombre: string, usuario: string, rol: Rol, credencial: string, debeCambiarCredencial = false) {
   const r = ds.getRepository(User);
   const existente = await r.findOne({ where: { usuario } });
   if (existente) return existente;
-  return r.save(r.create({ nombre, usuario, rol, ...(await hashCredencial(rol, credencial)) }));
+  return r.save(r.create({ nombre, usuario, rol, debeCambiarCredencial, ...(await hashCredencial(rol, credencial)) }));
 }
 
 async function main() {
@@ -37,7 +38,8 @@ async function main() {
 
   if ((await ds.getRepository(User).count()) === 0) {
     const pass = process.env.SEED_ADMIN_PASSWORD ?? `Cmms${randomBytes(6).toString('hex')}9`;
-    await crearUsuario(ds, 'Administrador', 'admin', Rol.ADMIN, pass);
+    // Con una contraseña generada, el administrador debe cambiarla al ingresar.
+    await crearUsuario(ds, 'Administrador', 'admin', Rol.ADMIN, pass, !process.env.SEED_ADMIN_PASSWORD);
     console.log('Usuario administrador creado: admin');
     if (!process.env.SEED_ADMIN_PASSWORD) console.log(`Contraseña generada (cámbiela al ingresar): ${pass}`);
   } else {
@@ -186,6 +188,19 @@ async function main() {
           { id: 'novedad', texto: 'Novedades del turno anterior', tipo: 'TEXTO', obligatorio: false },
         ],
       } as never);
+    }
+
+    // Instrumentos de medición: uno vigente, uno por vencer y uno vencido.
+    const dia = (dias: number) => new Date(Date.now() + dias * 86_400_000).toISOString().slice(0, 10);
+    for (const [codigo, nombre, tipo, area, fecha, vence] of [
+      ['TER-001', 'Termómetro de punzón digital', 'TERMOMETRO', 'Planta Desposte', dia(-345), dia(20)],
+      ['LUX-001', 'Luxómetro', 'LUXOMETRO', 'Mantenimiento', dia(-60), dia(305)],
+      ['BAS-001', 'Báscula de recepción de canales', 'BASCULA', 'Planta Pollo', dia(-200), dia(-17)],
+    ] as const) {
+      const inst = await ds.getRepository(Instrument).save({ codigo, nombre, tipo, area, frecuenciaMeses: tipo === 'BASCULA' ? 6 : 12, marca: tipo === 'LUXOMETRO' ? 'Extech' : null });
+      await ds.getRepository(Calibration).save({
+        instrumentoId: inst.id, fecha, venceEn: vence, laboratorio: 'Metrología del Valle', numeroCertificado: `MV-${codigo}`, resultado: 'APTO', usuarioId: admin.id,
+      });
     }
 
     // Los formatos reales de la planta (preoperacionales, hojas diarias, cuartos fríos, iluminación).

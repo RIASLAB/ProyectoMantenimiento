@@ -3,7 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { IS_PUBLIC, ROLES, SessionUser } from '../common/auth.decorators';
+import { IS_PUBLIC, ROLES, SessionUser, SIN_CAMBIO } from '../common/auth.decorators';
 import { Rol } from '../common/enums';
 import { User } from '../users/user.entity';
 
@@ -39,8 +39,13 @@ export class AuthGuard implements CanActivate {
     const user = await this.users.findOne({ where: { id: payload.sub } });
     if (!user || !user.activo) throw new UnauthorizedException('Usuario inactivo');
 
-    const session: SessionUser = { id: user.id, nombre: user.nombre, usuario: user.usuario, rol: user.rol };
+    const session: SessionUser = { id: user.id, nombre: user.nombre, usuario: user.usuario, rol: user.rol, debeCambiarCredencial: user.debeCambiarCredencial };
     req.user = session;
+
+    // Con una credencial puesta por otra persona solo se puede ver la sesión y cambiarla.
+    if (user.debeCambiarCredencial && !this.reflector.getAllAndOverride<boolean>(SIN_CAMBIO, targets)) {
+      throw new ForbiddenException('Debe cambiar su contraseña o PIN antes de continuar');
+    }
 
     const roles = this.reflector.getAllAndOverride<Rol[] | undefined>(ROLES, targets);
     if (roles && !roles.includes(user.rol)) {

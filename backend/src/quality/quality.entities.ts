@@ -160,6 +160,10 @@ export class ChecklistTemplate {
   @Column({ type: 'text', nullable: true })
   recomendacion: string | null;
 
+  /** Si se llena todos los días: a partir de esta hora (0-23) se avisa al jefe y a mantenimiento si aún no se ha hecho. */
+  @Column({ name: 'recordar_hora', type: 'int', nullable: true })
+  recordarHora: number | null;
+
   @Column({ type: 'jsonb' })
   items: ChecklistItem[];
 

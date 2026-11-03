@@ -8,6 +8,8 @@ export interface SessionUser {
   nombre: string;
   usuario: string;
   rol: Rol;
+  /** La contraseña o el PIN los puso un administrador: hay que cambiarlos antes de seguir. */
+  debeCambiarCredencial?: boolean;
 }
 
 export interface User extends SessionUser {
@@ -293,6 +295,7 @@ export interface ChecklistTemplateInfo {
   fechaElaboracion: string | null;
   fechaActualizacion: string | null;
   recomendacion: string | null;
+  recordarHora: number | null;
   items: ChecklistItemInfo[];
   vigente: boolean;
 }
@@ -337,6 +340,19 @@ export interface LightingSurveyDetail extends LightingSurvey {
     medicion1: number; medicion2: number; medicion3: number; media: number; cumple: boolean; planAccion: string | null; observaciones: string | null;
   }>;
 }
+
+export type TipoInstrumento = 'TERMOMETRO' | 'LUXOMETRO' | 'BASCULA' | 'MANOMETRO' | 'MULTIMETRO' | 'OTRO';
+export type EstadoCalibracion = 'VIGENTE' | 'POR_VENCER' | 'VENCIDA' | 'SIN_CALIBRAR' | 'NO_APTO';
+export interface InstrumentInfo {
+  id: string; codigo: string; nombre: string; tipo: TipoInstrumento; marca: string | null; modelo: string | null; serie: string | null;
+  area: string; ubicacion: string | null; rango: string | null; frecuenciaMeses: number; vigente: boolean; estado: EstadoCalibracion;
+  ultima?: { fecha: string; venceEn: string; resultado: 'APTO' | 'NO_APTO'; laboratorio: string } | null;
+}
+export interface CalibrationInfo {
+  id: string; fecha: string; venceEn: string; laboratorio: string; numeroCertificado: string | null; resultado: 'APTO' | 'NO_APTO';
+  observaciones: string | null; archivoNombre: string | null; archivoMime: string | null; usuario: PersonRef; creadoEn: string;
+}
+export interface InstrumentDetail extends InstrumentInfo { calibraciones: CalibrationInfo[] }
 
 export interface QualitySummary {
   temperaturas24h: number; desviaciones24h: number; checklists24h: number; checklistsNoConformes24h: number; puntosAtrasados: number;

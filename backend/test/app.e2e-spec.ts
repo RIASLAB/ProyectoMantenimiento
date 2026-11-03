@@ -32,9 +32,11 @@ async function login(usuario: string, credencial: string) {
   return r;
 }
 
-async function crearUsuario(nombre: string, usuario: string, rol: Rol, credencial: string) {
+/** Crea un usuario. Salvo que se pida, se omite el cambio obligatorio de credencial del primer ingreso (se prueba aparte). */
+async function crearUsuario(nombre: string, usuario: string, rol: Rol, credencial: string, primerIngreso = false) {
   const r = await http.post('/api/usuarios').set(auth(admin)).send({ nombre, usuario, rol, credencial });
   expect(r.status).toBe(201);
+  if (!primerIngreso) await app.get(DataSource).query('UPDATE usuarios SET debe_cambiar_credencial = false WHERE id = $1', [r.body.id]);
   return r.body.id as string;
 }
 
@@ -99,6 +101,41 @@ describe('SEG-01/02/06 · Inicio de sesión', () => {
   it('exige token en endpoints protegidos', async () => {
     expect((await http.get('/api/activos')).status).toBe(401);
     expect((await http.get('/api/activos').set(auth('token-falso'))).status).toBe(401);
+  });
+});
+
+describe('Primer ingreso: cambio obligatorio de la credencial puesta por el administrador', () => {
+  it('hasta cambiar el PIN solo puede ver su sesión; luego entra normal con el nuevo', async () => {
+    await crearUsuario('Técnico Nuevo', 'tnuevo', Rol.TECNICO, '5937', true);
+    const r = await login('tnuevo', '5937');
+    expect(r.status).toBe(200);
+    expect(r.body.usuario.debeCambiarCredencial).toBe(true);
+    const t = r.body.token;
+    expect((await http.get('/api/auth/yo').set(auth(t))).body).toMatchObject({ usuario: 'tnuevo', debeCambiarCredencial: true });
+    const bloqueado = await http.get('/api/ordenes').set(auth(t));
+    expect(bloqueado.status).toBe(403);
+    expect(bloqueado.body.message).toMatch(/Debe cambiar su contraseña o PIN/);
+
+    expect((await http.post('/api/auth/cambiar-credencial').set(auth(t)).send({ actual: '0000', nueva: '4682' })).status).toBe(400);
+    expect((await http.post('/api/auth/cambiar-credencial').set(auth(t)).send({ actual: '5937', nueva: '5937' })).body.message).toMatch(/distinto/);
+    expect((await http.post('/api/auth/cambiar-credencial').set(auth(t)).send({ actual: '5937', nueva: '1111' })).body.message).toMatch(/fácil de adivinar/);
+    const ok = await http.post('/api/auth/cambiar-credencial').set(auth(t)).send({ actual: '5937', nueva: '4682' });
+    expect(ok.status).toBe(200);
+    expect((await http.get('/api/ordenes').set(auth(t))).status).toBe(200);
+    expect((await login('tnuevo', '5937')).status).toBe(401);
+    const r2 = await login('tnuevo', '4682');
+    expect(r2.body.usuario.debeCambiarCredencial).toBe(false);
+  });
+
+  it('si el administrador restablece la credencial, se vuelve a pedir el cambio; la propia no', async () => {
+    const id = await crearUsuario('Auxiliar', 'auxiliar1', Rol.ADMIN, 'Auxiliar2026');
+    await http.patch(`/api/usuarios/${id}`).set(auth(admin)).send({ credencial: 'Temporal2026' }).expect(200);
+    expect((await login('auxiliar1', 'Temporal2026')).body.usuario.debeCambiarCredencial).toBe(true);
+    const tAux = (await login('auxiliar1', 'Temporal2026')).body.token;
+    await http.post('/api/auth/cambiar-credencial').set(auth(tAux)).send({ actual: 'Temporal2026', nueva: 'Propia2026x' }).expect(200);
+    // Un administrador que cambia su propia contraseña desde Usuarios no queda obligado a cambiarla otra vez.
+    await http.patch(`/api/usuarios/${id}`).set(auth(tAux)).send({ credencial: 'Propia2027x' }).expect(200);
+    expect((await login('auxiliar1', 'Propia2027x')).body.usuario.debeCambiarCredencial).toBe(false);
   });
 });
 

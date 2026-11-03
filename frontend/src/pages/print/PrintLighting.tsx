@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { LightingSurveyDetail } from '../../api/types';
-import { Firma, FormatHeader, Marca, PieSistema, PrintPage } from '../../components/print';
+import { FirmaCasilla, FormatHeader, Marca, PieSistema, PrintPage } from '../../components/print';
 import { date, qty } from '../../format';
 
 /** Medición de iluminación en el formato AC-PMT-MI01, con el resumen de límites permisibles. */
@@ -74,8 +74,8 @@ export function PrintLighting() {
           </table>
           {m.observaciones ? <p><strong>Observaciones:</strong> {m.observaciones}</p> : null}
           <div className="pfirmas dos">
-            <Firma cargo="Evaluador" nombre={m.evaluador} />
-            <Firma cargo="Revisó" />
+            <FirmaCasilla entidad="ILUMINACION" entidadId={m.id} casilla="EVALUADOR" cargo="Evaluador" nombre={m.evaluador} />
+            <FirmaCasilla entidad="ILUMINACION" entidadId={m.id} casilla="REVISO" cargo="Revisó" soloJefe />
           </div>
           <p className="ppie">Registró: {m.usuario.nombre}</p>
           <PieSistema />

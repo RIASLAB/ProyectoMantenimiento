@@ -12,7 +12,7 @@ interface Analisis {
   filas: number;
   validas: number;
   errores: ErrorFila[];
-  totales: { registros: number; porArea?: Record<string, number>; dadasDeBaja?: number; conStock?: number; unidades?: number; valor?: number };
+  totales: { registros: number; porArea?: Record<string, number>; dadasDeBaja?: number; instalaciones?: number; conStock?: number; unidades?: number; valor?: number };
   vistaPrevia: Array<Record<string, string | number | null> & { fila: number }>;
 }
 interface Resultado { tipo: Tipo; cargados: number; totales: Analisis['totales'] }
@@ -161,7 +161,7 @@ export function BulkImport() {
 function resumenTotales(tipo: Tipo, tot: Analisis['totales']) {
   if (tipo === 'maquinas') {
     const areas = Object.entries(tot.porArea ?? {}).map(([k, v]) => `${k}: ${v}`).join(' · ');
-    return [areas, tot.dadasDeBaja ? `${tot.dadasDeBaja} dada${tot.dadasDeBaja === 1 ? '' : 's'} de baja` : ''].filter(Boolean).join(' · ');
+    return [areas, tot.instalaciones ? `${tot.instalaciones} instalaci${tot.instalaciones === 1 ? 'ón' : 'ones'}` : '', tot.dadasDeBaja ? `${tot.dadasDeBaja} dada${tot.dadasDeBaja === 1 ? '' : 's'} de baja` : ''].filter(Boolean).join(' · ');
   }
   return `${tot.conStock ?? 0} con stock inicial · ${qty(tot.unidades ?? 0)} unidades · valor ${money(tot.valor ?? 0)}`;
 }

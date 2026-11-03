@@ -107,7 +107,10 @@ describe('COM-03/04/05 · Aprobación', () => {
     expect(propia.status).toBe(201);
     await c.http.patch(`/api/usuarios/${tec.id}`).set(c.auth(c.admin)).send({ rol: 'AUTORIZADOR', credencial: 'Ascendido2026' }).expect(200);
     await c.http.put('/api/parametros/autorizador').set(c.auth(c.admin)).send({ usuarioId: tec.id }).expect(200);
-    const t = await c.login('tec', 'Ascendido2026');
+    // Le restablecieron la credencial: primero la cambia.
+    const temporal = await c.login('tec', 'Ascendido2026');
+    await c.http.post('/api/auth/cambiar-credencial').set(c.auth(temporal)).send({ actual: 'Ascendido2026', nueva: 'Ascendido2027' }).expect(200);
+    const t = await c.login('tec', 'Ascendido2027');
     const r = await c.http.post(`/api/compras/${propia.body.id}/aprobar`).set(c.auth(t));
     expect(r.status).toBe(403);
     expect(r.body.message).toMatch(/hecha por usted/);

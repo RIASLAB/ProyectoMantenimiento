@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { WorkOrderDetail } from '../../api/types';
 import { useProtectedImage } from '../../components/orders-shared';
-import { Firma, FormatHeader, Marca, PieSistema, PrintPage, useFormatos } from '../../components/print';
+import { FirmaCasilla, FormatHeader, Marca, PieSistema, PrintPage, useFormatos } from '../../components/print';
 import { dateTime, money, ORDEN_ESTADO_LABEL, PRIORIDAD_LABEL, qty, VERIFICACIONES_CIERRE } from '../../format';
 
 function Foto({ id, momento }: { id: string; momento: string }) {
@@ -111,9 +111,9 @@ export function PrintOrder() {
             </>
           ) : null}
           <div className="pfirmas">
-            <Firma cargo="Responsable del reporte" nombre={d.reportadoPor?.nombre ?? (d.plan ? `Preventivo: ${d.plan.nombre}` : null)} />
-            <Firma cargo="Jefe de mantenimiento" />
-            <Firma cargo="Líder de área" />
+            <FirmaCasilla entidad="OT" entidadId={d.id} casilla="RESPONSABLE" cargo="Responsable del reporte" nombre={d.reportadoPor?.nombre ?? null} />
+            <FirmaCasilla entidad="OT" entidadId={d.id} casilla="JEFE_MANTENIMIENTO" cargo="Jefe de mantenimiento" soloJefe />
+            <FirmaCasilla entidad="OT" entidadId={d.id} casilla="LIDER_AREA" cargo="Líder de área" />
           </div>
           <p className="ppie">Técnico: {d.asignadoA?.nombre ?? '—'}{d.cerradaPor ? ` · Cerró: ${d.cerradaPor.nombre}` : ''}</p>
           <PieSistema />

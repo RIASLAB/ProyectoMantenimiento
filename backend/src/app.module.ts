@@ -27,6 +27,8 @@ import { NotificationsService } from './notifications/notifications.service';
 import { PurchasesController } from './purchases/purchases.controller';
 import { PurchasesService } from './purchases/purchases.service';
 import { LightingController } from './lighting/lighting.controller';
+import { SignaturesController, SignaturesService } from './signatures/signatures';
+import { InstrumentsController, InstrumentsService } from './instruments/instruments';
 import { LightingService } from './lighting/lighting.service';
 import { QualityController } from './quality/quality.controller';
 import { QualityService } from './quality/quality.service';
@@ -66,11 +68,11 @@ class HealthController {
   ],
   controllers: [
     HealthController, AuthController, UsersController, SettingsController, AuditController,
-    AssetHistoryController, AssetsController, SparePartsController, InventoryController, WorkOrdersController, PlansController, PurchasesController, QualityController, NotificationsController, KpiController, ImportController, EquipmentController, LightingController,
+    AssetHistoryController, AssetsController, SparePartsController, InventoryController, WorkOrdersController, PlansController, PurchasesController, QualityController, NotificationsController, KpiController, ImportController, EquipmentController, LightingController, SignaturesController, InstrumentsController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: AuthGuard },
-    AuthService, UsersService, SettingsService, AuditService, AssetsService, InventoryService, MaintenanceService, PurchasesService, QualityService, NotificationsService, KpiService, ImportService, EquipmentService, LightingService,
+    AuthService, UsersService, SettingsService, AuditService, AssetsService, InventoryService, MaintenanceService, PurchasesService, QualityService, NotificationsService, KpiService, ImportService, EquipmentService, LightingService, SignaturesService, InstrumentsService,
   ],
 })
 export class AppModule {}

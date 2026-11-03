@@ -1,5 +1,8 @@
 import { randomUUID } from 'crypto';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, IsNull } from 'typeorm';
+
+/** Hora local a partir de la cual se avisa que falta el preoperatorio diario. */
+export const HORA_RECORDAR_DIARIA = 9;
 import { Asset } from '../../assets/asset.entity';
 import { AuditLog } from '../../audit/audit-log.entity';
 import { ClaseActivo } from '../../common/enums';
@@ -47,6 +50,10 @@ export async function cargarFormatos(ds: DataSource, usuarioId: string | null = 
     // Checklists (preoperacionales, hojas diarias y tableros).
     for (const f of [...PREOPERACIONALES, ...HOJAS_DIARIAS, TABLEROS_ELECTRICOS]) {
       if (await crearPlantilla(em, f)) r.plantillas++;
+    }
+    // Las hojas diarias de cada planta avisan a las 9 a. m. si no se han llenado (solo si nadie configuró otra hora).
+    for (const f of HOJAS_DIARIAS) {
+      await em.getRepository(ChecklistTemplate).update({ nombre: f.nombre, recordarHora: IsNull() }, { recordarHora: HORA_RECORDAR_DIARIA });
     }
 
     // Cuartos fríos y áreas: cada uno es una instalación con su punto de temperatura cada 3 horas.

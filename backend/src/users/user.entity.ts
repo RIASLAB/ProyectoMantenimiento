@@ -36,6 +36,10 @@ export class User {
   @Column({ name: 'bloqueado_hasta', type: 'timestamptz', nullable: true })
   bloqueadoHasta: Date | null;
 
+  /** La contraseña o el PIN los puso un administrador: hay que cambiarlos al ingresar. */
+  @Column({ name: 'debe_cambiar_credencial', default: false })
+  debeCambiarCredencial: boolean;
+
   @CreateDateColumn({ name: 'creado_en', type: 'timestamptz' })
   creadoEn: Date;
 

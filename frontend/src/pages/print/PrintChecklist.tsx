@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { api, qs } from '../../api/client';
 import type { Asset, ChecklistItemInfo, ChecklistRecordInfo, ChecklistTemplateInfo } from '../../api/types';
-import { Firma, FormatHeader, PieSistema, PrintPage } from '../../components/print';
+import { FirmaCasilla, FormatHeader, PieSistema, PrintPage } from '../../components/print';
 import { Input, Select } from '../../components/ui';
 import { dateTime, ESCALA, valorChecklist } from '../../format';
 import { useUrlFilters } from '../../hooks';
@@ -18,37 +18,25 @@ function lunes(fecha?: string) {
 }
 const masDias = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 const formatoDe = (t?: ChecklistTemplateInfo | null) => (t ? { codigo: t.codigo ?? undefined, version: t.version ?? undefined, fechaElaboracion: t.fechaElaboracion, fechaActualizacion: t.fechaActualizacion } : null);
+export const lunesDe = (fecha: string) => lunes(fecha);
+export const isoFecha = (d: Date) => iso(d);
 const leyenda = (items: ChecklistItemInfo[]) => {
   if (items.some((i) => i.tipo === 'ESCALA')) return 'B: Bueno · R: Regular · M: Malo · No: No tiene · NA: No aplica';
   if (items.some((i) => i.tipo === 'SI_NO' && i.etiqueta === 'C_NC')) return 'C: Cumple · NC: No cumple · NA: No aplica';
   return '';
 };
 
-/**
- * Preoperacional de una máquina en la semana (lunes a domingo), como el formato en papel:
- * una columna por día con la calificación de cada punto y quién lo hizo.
- */
-export function PrintChecklistWeek() {
-  const [f, set] = useUrlFilters(['plantilla', 'activo', 'semana'] as const);
-  const inicio = lunes(f.semana || undefined);
+/** Una semana de un preoperacional (también la usa el paquete mensual). */
+export function HojaSemana({ t, activo, inicio, regs }: { t: ChecklistTemplateInfo; activo: Asset | null; inicio: Date; regs: ChecklistRecordInfo[] }) {
   const fin = masDias(inicio, 6);
-  const plantillas = useQuery({ queryKey: ['calidad', 'plantillas'], queryFn: () => api.get<ChecklistTemplateInfo[]>('/calidad/plantillas') });
-  const activos = useQuery({ queryKey: ['activos', '', '', ''], queryFn: () => api.get<Asset[]>('/activos') });
-  const t = useQuery({ queryKey: ['calidad', 'plantilla', f.plantilla], queryFn: () => api.get<ChecklistTemplateInfo>(`/calidad/plantillas/${f.plantilla}`), enabled: !!f.plantilla });
-  const regs = useQuery({
-    queryKey: ['calidad', 'checklists', 'semana', f.plantilla, f.activo, iso(inicio)],
-    queryFn: () => api.get<ChecklistRecordInfo[]>(`/calidad/checklists${qs({ plantillaId: f.plantilla, activoId: f.activo || undefined, desde: iso(inicio), hasta: iso(fin) })}`),
-    enabled: !!f.plantilla,
-  });
-  const activo = activos.data?.find((a) => a.id === f.activo) ?? null;
   // El último registro válido de cada día.
   const porDia: Array<ChecklistRecordInfo | null> = DIAS.map(() => null);
-  for (const r of [...(regs.data ?? [])].filter((r) => !r.anulacion).reverse()) {
+  for (const r of [...regs].filter((r) => !r.anulacion).reverse()) {
     const d = new Date(r.registradoEn);
     const k = Math.round((new Date(iso(d) + 'T12:00:00').getTime() - inicio.getTime()) / 86_400_000);
     if (k >= 0 && k < 7) porDia[k] = r;
   }
-  const items = t.data?.items ?? [];
+  const items = t.items;
   const notas: string[] = [];
   porDia.forEach((r, k) => {
     if (!r) return;
@@ -57,29 +45,9 @@ export function PrintChecklistWeek() {
     if (partes.length) notas.push(`${DIAS[k]}: ${partes.join(' · ')}`);
   });
   let n = 0;
-
-  const controles = (
-    <>
-      <Select value={f.plantilla} onChange={(e) => set('plantilla', e.target.value)} aria-label="Formato">
-        <option value="">Elija el formato…</option>
-        {plantillas.data?.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-      </Select>
-      <Select value={f.activo} onChange={(e) => set('activo', e.target.value)} aria-label="Máquina">
-        <option value="">Todas las máquinas</option>
-        {activos.data?.filter((a) => a.clase === 'EQUIPO').map((a) => <option key={a.id} value={a.id}>{a.codigo} · {a.nombre}</option>)}
-      </Select>
-      <button type="button" className="btn btn-ghost" aria-label="Semana anterior" onClick={() => set('semana', iso(masDias(inicio, -7)))}>‹</button>
-      <Input type="date" value={iso(inicio)} onChange={(e) => set('semana', e.target.value)} aria-label="Semana del" />
-      <button type="button" className="btn btn-ghost" aria-label="Semana siguiente" onClick={() => set('semana', iso(masDias(inicio, 7)))}>›</button>
-    </>
-  );
-
   return (
-    <PrintPage titulo={t.data ? `${t.data.nombre} · semana ${iso(inicio)}` : 'Preoperacional semanal'} controles={controles} horizontal
-      loading={!!f.plantilla && (t.isPending || regs.isPending)} error={t.error ?? regs.error}>
-      {!f.plantilla ? <p>Elija el formato (y la máquina) para ver la semana.</p> : t.data ? (
-        <>
-          <FormatHeader titulo={t.data.nombre} formato={formatoDe(t.data)} />
+    <>
+          <FormatHeader titulo={t.nombre} formato={formatoDe(t)} />
           <table>
             <tbody>
               <tr>
@@ -88,7 +56,7 @@ export function PrintChecklistWeek() {
                 <td><span className="plabel">MODELO:</span> {activo?.modelo ?? ''}</td>
               </tr>
               <tr>
-                <td><span className="plabel">UBICACIÓN:</span> {activo ? [activo.area, activo.ubicacion].filter(Boolean).join(' · ') : t.data.area ?? ''}</td>
+                <td><span className="plabel">UBICACIÓN:</span> {activo ? [activo.area, activo.ubicacion].filter(Boolean).join(' · ') : t.area ?? ''}</td>
                 <td><span className="plabel">PERIODICIDAD DE USO:</span> DIARIO</td>
                 <td><span className="plabel">ESTADO DEL EQUIPO:</span> {activo ? (activo.estado === 'OPERATIVO' ? 'Operativo' : activo.estado.replace(/_/g, ' ').toLowerCase()) : ''}</td>
               </tr>
@@ -122,7 +90,7 @@ export function PrintChecklistWeek() {
             </tbody>
           </table>
           <p style={{ fontSize: '8.5pt' }}>{leyenda(items)}{items.some((i) => i.tipo !== 'SECCION') ? ' · ¹ con observación' : ''}</p>
-          {t.data.recomendacion ? <p><strong>Recomendación:</strong> {t.data.recomendacion}</p> : null}
+          {t.recomendacion ? <p><strong>Recomendación:</strong> {t.recomendacion}</p> : null}
           <table>
             <tbody>
               <tr><th>OBSERVACIONES</th></tr>
@@ -130,6 +98,50 @@ export function PrintChecklistWeek() {
             </tbody>
           </table>
           <PieSistema />
+    </>
+  );
+}
+
+/**
+ * Preoperacional de una máquina en la semana (lunes a domingo), como el formato en papel:
+ * una columna por día con la calificación de cada punto y quién lo hizo.
+ */
+export function PrintChecklistWeek() {
+  const [f, set] = useUrlFilters(['plantilla', 'activo', 'semana'] as const);
+  const inicio = lunes(f.semana || undefined);
+  const fin = masDias(inicio, 6);
+  const plantillas = useQuery({ queryKey: ['calidad', 'plantillas'], queryFn: () => api.get<ChecklistTemplateInfo[]>('/calidad/plantillas') });
+  const activos = useQuery({ queryKey: ['activos', '', '', ''], queryFn: () => api.get<Asset[]>('/activos') });
+  const t = useQuery({ queryKey: ['calidad', 'plantilla', f.plantilla], queryFn: () => api.get<ChecklistTemplateInfo>(`/calidad/plantillas/${f.plantilla}`), enabled: !!f.plantilla });
+  const regs = useQuery({
+    queryKey: ['calidad', 'checklists', 'semana', f.plantilla, f.activo, iso(inicio)],
+    queryFn: () => api.get<ChecklistRecordInfo[]>(`/calidad/checklists${qs({ plantillaId: f.plantilla, activoId: f.activo || undefined, desde: iso(inicio), hasta: iso(fin) })}`),
+    enabled: !!f.plantilla,
+  });
+  const activo = activos.data?.find((a) => a.id === f.activo) ?? null;
+
+  const controles = (
+    <>
+      <Select value={f.plantilla} onChange={(e) => set('plantilla', e.target.value)} aria-label="Formato">
+        <option value="">Elija el formato…</option>
+        {plantillas.data?.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+      </Select>
+      <Select value={f.activo} onChange={(e) => set('activo', e.target.value)} aria-label="Máquina">
+        <option value="">Todas las máquinas</option>
+        {activos.data?.filter((a) => a.clase === 'EQUIPO').map((a) => <option key={a.id} value={a.id}>{a.codigo} · {a.nombre}</option>)}
+      </Select>
+      <button type="button" className="btn btn-ghost" aria-label="Semana anterior" onClick={() => set('semana', iso(masDias(inicio, -7)))}>‹</button>
+      <Input type="date" value={iso(inicio)} onChange={(e) => set('semana', e.target.value)} aria-label="Semana del" />
+      <button type="button" className="btn btn-ghost" aria-label="Semana siguiente" onClick={() => set('semana', iso(masDias(inicio, 7)))}>›</button>
+    </>
+  );
+
+  return (
+    <PrintPage titulo={t.data ? `${t.data.nombre} · semana ${iso(inicio)}` : 'Preoperacional semanal'} controles={controles} horizontal
+      loading={!!f.plantilla && (t.isPending || regs.isPending)} error={t.error ?? regs.error}>
+      {!f.plantilla ? <p>Elija el formato (y la máquina) para ver la semana.</p> : t.data ? (
+        <>
+          <HojaSemana t={t.data} activo={activo} inicio={inicio} regs={regs.data ?? []} />
         </>
       ) : null}
     </PrintPage>
@@ -212,8 +224,8 @@ export function PrintChecklist() {
             </tbody>
           </table>
           <div className="pfirmas dos">
-            <Firma cargo="Realizó" nombre={r.usuario.nombre} />
-            <Firma cargo="Verificó (jefe de área)" />
+            <FirmaCasilla entidad="CHECKLIST" entidadId={r.id} casilla="REALIZO" cargo="Realizó" nombre={r.usuario.nombre} />
+            <FirmaCasilla entidad="CHECKLIST" entidadId={r.id} casilla="VERIFICO" cargo="Verificó (jefe de área)" />
           </div>
           <PieSistema />
         </>

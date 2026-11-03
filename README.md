@@ -29,6 +29,11 @@ Sistema de mantenimiento e inventario de repuestos: hoja de vida de máquinas, m
 | Inventario de equipos: máquinas compradas en bodega sin instalar, instalar desde el inventario | ✅ |
 | Formatos de la planta: preoperacionales B/R/M/NA (13 máquinas) y hojas diarias C/NC por planta, ronda y planilla de temperaturas de 55 cuartos fríos con su verificación, verificaciones de entrega de la OT, mantenimiento locativo, hoja de vida completa y medición de iluminación | ✅ |
 | Impresión / PDF de los formatos con logo, código y versión (OT, hoja de vida, preoperacional semanal, checklist, planilla de temperaturas, iluminación) | ✅ |
+| Firma en la pantalla (dedo o lápiz) en los formatos: OT, checklists, planilla de temperaturas e iluminación | ✅ |
+| Avisos de rondas de temperatura atrasadas y de hojas diarias sin llenar, dentro del horario de producción | ✅ |
+| Calibración de instrumentos de medición con certificado, vencimientos y avisos | ✅ |
+| Paquete mensual para auditoría por planta (un solo PDF) | ✅ |
+| Cambio obligatorio de contraseña o PIN al primer ingreso; tope de intentos fallidos por equipo | ✅ |
 | Producción con Docker y HTTPS, respaldos diarios cifrados con prueba de restauración | ✅ Sprint 3 |
 
 ### Roles en el área de mantenimiento
@@ -101,9 +106,9 @@ cd backend
 npm run test:e2e
 ```
 
-Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **198 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
+Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **217 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
 
-Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**103 verificaciones**):
+Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**108 verificaciones**):
 
 | Script | Qué recorre |
 |---|---|
@@ -112,6 +117,7 @@ Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritori
 | `e2e/compras.py` | Faltante automático → autorizador aprueba/rechaza → admin compra y recibe en bodega |
 | `e2e/calidad.py` | Temperatura fuera de rango, checklist con no conformidad, anulación, exportación, configuración |
 | `e2e/equipos_en_bodega.py` | Inventario de equipos sin instalar: 5 molinos con 2 en bodega, instalar, conteo por área y guardar en bodega |
+| `e2e/mejoras_operacion.py` | PIN temporal que se cambia al primer ingreso, firma del jefe y del líder de área en el formato de OT (PDF), calibración con certificado, recordatorio diario y paquete mensual |
 | `e2e/formatos_planta.py` | Formatos de la planta: preoperacional B/R/M y su semana, hoja diaria C/NC, ronda y planilla de temperaturas con verificación, cierre de OT con verificaciones de entrega (celular), hoja de vida, iluminación y versión del formato en el PDF |
 | `e2e/lista_materiales.py` | Lista de materiales editable desde la ficha de la máquina: quitar, agregar y vaciar; el cambio aplica a todo el tipo |
 | `e2e/tipos_equipo.py` | Tipos de equipo con lista de materiales, 3 aires iguales de una vez, cuántos hay en Bodega, preventivo por tipo y materiales en correctivos |
@@ -129,7 +135,8 @@ Todas las rutas van bajo `/api` y requieren `Authorization: Bearer <token>`, sal
 
 | Método y ruta | Rol | Descripción |
 |---|---|---|
-| `POST /auth/login` | Público | `{ usuario, credencial }`: contraseña (Admin/Autorizador) o PIN (Técnico/Operario) |
+| `POST /auth/login` | Público | `{ usuario, credencial }`: contraseña (Admin/Autorizador) o PIN (Técnico/Operario). Tras 30 intentos fallidos desde el mismo equipo responde 429 por 15 min |
+| `POST /auth/cambiar-credencial` | Todos | `{ actual, nueva }`: cambia la propia contraseña o PIN (obligatorio si la puso un administrador) |
 | `GET /auth/yo` | Todos | Usuario de la sesión |
 | `GET/POST /usuarios`, `PATCH /usuarios/:id` | Admin | Gestión de usuarios |
 | `GET/PUT /parametros/autorizador` | Todos / Admin | Autorizador de compras vigente |
@@ -164,6 +171,10 @@ Todas las rutas van bajo `/api` y requieren `Authorization: Bearer <token>`, sal
 | `GET /calidad/planilla`, `GET /calidad/planilla/areas` | Todos | Planilla diaria de temperaturas de una planta (franjas de 3 horas, Realizó/Verificó) |
 | `POST /calidad/planilla/verificar` | Admin, Autorizador | "Verificó" de la planilla del día |
 | `GET /iluminacion/recintos` · `puntos`, `POST/PATCH` | Todos / Admin | Tipos de recinto (lux mín.-prom.-máx.) y puntos de medición |
+| `GET/POST /firmas` | Todos (las del jefe: Admin, Autorizador) | Firmas en pantalla de los formatos; una por casilla, no se cambian |
+| `GET /instrumentos`, `GET /instrumentos/:id`, `POST/PATCH` | Todos / Admin | Instrumentos de medición con el estado de su calibración |
+| `POST /instrumentos/:id/calibraciones` | Admin, Técnico | Calibración con certificado (PDF o foto) |
+| `GET /instrumentos/calibraciones/:id/certificado` | Todos | Descargar el certificado |
 | `GET/POST /iluminacion/mediciones`, `GET /iluminacion/mediciones/:id` | Todos / Admin, Técnico | Mediciones de iluminación |
 | `POST /calidad/anulaciones` | Admin | Anular un registro con motivo |
 | `GET /calidad/exportar/temperaturas` · `checklists` | Admin, Autorizador | CSV para auditoría |

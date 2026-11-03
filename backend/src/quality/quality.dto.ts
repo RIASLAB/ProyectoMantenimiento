@@ -116,6 +116,10 @@ export class CreateTemplateDto {
 
   @IsOptional() @IsString() @MaxLength(1000)
   recomendacion?: string | null;
+
+  /** Checklist diario: hora (0-23) desde la que se avisa si no se ha llenado. */
+  @IsOptional() @ValidateIf((_, v) => v !== null) @Type(() => Number) @IsInt() @Min(0) @Max(23)
+  recordarHora?: number | null;
 }
 
 export class UpdateTemplateDto {
@@ -151,6 +155,9 @@ export class UpdateTemplateDto {
 
   @IsOptional() @IsString() @MaxLength(1000)
   recomendacion?: string | null;
+
+  @IsOptional() @ValidateIf((_, v) => v !== null) @Type(() => Number) @IsInt() @Min(0) @Max(23)
+  recordarHora?: number | null;
 }
 
 export class AnswerDto {

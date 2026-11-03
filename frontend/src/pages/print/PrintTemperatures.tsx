@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { api, qs } from '../../api/client';
 import type { PlanillaTemperaturas } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
-import { Firma, FormatHeader, PieSistema, PrintPage } from '../../components/print';
+import { FirmaCasilla, FormatHeader, PieSistema, PrintPage } from '../../components/print';
 import { Button, ErrorBox, Field, Input, Modal, Select, Textarea } from '../../components/ui';
 import { dateTime, qty, rangoTexto } from '../../format';
 import { useUrlFilters } from '../../hooks';
@@ -22,52 +22,17 @@ const PARAMETROS = [
   'Subproductos y devoluciones: −2 a 6 °C',
 ];
 
-/**
- * Planilla diaria de temperaturas de una planta (AC-PMT-FR01/FR02): una fila por franja de 3 horas y una columna por cuarto,
- * con quién registró (Realizó) y la verificación del jefe (Verificó).
- */
-export function PrintTemperatures() {
-  const { can } = useAuth();
-  const qc = useQueryClient();
-  const [f, set] = useUrlFilters(['area', 'fecha'] as const);
-  const fecha = f.fecha || hoyLocal();
-  const [verificar, setVerificar] = useState(false);
-  const [obs, setObs] = useState('');
-  const areas = useQuery({ queryKey: ['calidad', 'planilla', 'areas'], queryFn: () => api.get<string[]>('/calidad/planilla/areas') });
-  const area = f.area || areas.data?.[0] || '';
-  const q = useQuery({
-    queryKey: ['calidad', 'planilla', area, fecha],
-    queryFn: () => api.get<PlanillaTemperaturas>(`/calidad/planilla${qs({ area, fecha })}`),
-    enabled: !!area,
-  });
-  const v = useMutation({
-    mutationFn: () => api.post('/calidad/planilla/verificar', { fecha, area, observaciones: obs || undefined }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['calidad', 'planilla'] }); setVerificar(false); setObs(''); },
-  });
-  const p = q.data;
+/** Una planilla diaria (también la usa el paquete mensual). */
+export function HojaTemperaturas({ p, fecha, claveFirma }: { p: PlanillaTemperaturas; fecha: string; claveFirma: string }) {
   // Última lectura de cada punto en cada franja.
   const celda = new Map<string, PlanillaTemperaturas['lecturas'][number]>();
-  for (const l of p?.lecturas ?? []) celda.set(`${l.puntoId}:${l.franja}`, l);
+  for (const l of p.lecturas) celda.set(`${l.puntoId}:${l.franja}`, l);
   const grupos: Array<PlanillaTemperaturas['puntos']> = [];
-  for (let i = 0; i < (p?.puntos.length ?? 0); i += POR_TABLA) grupos.push(p!.puntos.slice(i, i + POR_TABLA));
-  const desviaciones = (p?.lecturas ?? []).filter((l) => l.fueraDeRango || l.accionCorrectiva);
-  const nombrePunto = (id: string) => p?.puntos.find((x) => x.id === id)?.activo.nombre ?? '';
-
-  const controles = (
-    <>
-      <Select value={area} onChange={(e) => set('area', e.target.value)} aria-label="Planta o área">
-        {areas.data?.map((a) => <option key={a} value={a}>{a}</option>)}
-      </Select>
-      <Input type="date" value={fecha} max={hoyLocal()} onChange={(e) => set('fecha', e.target.value)} aria-label="Fecha" />
-      <Link className="btn btn-ghost" to={`/calidad/ronda?area=${encodeURIComponent(area)}`}>Registrar ronda</Link>
-      {can('ADMIN', 'AUTORIZADOR') && p && !p.verificacion && p.lecturas.length ? <Button variant="secondary" onClick={() => setVerificar(true)}>Verificar planilla</Button> : null}
-    </>
-  );
-
+  for (let i = 0; i < p.puntos.length; i += POR_TABLA) grupos.push(p.puntos.slice(i, i + POR_TABLA));
+  const desviaciones = p.lecturas.filter((l) => l.fueraDeRango || l.accionCorrectiva);
+  const nombrePunto = (id: string) => p.puntos.find((x) => x.id === id)?.activo.nombre ?? '';
   return (
-    <PrintPage titulo={`Temperaturas ${area} ${fecha}`} controles={controles} horizontal loading={areas.isPending || (!!area && q.isPending)} error={areas.error ?? q.error}>
-      {!area ? <p>No hay puntos de control de temperatura configurados.</p> : p ? (
-        <>
+    <>
           <FormatHeader titulo={`Nutrialimentos Cárnicos S.A.S. · Registro de temperatura de cuartos fríos y áreas · ${p.area}`} formato={p.formato} />
           <p><span className="plabel">FECHA:</span> {fecha.split('-').reverse().join('/')}</p>
           {grupos.map((g, gi) => (
@@ -105,12 +70,60 @@ export function PrintTemperatures() {
           </table>
           <p style={{ fontSize: '8pt' }}>* Fuera del rango permitido. Si en una franja hay varias lecturas se muestra la última.</p>
           <div className="pfirmas dos">
-            <Firma cargo="Realizó" nombre={p.realizadoPor.join(', ') || null} />
-            <Firma cargo="Verificó" nombre={p.verificacion ? `${p.verificacion.usuario} · ${dateTime(p.verificacion.creadoEn)}` : null} />
+            <FirmaCasilla entidad="PLANILLA" entidadId={claveFirma} casilla="REALIZO" cargo="Realizó" nombre={p.realizadoPor.join(', ') || null} />
+            <FirmaCasilla entidad="PLANILLA" entidadId={claveFirma} casilla="VERIFICO" cargo="Verificó" soloJefe
+              nombre={p.verificacion ? `${p.verificacion.usuario} · ${dateTime(p.verificacion.creadoEn)}` : null} />
           </div>
           <h3>Parámetros de temperatura</h3>
           <p style={{ fontSize: '8.5pt' }}>{PARAMETROS.join(' · ')}</p>
           <PieSistema />
+    </>
+  );
+}
+
+/**
+ * Planilla diaria de temperaturas de una planta (AC-PMT-FR01/FR02): una fila por franja de 3 horas y una columna por cuarto,
+ * con quién registró (Realizó) y la verificación del jefe (Verificó).
+ */
+export function PrintTemperatures() {
+  const { can } = useAuth();
+  const qc = useQueryClient();
+  const [f, set] = useUrlFilters(['area', 'fecha'] as const);
+  const fecha = f.fecha || hoyLocal();
+  const [verificar, setVerificar] = useState(false);
+  const [obs, setObs] = useState('');
+  const areas = useQuery({ queryKey: ['calidad', 'planilla', 'areas'], queryFn: () => api.get<string[]>('/calidad/planilla/areas') });
+  const area = f.area || areas.data?.[0] || '';
+  const q = useQuery({
+    queryKey: ['calidad', 'planilla', area, fecha],
+    queryFn: () => api.get<PlanillaTemperaturas>(`/calidad/planilla${qs({ area, fecha })}`),
+    enabled: !!area,
+  });
+  const v = useMutation({
+    mutationFn: () => api.post('/calidad/planilla/verificar', { fecha, area, observaciones: obs || undefined }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['calidad', 'planilla'] }); setVerificar(false); setObs(''); },
+  });
+  const p = q.data;
+  // La firma de la planilla se guarda con el área tal como está registrada.
+  const claveFirma = p ? `${fecha}|${areas.data?.find((x) => x.toLowerCase() === p.area.toLowerCase()) ?? p.area}` : '';
+  const desviaciones = (p?.lecturas ?? []).filter((l) => l.fueraDeRango || l.accionCorrectiva);
+
+  const controles = (
+    <>
+      <Select value={area} onChange={(e) => set('area', e.target.value)} aria-label="Planta o área">
+        {areas.data?.map((a) => <option key={a} value={a}>{a}</option>)}
+      </Select>
+      <Input type="date" value={fecha} max={hoyLocal()} onChange={(e) => set('fecha', e.target.value)} aria-label="Fecha" />
+      <Link className="btn btn-ghost" to={`/calidad/ronda?area=${encodeURIComponent(area)}`}>Registrar ronda</Link>
+      {can('ADMIN', 'AUTORIZADOR') && p && !p.verificacion && p.lecturas.length ? <Button variant="secondary" onClick={() => setVerificar(true)}>Verificar planilla</Button> : null}
+    </>
+  );
+
+  return (
+    <PrintPage titulo={`Temperaturas ${area} ${fecha}`} controles={controles} horizontal loading={areas.isPending || (!!area && q.isPending)} error={areas.error ?? q.error}>
+      {!area ? <p>No hay puntos de control de temperatura configurados.</p> : p ? (
+        <>
+          <HojaTemperaturas p={p} fecha={fecha} claveFirma={claveFirma} />
         </>
       ) : null}
       <Modal open={verificar} title="Verificar planilla" onClose={() => setVerificar(false)}
