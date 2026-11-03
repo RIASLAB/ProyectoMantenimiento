@@ -36,7 +36,9 @@ export class SettingsService {
   async setAutorizador(usuarioId: string, actor: SessionUser) {
     const u = await this.users.findOne({ where: { id: usuarioId } });
     if (!u || !u.activo) throw new BadRequestException('El usuario no existe o está inactivo');
-    if (u.rol !== Rol.AUTORIZADOR) throw new BadRequestException('El autorizador debe tener el rol Autorizador');
+    // D-25: puede ser alguien de dirección (rol Autorizador) o el jefe de mantenimiento (Administrador).
+    // Aunque haya varios administradores, solo el autorizador vigente decide las compras.
+    if (u.rol !== Rol.AUTORIZADOR && u.rol !== Rol.ADMIN) throw new BadRequestException('El autorizador debe tener el rol Autorizador o Administrador');
 
     await this.ds.transaction(async (em) => {
       const r = em.getRepository(Setting);

@@ -81,7 +81,8 @@ function Autorizador() {
   const [sel, setSel] = useState('');
   useEffect(() => setSel(actual.data?.autorizador?.id ?? ''), [actual.data]);
 
-  const candidatos = usuarios.data?.filter((u) => u.rol === 'AUTORIZADOR' && u.activo) ?? [];
+  // El jefe de mantenimiento (Administrador) o alguien de dirección (Autorizador).
+  const candidatos = usuarios.data?.filter((u) => (u.rol === 'AUTORIZADOR' || u.rol === 'ADMIN') && u.activo) ?? [];
   const m = useMutation({
     mutationFn: () => api.put('/parametros/autorizador', { usuarioId: sel }),
     onSuccess: () => {
@@ -93,7 +94,7 @@ function Autorizador() {
   return (
     <section className="card">
       <h2>Autorizador de compras</h2>
-      <p className="muted">Recibe y aprueba las solicitudes de compra de repuestos. Se puede cambiar en cualquier momento; el cambio queda en la bitácora.</p>
+      <p className="muted">Recibe y aprueba las solicitudes de compra de repuestos: normalmente el jefe de mantenimiento. Aunque haya otros administradores (por ejemplo la auxiliar administrativa), solo esta persona aprueba. Nadie aprueba sus propias solicitudes. El cambio queda en la bitácora.</p>
       {actual.isPending || usuarios.isPending ? <Spinner /> : actual.isError ? <ErrorBox error={actual.error} /> : (
         <>
           <p>

@@ -165,3 +165,22 @@ describe('COM-02/06 · Manual y rechazo', () => {
     expect(r.body.pendientes).toBe(1);
   });
 });
+
+describe('D-25 · El jefe de mantenimiento (administrador) como autorizador de compras', () => {
+  it('el jefe aprueba lo que pide un técnico; otra administradora (la auxiliar) no puede', async () => {
+    const jefe = await c.usuario('jefe', 'ADMIN', 'JefeMant2026');
+    const auxiliar = await c.usuario('auxiliar', 'ADMIN', 'AuxAdmin2026');
+    const trabajador = await c.usuario('trabajador', 'TECNICO', '6194');
+    expect((await c.http.put('/api/parametros/autorizador').set(c.auth(c.admin)).send({ usuarioId: op.id })).status).toBe(400);
+    await c.http.put('/api/parametros/autorizador').set(c.auth(c.admin)).send({ usuarioId: jefe.id }).expect(200);
+    const s = await c.http.post('/api/compras').set(c.auth(trabajador.token)).send({ repuestoId: rodId, cantidad: 2, justificacion: 'Rodamientos para el preventivo' });
+    expect(s.status).toBe(201);
+    expect((await c.http.post(`/api/compras/${s.body.id}/aprobar`).set(c.auth(auxiliar.token))).status).toBe(403);
+    expect((await c.http.post(`/api/compras/${s.body.id}/aprobar`).set(c.auth(aut.token))).status).toBe(403);
+    const ok = await c.http.post(`/api/compras/${s.body.id}/aprobar`).set(c.auth(jefe.token));
+    expect(ok.status).toBe(201);
+    // Lo que pide el propio jefe no lo puede aprobar él mismo.
+    const propia = await c.http.post('/api/compras').set(c.auth(jefe.token)).send({ repuestoId: rodId, cantidad: 1, justificacion: 'Respaldo' });
+    expect((await c.http.post(`/api/compras/${propia.body.id}/aprobar`).set(c.auth(jefe.token))).status).toBe(403);
+  });
+});

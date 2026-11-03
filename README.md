@@ -31,6 +31,15 @@ Sistema de mantenimiento e inventario de repuestos: hoja de vida de máquinas, m
 | Impresión / PDF de los formatos con logo, código y versión (OT, hoja de vida, preoperacional semanal, checklist, planilla de temperaturas, iluminación) | ✅ |
 | Producción con Docker y HTTPS, respaldos diarios cifrados con prueba de restauración | ✅ Sprint 3 |
 
+### Roles en el área de mantenimiento
+
+| Persona | Rol en el sistema |
+|---|---|
+| Jefe de mantenimiento | **Administrador**, y autorizador de compras (Ajustes → Autorizador de compras) |
+| Auxiliar administrativa | **Administrador** (compras, inventario, carga desde Excel, formatos). No aprueba compras: solo lo hace el autorizador configurado |
+| Trabajadores de mantenimiento | **Técnico**: órdenes, preoperacionales, rondas de temperatura, iluminación, solicitudes de repuestos (con PIN) |
+| Producción | No usa el sistema por ahora (el rol **Operario** queda disponible por si se decide después) |
+
 El detalle requisito por requisito está en [docs/trazabilidad.md](docs/trazabilidad.md).
 Las decisiones que se asumieron mientras los líderes del proceso las definen están en [docs/decisiones-asumidas.md](docs/decisiones-asumidas.md).
 
@@ -92,7 +101,7 @@ cd backend
 npm run test:e2e
 ```
 
-Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **197 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
+Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **198 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
 
 Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**103 verificaciones**):
 

@@ -33,13 +33,13 @@ export class PurchasesController {
 
   /** La aprobación se valida contra el autorizador vigente (parámetro), no solo contra el rol. */
   @Post(':id/aprobar')
-  @Roles(Rol.AUTORIZADOR)
+  @Roles(Rol.AUTORIZADOR, Rol.ADMIN)
   aprobar(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: SessionUser) {
     return this.svc.aprobar(id, actor);
   }
 
   @Post(':id/rechazar')
-  @Roles(Rol.AUTORIZADOR)
+  @Roles(Rol.AUTORIZADOR, Rol.ADMIN)
   rechazar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: RejectDto, @CurrentUser() actor: SessionUser) {
     return this.svc.rechazar(id, dto.motivo, actor);
   }
