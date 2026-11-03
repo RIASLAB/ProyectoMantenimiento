@@ -1,6 +1,7 @@
 """
-Lista de materiales editable desde la ficha de la máquina: quitar y agregar materiales, y que el cambio
-aplique a todas las máquinas del tipo. Requiere los datos de demostración recién cargados y el frontend compilado.
+Lista de materiales de cada máquina (D-30), creada desde su ficha eligiendo solo repuestos y cantidades:
+una máquina sin tipo la crea; una con tipo usa la del tipo hasta que se le hace la propia, sin cambiar las demás;
+y la propia es la que se sugiere en sus órdenes. Requiere los datos de demostración recién cargados y el frontend compilado.
 Uso: python e2e/lista_materiales.py <contraseña-admin>
 """
 import sys, re, os, tempfile
@@ -30,67 +31,74 @@ def ficha(page, codigo):
     page.locator('.list-row', has_text=codigo).first.click()
     expect(page.locator('.page-subtitle')).to_contain_text(codigo)
 
+def elegir(fila, codigo):
+    sel = fila.get_by_label('Repuesto', exact=True)
+    expect(sel.locator('option', has_text=codigo)).to_be_attached()
+    sel.select_option(sel.evaluate(f"s => [...s.options].find(o => o.textContent.includes('{codigo}')).value"))
+
 with sync_playwright() as p:
     b = p.chromium.launch()
     a = b.new_context(viewport={'width': 1366, 'height': 900}, locale='es-CO', timezone_id='America/Bogota').new_page(); track(a)
     login(a, 'admin', ADMIN_PASS)
 
-    # 1) La ficha muestra la lista y el botón para editarla
-    ficha(a, 'MOL-001')
+    # 1) Máquina sin tipo: se crea su lista sin llenar tipo ni modelo
+    ficha(a, 'HRN-001')
     lista = a.locator('.materiales')
+    expect(lista).to_contain_text('Esta máquina aún no tiene lista de materiales')
+    lista.get_by_role('button', name='Crear lista de materiales').click()
+    d = a.locator('dialog[open]')
+    expect(d).to_contain_text('No hace falta llenar tipo ni modelo')
+    expect(d.get_by_label('Modelo')).to_have_count(0)
+    filas = d.locator('.part-row')
+    expect(filas).to_have_count(1)
+    elegir(filas.first, 'RP-ROD-6205')
+    filas.first.get_by_label('Cantidad').fill('2')
+    d.get_by_role('button', name='Agregar repuesto').click()
+    elegir(filas.last, 'RP-ACE-GA')
+    filas.last.get_by_label('Cantidad').fill('0.5')
+    a.screenshot(path=f'{SP}/mat-01-crear.png', full_page=True)
+    d.get_by_role('button', name='Guardar lista').click()
+    expect(a.locator('dialog[open]')).to_have_count(0)
+    expect(lista).to_contain_text('Lista de materiales de esta máquina')
+    expect(lista.locator('li')).to_have_count(2)
+    expect(lista).to_contain_text('RP-ROD-6205')
+    a.screenshot(path=f'{SP}/mat-02-ficha.png', full_page=True)
+    ok('HRN-001 (sin tipo): lista creada desde la ficha con solo repuestos y cantidades')
+
+    # 2) Máquina con tipo: usa la del tipo; al editarla queda con la suya sin tocar las demás
+    ficha(a, 'MOL-001')
     expect(lista).to_contain_text('Lista de materiales · Molino Javar M-32')
     expect(lista.locator('li')).to_have_count(3)
-    expect(lista).to_contain_text('RP-PLACA-8')
-    ok('ficha de MOL-001: lista de materiales con 3 materiales y botón Editar lista')
-
-    # 2) Quitar un material y agregar otro
     lista.get_by_role('button', name='Editar lista').click()
     d = a.locator('dialog[open]')
-    expect(d).to_contain_text('Editar tipo de equipo')
     filas = d.locator('.part-row')
     expect(filas).to_have_count(3)
-    fila_placa = filas.filter(has=a.locator('option:checked', has_text='RP-PLACA-8'))
-    fila_placa.get_by_role('button', name='Quitar repuesto').click()
+    filas.filter(has=a.locator('option:checked', has_text='RP-PLACA-8')).get_by_role('button', name='Quitar repuesto').click()
     expect(filas).to_have_count(2)
-    d.get_by_role('button', name='Agregar repuesto').click()
-    nueva = filas.last
-    sel = nueva.get_by_label('Repuesto', exact=True)
-    expect(sel.locator('option', has_text='RP-ACE-GA')).to_be_attached()
-    sel.select_option(sel.evaluate("s => [...s.options].find(o => o.textContent.includes('RP-ACE-GA')).value"))
-    nueva.get_by_label('Cantidad').fill('0.5')
-    a.screenshot(path=f'{SP}/mat-01-editar.png', full_page=True)
-    d.get_by_role('button', name='Guardar').click()
+    d.get_by_role('button', name='Guardar lista').click()
     expect(a.locator('dialog[open]')).to_have_count(0)
-    expect(lista.locator('li')).to_have_count(3)
+    expect(lista).to_contain_text('Lista de materiales de esta máquina')
+    expect(lista.locator('li')).to_have_count(2)
     expect(lista).not_to_contain_text('RP-PLACA-8')
-    expect(lista).to_contain_text('RP-ACE-GA')
-    a.screenshot(path=f'{SP}/mat-02-ficha.png', full_page=True)
-    ok('quitar RP-PLACA-8 y agregar RP-ACE-GA × 0,5 desde la ficha')
-
-    # 3) Aplica a las demás máquinas del mismo tipo
     ficha(a, 'MOL-002')
-    expect(a.locator('.materiales')).to_contain_text('RP-ACE-GA')
-    expect(a.locator('.materiales')).not_to_contain_text('RP-PLACA-8')
-    a.goto(BASE + '/maquinas/tipos')
-    expect(a.locator('.tipo-row', has_text='Molino Javar M-32')).to_contain_text('RP-ACE-GA')
-    ok('el cambio aplica a MOL-002 y al tipo Molino Javar M-32')
+    expect(a.locator('.materiales')).to_contain_text('RP-PLACA-8')
+    ok('MOL-001 queda con su propia lista; MOL-002 y el tipo conservan la del tipo')
 
-    # 4) Vaciar la lista
+    # 3) La lista de la máquina es la que se sugiere en su orden
+    a.goto(BASE + '/ordenes/reportar')
+    maq = a.get_by_label('Máquina *')
+    expect(maq.locator('option', has_text='HRN-001')).to_be_attached()
+    maq.select_option(maq.evaluate("s => [...s.options].find(o => o.textContent.includes('HRN-001')).value"))
+    expect(a.locator('.sugeridos')).to_contain_text('Lista de materiales de la máquina · HRN-001')
+    expect(a.locator('.sugeridos')).to_contain_text('RP-ROD-6205')
+    ok('al reportar una falla de HRN-001 se sugieren los materiales de su lista')
+
+    # 4) Volver a la lista del tipo
     ficha(a, 'MOL-001')
-    a.locator('.materiales').get_by_role('button', name='Editar lista').click()
-    d = a.locator('dialog[open]')
-    expect(d.locator('.part-row')).to_have_count(3)
-    while d.locator('.part-row').count():
-        d.locator('.part-row').first.get_by_role('button', name='Quitar repuesto').click()
-    d.get_by_role('button', name='Guardar').click()
-    expect(a.locator('.materiales')).to_contain_text('El tipo aún no tiene lista de materiales')
-    ok('se puede eliminar la lista completa')
-
-    # 5) Máquina sin tipo: indica cómo tener lista
-    ficha(a, 'HRN-001')
-    expect(a.locator('.materiales')).to_contain_text('no tiene tipo de equipo')
-    expect(a.locator('.materiales').get_by_role('link', name='Editar')).to_be_visible()
-    ok('máquina sin tipo: indica asignarle un tipo para tener lista de materiales')
+    lista.get_by_role('button', name='Usar la lista del tipo Molino Javar M-32').click()
+    expect(lista).to_contain_text('Lista de materiales · Molino Javar M-32')
+    expect(lista.locator('li')).to_have_count(3)
+    ok('MOL-001 vuelve a usar la lista de su tipo')
     b.close()
 
 print('\n', len(results), 'verificaciones OK. Capturas en', SP)

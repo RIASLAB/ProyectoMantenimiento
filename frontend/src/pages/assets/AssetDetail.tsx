@@ -2,9 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChangeEvent, ReactNode, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, openProtectedFile } from '../../api/client';
-import type { Asset, AssetDocument, AssetHistory, EquipmentModel } from '../../api/types';
-import { TipoModal } from './EquipmentTypes';
-import { OrderStateBadge } from '../../components/orders-shared';
+import type { Asset, AssetDocument, AssetHistory } from '../../api/types';
+import { OrderStateBadge, PartRow, PartRows, rowsToPayload, useMaterialesEquipo } from '../../components/orders-shared';
 import { InstallModal } from '../../components/InstallModal';
 import { useAuth } from '../../auth/AuthContext';
 import { Badge, Button, Empty, ErrorBox, Icon, KeyValue, Modal, PageHeader, Spinner } from '../../components/ui';
@@ -65,10 +64,61 @@ function Garantia({ fecha }: { fecha: string | null }) {
   return <>{date(fecha)} <Badge tone="ok">Vigente</Badge></>;
 }
 
-/** Edita la lista de materiales del tipo de la máquina sin salir de su ficha. */
-function ListaMaterialesModal({ modeloId, open, onClose }: { modeloId: string; open: boolean; onClose: () => void }) {
-  const t = useQuery({ queryKey: ['tipo-equipo', modeloId], queryFn: () => api.get<EquipmentModel>(`/tipos-equipo/${modeloId}`), enabled: open });
-  return <TipoModal tipo={t.data ?? null} open={open && !!t.data} onClose={onClose} />;
+/**
+ * Lista de materiales de la máquina (D-30): se crea desde su ficha eligiendo solo repuestos y cantidades.
+ * Si la máquina no tiene lista propia usa la de su tipo de equipo. Es la que se sugiere en sus correctivos y preventivos.
+ */
+function MaterialesMaquina({ a }: { a: Asset }) {
+  const { can } = useAuth();
+  const qc = useQueryClient();
+  const lista = useMaterialesEquipo(a.id);
+  const [abierto, setAbierto] = useState(false);
+  const [rows, setRows] = useState<PartRow[]>([]);
+  const guardar = useMutation({
+    mutationFn: (materiales: Array<{ repuestoId: string; cantidad: number }>) => api.put(`/activos/${a.id}/materiales`, { materiales }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['activo-materiales', a.id] }); qc.invalidateQueries({ queryKey: ['bitacora'] }); setAbierto(false); },
+  });
+  const l = lista.data;
+  const abrir = () => {
+    guardar.reset();
+    const base = l?.materiales.map((m) => ({ repuestoId: m.repuestoId, cantidad: String(m.cantidad) })) ?? [];
+    setRows(base.length ? base : [{ repuestoId: '', cantidad: '1' }]);
+    setAbierto(true);
+  };
+  const propia = l?.origen === 'EQUIPO';
+  // El diálogo va fuera de .materiales: sus opciones de repuestos no deben contarse como parte de la lista.
+  return (
+    <>
+    <div className="materiales">
+      <div className="materiales-head">
+        <p className="subtle-head">{propia ? 'Lista de materiales de esta máquina' : l?.origen === 'TIPO' ? `Lista de materiales · ${l.tipo?.nombre}` : 'Lista de materiales'}</p>
+        {can('ADMIN') && l ? (
+          <Button variant="ghost" onClick={abrir}><Icon name={l.origen ? 'edit' : 'plus'} /> {l.origen ? 'Editar lista' : 'Crear lista de materiales'}</Button>
+        ) : null}
+      </div>
+      {lista.isPending ? <Spinner /> : lista.isError ? <ErrorBox error={lista.error} /> : l!.materiales.length ? (
+        <ul>
+          {l!.materiales.map((m) => (
+            <li key={m.repuestoId}><Link to={`/inventario/${m.repuesto.id}`}><strong>{m.repuesto.codigo}</strong> {m.repuesto.descripcion}</Link> <span className="muted">× {qty(m.cantidad)} {m.repuesto.unidad}</span></li>
+          ))}
+        </ul>
+      ) : <p className="muted small" style={{ margin: 0 }}>Esta máquina aún no tiene lista de materiales.</p>}
+      {l?.origen === 'TIPO' ? <p className="muted small" style={{ margin: '.25rem 0 0' }}>Es la lista de su tipo de equipo. Si la edita aquí, esta máquina queda con su propia lista.</p> : null}
+      {propia && can('ADMIN') ? (
+        <p className="muted small" style={{ margin: '.25rem 0 0' }}>Se sugiere en las órdenes y planes de esta máquina.
+          {l.tipo ? <> <button type="button" className="link-btn" disabled={guardar.isPending} onClick={() => guardar.mutate([])}>Usar la lista del tipo {l.tipo.nombre}</button></> : null}</p>
+      ) : null}
+    </div>
+      <Modal open={abierto} title={`Lista de materiales · ${a.codigo}`} onClose={() => setAbierto(false)}
+        footer={<><Button variant="ghost" onClick={() => setAbierto(false)}>Cancelar</Button><Button busy={guardar.isPending} onClick={() => guardar.mutate(rowsToPayload(rows))}>Guardar lista</Button></>}>
+        <div className="stack">
+          <p className="muted small" style={{ margin: 0 }}>Elija los repuestos y la cantidad que usa esta máquina en un mantenimiento. No hace falta llenar tipo ni modelo.</p>
+          <PartRows rows={rows} onChange={setRows} />
+          {guardar.isError ? <ErrorBox error={guardar.error} /> : null}
+        </div>
+      </Modal>
+    </>
+  );
 }
 
 export function AssetDetail() {
@@ -80,7 +130,6 @@ export function AssetDetail() {
   const [openError, setOpenError] = useState('');
   const [aBorrar, setABorrar] = useState<AssetDocument | null>(null);
   const [instalar, setInstalar] = useState(false);
-  const [editarLista, setEditarLista] = useState(false);
 
   const q = useQuery({ queryKey: ['activo', id], queryFn: () => api.get<Asset>(`/activos/${id}`) });
 
@@ -169,29 +218,7 @@ export function AssetDetail() {
             ]}
           />
           {a.notas ? <p className="notes">{a.notas}</p> : null}
-          {a.modeloEquipo ? (
-            <div className="materiales">
-              <div className="materiales-head">
-                <p className="subtle-head">Lista de materiales · {a.modeloEquipo.nombre}</p>
-                {can('ADMIN') ? <Button variant="ghost" onClick={() => setEditarLista(true)}><Icon name="edit" /> Editar lista</Button> : null}
-              </div>
-              {a.modeloEquipo.materiales?.length ? (
-                <ul>
-                  {a.modeloEquipo.materiales.map((m) => (
-                    <li key={m.repuestoId}><Link to={`/inventario/${m.repuesto.id}`}><strong>{m.repuesto.codigo}</strong> {m.repuesto.descripcion}</Link> <span className="muted">× {qty(m.cantidad)} {m.repuesto.unidad}</span></li>
-                  ))}
-                </ul>
-              ) : <p className="muted small" style={{ margin: 0 }}>El tipo aún no tiene lista de materiales.</p>}
-              {can('ADMIN') ? <p className="muted small" style={{ margin: '.25rem 0 0' }}>Los cambios aplican a todas las máquinas de este tipo.</p> : null}
-            </div>
-          ) : (
-            <div className="materiales">
-              <p className="subtle-head">Lista de materiales</p>
-              <p className="muted small" style={{ margin: 0 }}>
-                Esta máquina no tiene tipo de equipo.{can('ADMIN') ? <> Asígnele uno en <Link to={`/maquinas/${a.id}/editar`}>Editar</Link> para tener su lista de materiales.</> : null}
-              </p>
-            </div>
-          )}
+          <MaterialesMaquina a={a} />
         </section>
 
         <section className="card">
@@ -245,7 +272,6 @@ export function AssetDetail() {
         </section>
       </div>
       <InstallModal equipo={instalar ? a : null} onClose={() => setInstalar(false)} />
-      {a.modeloEquipo ? <ListaMaterialesModal modeloId={a.modeloEquipo.id} open={editarLista} onClose={() => setEditarLista(false)} /> : null}
       <Modal open={!!aBorrar} title="Eliminar documento" onClose={cerrarBorrar}
         footer={<><Button variant="ghost" onClick={cerrarBorrar}>Cancelar</Button><Button variant="danger" busy={borrar.isPending} onClick={() => aBorrar && borrar.mutate(aBorrar.id)}>Eliminar</Button></>}>
         <p style={{ marginTop: 0 }}>¿Eliminar <strong>{aBorrar?.nombreOriginal}</strong> de esta máquina?</p>

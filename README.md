@@ -106,9 +106,9 @@ cd backend
 npm run test:e2e
 ```
 
-Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **217 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
+Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **219 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
 
-Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**108 verificaciones**):
+Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**107 verificaciones**):
 
 | Script | Qué recorre |
 |---|---|
@@ -119,7 +119,7 @@ Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritori
 | `e2e/equipos_en_bodega.py` | Inventario de equipos sin instalar: 5 molinos con 2 en bodega, instalar, conteo por área y guardar en bodega |
 | `e2e/mejoras_operacion.py` | PIN temporal que se cambia al primer ingreso, firma del jefe y del líder de área en el formato de OT (PDF), calibración con certificado, recordatorio diario y paquete mensual |
 | `e2e/formatos_planta.py` | Formatos de la planta: preoperacional B/R/M y su semana, hoja diaria C/NC, ronda y planilla de temperaturas con verificación, cierre de OT con verificaciones de entrega (celular), hoja de vida, iluminación y versión del formato en el PDF |
-| `e2e/lista_materiales.py` | Lista de materiales editable desde la ficha de la máquina: quitar, agregar y vaciar; el cambio aplica a todo el tipo |
+| `e2e/lista_materiales.py` | Lista de materiales de cada máquina creada desde su ficha (con o sin tipo), sugerida en sus órdenes; volver a la del tipo |
 | `e2e/tipos_equipo.py` | Tipos de equipo con lista de materiales, 3 aires iguales de una vez, cuántos hay en Bodega, preventivo por tipo y materiales en correctivos |
 | `e2e/eliminar_adjuntos.py` | Eliminar fotos de una orden (quién puede y cuándo) y documentos de una máquina |
 | `e2e/carga_masiva.py` | Descarga la plantilla, la llena, la sube con errores (fila y columna), la corrige y carga máquinas y repuestos con stock inicial |

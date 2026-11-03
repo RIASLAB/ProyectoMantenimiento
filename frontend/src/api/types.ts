@@ -156,6 +156,9 @@ export interface OrdersSummary {
 
 export interface MaterialRef { id?: string; repuestoId: string; cantidad: number; repuesto: { id: string; codigo: string; descripcion: string; unidad: string } }
 
+/** Lista de materiales que aplica a una máquina: la propia (EQUIPO) o la de su tipo (TIPO). */
+export interface MaterialesEquipo { origen: 'EQUIPO' | 'TIPO' | null; tipo: { id: string; nombre: string } | null; materiales: MaterialRef[] }
+
 export interface EquipmentModelRef {
   id: string;
   nombre: string;

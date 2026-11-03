@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { Asset, EquipmentModel, PersonRef, Plan, UnidadFrecuencia } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
-import { PartRow, PartRows, rowsToPayload, useTipoEquipo } from '../../components/orders-shared';
+import { PartRow, PartRows, rowsToPayload, tituloLista, useMaterialesEquipo, useTipoEquipo } from '../../components/orders-shared';
 import { Badge, Button, Empty, ErrorBox, Field, Icon, Input, Modal, PageHeader, Select, Spinner, Textarea } from '../../components/ui';
 import { frecuencia, qty } from '../../format';
 import { OrdersTabs } from './OrdersList';
@@ -47,16 +47,20 @@ function PlanModal({ plan, equiposDelTipo, open, onClose }: { plan: Plan | null;
 
   // Tipo de equipo del destino: su lista de materiales es la base del kit del plan.
   const activo = activos.data?.find((a) => a.id === f.activoId);
-  const modeloId = destino === 'tipo' ? f.modeloId : activo?.modeloId ?? null;
-  const tipo = useTipoEquipo(modeloId);
-  const materiales = tipo.data?.materiales ?? [];
+  // Plan de una máquina: su lista propia (o la de su tipo). Plan por tipo: la lista del tipo.
+  const tipo = useTipoEquipo(destino === 'tipo' ? f.modeloId : null);
+  const listaEquipo = useMaterialesEquipo(destino === 'maquina' ? f.activoId : null);
+  const fuente = destino === 'tipo'
+    ? (tipo.data ? { clave: `t${tipo.data.id}`, materiales: tipo.data.materiales ?? [], titulo: `Lista de materiales · ${tipo.data.nombre}` } : null)
+    : (listaEquipo.data && f.activoId ? { clave: `a${f.activoId}`, materiales: listaEquipo.data.materiales, titulo: tituloLista(listaEquipo.data, activo?.codigo) } : null);
+  const materiales = fuente?.materiales ?? [];
   const [precargado, setPrecargado] = useState<string | null>(null);
   useEffect(() => {
     // Al elegir la máquina o el tipo, el kit vacío se llena con la lista de materiales (se puede ajustar).
-    if (editing || !tipo.data || precargado === tipo.data.id) return;
-    setPrecargado(tipo.data.id);
-    if (rows.every((r) => !r.repuestoId)) setRows(tipo.data.materiales.map((m) => ({ repuestoId: m.repuestoId, cantidad: String(m.cantidad) })));
-  }, [tipo.data, editing, precargado, rows]);
+    if (editing || !fuente || precargado === fuente.clave) return;
+    setPrecargado(fuente.clave);
+    if (rows.every((r) => !r.repuestoId)) setRows(fuente.materiales.map((m) => ({ repuestoId: m.repuestoId, cantidad: String(m.cantidad) })));
+  }, [fuente, editing, precargado, rows]);
   useEffect(() => { if (!open) setPrecargado(null); }, [open]);
 
   const equiposTipo = destino === 'tipo' && f.modeloId ? activos.data?.filter((a) => a.modeloId === f.modeloId && a.estado !== 'DADO_DE_BAJA' && a.estado !== 'EN_BODEGA').length ?? 0 : 0;
@@ -138,7 +142,7 @@ function PlanModal({ plan, equiposDelTipo, open, onClose }: { plan: Plan | null;
         ) : null}
         <div>
           <p className="subtle-head">Materiales por ejecución</p>
-          <PartRows rows={rows} onChange={setRows} sugeridos={materiales} tituloSugeridos={tipo.data ? `Lista de materiales · ${tipo.data.nombre}` : undefined} />
+          <PartRows rows={rows} onChange={setRows} sugeridos={materiales} tituloSugeridos={fuente?.titulo} />
         </div>
         {m.isError ? <ErrorBox error={m.error} /> : null}
       </form>

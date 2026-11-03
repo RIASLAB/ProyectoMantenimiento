@@ -7,7 +7,7 @@ import { Button, ErrorBox, Field, Icon, PageHeader, Select, Spinner, Textarea } 
 import { useAuth } from '../../auth/AuthContext';
 import { PRIORIDAD_LABEL } from '../../format';
 import { comprimirFoto, enviarOEncolar } from '../../offline/outbox';
-import { PartRow, PartRows, rowsToPayload, useTipoEquipo } from '../../components/orders-shared';
+import { PartRow, PartRows, rowsToPayload, tituloLista, useMaterialesEquipo } from '../../components/orders-shared';
 
 const MAX_MB = 20;
 
@@ -36,7 +36,7 @@ export function ReportFault() {
     return [...m];
   }, [activos.data]);
   const elegido = activos.data?.find((a) => a.id === activoId);
-  const tipo = useTipoEquipo(planifica ? elegido?.modeloId : null);
+  const lista = useMaterialesEquipo(planifica ? elegido?.id : null);
 
   const m = useMutation({
     mutationFn: async () => {
@@ -116,8 +116,8 @@ export function ReportFault() {
         {planifica && activoId ? (
           <div>
             <p className="subtle-head">Materiales que se van a necesitar (opcional)</p>
-            <PartRows rows={rows} onChange={setRows} sugeridos={tipo.data?.materiales}
-              tituloSugeridos={tipo.data ? `Lista de materiales · ${tipo.data.nombre}` : undefined} />
+            <PartRows rows={rows} onChange={setRows} sugeridos={lista.data?.materiales}
+              tituloSugeridos={tituloLista(lista.data, elegido?.codigo)} />
           </div>
         ) : null}
 

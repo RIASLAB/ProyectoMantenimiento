@@ -12,9 +12,11 @@ import { ClaseActivo, EstadoActivo } from '../common/enums';
 import { validateUpload } from '../common/files';
 import { AssetDocument } from './asset-document.entity';
 import { Asset } from './asset.entity';
-import { EquipmentModel } from '../equipment/equipment.entities';
+import { EquipmentModel, EquipmentModelPart } from '../equipment/equipment.entities';
 import { MaintenanceService } from '../maintenance/maintenance.service';
-import { CreateAssetDto, CreateManyAssetsDto, InstallAssetDto, UpdateAssetDto } from './assets.dto';
+import { AssetPartsDto, CreateAssetDto, CreateManyAssetsDto, InstallAssetDto, UpdateAssetDto } from './assets.dto';
+import { AssetPart } from './asset-part.entity';
+import { SparePart } from '../inventory/spare-part.entity';
 
 @Injectable()
 export class AssetsService {
@@ -134,6 +136,49 @@ export class AssetsService {
       const planes = await this.maintenance.aplicarPlanesDeTipo(em, [id], actor);
       return { ok: true, planesAplicados: planes };
     });
+  }
+
+  /**
+   * Lista de materiales que aplica a la máquina: la propia si tiene (D-30); si no, la de su tipo de equipo.
+   * Es la que se sugiere en sus correctivos y con la que se arma el kit de sus preventivos.
+   */
+  async materiales(id: string) {
+    const a = await this.repo.findOne({ where: { id }, relations: { modeloEquipo: true } });
+    if (!a) throw new NotFoundException('Máquina no encontrada');
+    const sel = ['r.id', 'r.codigo', 'r.descripcion', 'r.unidad'];
+    const propia = await this.ds.getRepository(AssetPart).createQueryBuilder('p').leftJoin('p.repuesto', 'r').addSelect(sel)
+      .where('p.activoId = :id', { id }).orderBy('r.codigo').getMany();
+    const tipo = a.modeloEquipo ? { id: a.modeloEquipo.id, nombre: a.modeloEquipo.nombre } : null;
+    if (propia.length) return { origen: 'EQUIPO' as const, tipo, materiales: propia };
+    if (!a.modeloId) return { origen: null, tipo, materiales: [] };
+    const delTipo = await this.ds.getRepository(EquipmentModelPart).createQueryBuilder('p').leftJoin('p.repuesto', 'r').addSelect(sel)
+      .where('p.modeloId = :m', { m: a.modeloId }).orderBy('r.codigo').getMany();
+    return { origen: delTipo.length ? ('TIPO' as const) : null, tipo, materiales: delTipo };
+  }
+
+  /** Reemplaza la lista propia de la máquina. Vacía, la máquina vuelve a usar la de su tipo. */
+  async guardarMateriales(id: string, dto: AssetPartsDto, actor: SessionUser) {
+    const a = await this.repo.findOne({ where: { id } });
+    if (!a) throw new NotFoundException('Máquina no encontrada');
+    const m = new Map<string, number>();
+    for (const i of dto.materiales) if (i.cantidad > 0) m.set(i.repuestoId, (m.get(i.repuestoId) ?? 0) + i.cantidad);
+    const ids = [...m.keys()];
+    if (ids.length) {
+      const encontrados = await this.ds.getRepository(SparePart).find({ where: { id: In(ids) } });
+      if (encontrados.length !== ids.length) throw new BadRequestException('Uno de los repuestos no existe');
+      const inactivo = encontrados.find((r) => !r.activo);
+      if (inactivo) throw new BadRequestException(`El repuesto ${inactivo.codigo} está inactivo`);
+    }
+    await this.ds.transaction(async (em) => {
+      const antes = await em.getRepository(AssetPart).count({ where: { activoId: id } });
+      await em.getRepository(AssetPart).delete({ activoId: id });
+      if (ids.length) await em.getRepository(AssetPart).insert([...m].map(([repuestoId, cantidad]) => ({ activoId: id, repuestoId, cantidad })));
+      await this.audit.log({
+        usuarioId: actor.id, accion: 'ACTIVO_MATERIALES', entidad: 'activo', entidadId: id,
+        detalle: { codigo: a.codigo, materiales: { antes, despues: ids.length }, ...(ids.length ? {} : { usa: 'la lista del tipo de equipo' }) },
+      }, em);
+    });
+    return this.materiales(id);
   }
 
   /** "AA-008" × 3 → AA-008, AA-009, AA-010 (conserva los ceros a la izquierda). */

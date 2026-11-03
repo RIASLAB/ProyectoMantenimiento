@@ -284,3 +284,40 @@ describe('Equipos en bodega (comprados sin instalar)', () => {
     expect(r2.body.planesAplicados).toBe(1);
   });
 });
+
+describe('Lista de materiales propia de cada máquina (D-30)', () => {
+  const put = (path: string, body: object, token = c.admin) => c.http.put(`/api${path}`).set(c.auth(token)).send(body);
+  type Lista = { origen: string | null; tipo: { nombre: string } | null; materiales: Array<{ repuesto: { codigo: string }; cantidad: number }> };
+  const resumen = (l: Lista) => l.materiales.map((m) => `${m.repuesto.codigo}×${m.cantidad}`).sort();
+
+  it('una máquina sin tipo se crea con su lista eligiendo solo repuestos y cantidades', async () => {
+    const a = (await post('/activos', { codigo: 'EMP-001', nombre: 'Empacadora al vacío', area: 'Empaque' })).body;
+    expect((await get(`/activos/${a.id}/materiales`)).body).toEqual({ origen: null, tipo: null, materiales: [] });
+    const r = await put(`/activos/${a.id}/materiales`, { materiales: [{ repuestoId: rep['RP-CUCH'], cantidad: 2 }, { repuestoId: rep['RP-FIL'], cantidad: 1 }, { repuestoId: rep['RP-CUCH'], cantidad: 1 }] });
+    expect(r.status).toBe(200);
+    expect(r.body.origen).toBe('EQUIPO');
+    expect(resumen(r.body)).toEqual(['RP-CUCH×3', 'RP-FIL×1']);
+    // Todo mantenimiento la consulta; solo el administrador la cambia
+    expect((await get(`/activos/${a.id}/materiales`, tec.token)).body.origen).toBe('EQUIPO');
+    expect((await put(`/activos/${a.id}/materiales`, { materiales: [] }, tec.token)).status).toBe(403);
+    expect((await put(`/activos/${a.id}/materiales`, { materiales: [{ repuestoId: '00000000-0000-4000-8000-000000000000', cantidad: 1 }] })).status).toBe(400);
+    const bit = await get(`/bitacora?entidad=activo&entidadId=${a.id}`);
+    expect(JSON.stringify(bit.body)).toContain('ACTIVO_MATERIALES');
+  });
+
+  it('una máquina con tipo usa la del tipo hasta que se le crea la suya; vacía vuelve a la del tipo', async () => {
+    const a = (await post('/activos', { codigo: 'AA-050', nombre: 'Aire oficina', area: 'Oficinas', modeloId: miniSplit })).body;
+    const delTipo = (await get(`/activos/${a.id}/materiales`)).body;
+    expect(delTipo).toMatchObject({ origen: 'TIPO', tipo: { nombre: 'Mini split 12.000 BTU' } });
+    expect(resumen(delTipo)).toEqual(['RP-FIL×3', 'RP-GAS×0.5']);
+    await put(`/activos/${a.id}/materiales`, { materiales: [{ repuestoId: rep['RP-GAS'], cantidad: 1.25 }] }).expect(200);
+    const propia = (await get(`/activos/${a.id}/materiales`)).body;
+    expect(propia.origen).toBe('EQUIPO');
+    expect(resumen(propia)).toEqual(['RP-GAS×1.25']);
+    // La lista del tipo y las demás máquinas del tipo no cambian
+    expect((await get(`/tipos-equipo/${miniSplit}`)).body.materiales).toHaveLength(2);
+    const vuelve = (await put(`/activos/${a.id}/materiales`, { materiales: [] })).body;
+    expect(vuelve.origen).toBe('TIPO');
+    expect(resumen(vuelve)).toEqual(['RP-FIL×3', 'RP-GAS×0.5']);
+  });
+});

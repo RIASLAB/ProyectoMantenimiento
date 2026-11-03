@@ -1,11 +1,11 @@
 import {
-  Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Res, StreamableFile, UploadedFile, UseInterceptors,
+  Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Put, Query, Res, StreamableFile, UploadedFile, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { CurrentUser, Roles, SessionUser } from '../common/auth.decorators';
 import { EstadoActivo, Rol, ClaseActivo } from '../common/enums';
-import { CreateAssetDto, CreateManyAssetsDto, InstallAssetDto, UpdateAssetDto } from './assets.dto';
+import { CreateAssetDto, CreateManyAssetsDto, InstallAssetDto, UpdateAssetDto, AssetPartsDto } from './assets.dto';
 import { AssetsService } from './assets.service';
 
 const LIMITE_MULTER = Number(process.env.MAX_UPLOAD_MB ?? 20) * 1024 * 1024 + 1;
@@ -73,6 +73,18 @@ export class AssetsController {
   @Roles(Rol.ADMIN)
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateAssetDto, @CurrentUser() actor: SessionUser) {
     return this.assets.update(id, dto, actor);
+  }
+
+  /** Lista de materiales de la máquina (la propia o la de su tipo). */
+  @Get(':id/materiales')
+  materiales(@Param('id', ParseUUIDPipe) id: string) {
+    return this.assets.materiales(id);
+  }
+
+  @Put(':id/materiales')
+  @Roles(Rol.ADMIN)
+  guardarMateriales(@Param('id', ParseUUIDPipe) id: string, @Body() dto: AssetPartsDto, @CurrentUser() actor: SessionUser) {
+    return this.assets.guardarMateriales(id, dto, actor);
   }
 
   @Post(':id/documentos')

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { EquipmentModel, EstadoOrden, MaterialRef, SparePart, WorkOrderSummary } from '../api/types';
+import type { EquipmentModel, EstadoOrden, MaterialesEquipo, MaterialRef, SparePart, WorkOrderSummary } from '../api/types';
 import { ORDEN_ESTADO_LABEL, ORDEN_ESTADO_TONE, qty, TIPO_LABEL } from '../format';
 import { Badge, Button, Icon, Input, Select } from './ui';
 
@@ -10,6 +10,17 @@ export interface PartRow { repuestoId: string; cantidad: string }
 /** Tipo de equipo (con su lista de materiales); se guarda en caché para trabajar sin señal. */
 export function useTipoEquipo(id: string | null | undefined) {
   return useQuery({ queryKey: ['tipo-equipo', id], queryFn: () => api.get<EquipmentModel>(`/tipos-equipo/${id}`), enabled: !!id });
+}
+
+/** Lista de materiales de una máquina (la propia o, si no tiene, la de su tipo); en caché para trabajar sin señal. */
+export function useMaterialesEquipo(activoId: string | null | undefined) {
+  return useQuery({ queryKey: ['activo-materiales', activoId], queryFn: () => api.get<MaterialesEquipo>(`/activos/${activoId}/materiales`), enabled: !!activoId });
+}
+
+/** Título de las sugerencias según de dónde sale la lista. */
+export function tituloLista(l: MaterialesEquipo | undefined, codigo?: string) {
+  if (!l?.origen) return undefined;
+  return l.origen === 'EQUIPO' ? `Lista de materiales de la máquina${codigo ? ` · ${codigo}` : ''}` : `Lista de materiales · ${l.tipo?.nombre ?? ''}`;
 }
 
 /** La lista de materiales del tipo de equipo como sugerencias para agregar con un toque. */

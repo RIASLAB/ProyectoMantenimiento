@@ -1,6 +1,7 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { Type } from 'class-transformer';
-import { IsDateString, IsEnum, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsDateString, IsEnum, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
+import { PartQtyDto } from '../maintenance/maintenance.dto';
 import { ClaseActivo, EstadoActivo } from '../common/enums';
 
 export class CreateAssetDto {
@@ -66,6 +67,12 @@ export class CreateAssetDto {
 }
 
 export class UpdateAssetDto extends PartialType(CreateAssetDto) {}
+
+/** Lista de materiales propia de la máquina; vacía = volver a la de su tipo de equipo. */
+export class AssetPartsDto {
+  @IsArray() @ArrayMaxSize(80) @ValidateNested({ each: true }) @Type(() => PartQtyDto)
+  materiales: PartQtyDto[];
+}
 
 /** Varios equipos iguales de una vez: el código debe terminar en número y se numeran seguidos (AA-001, AA-002…). */
 export class CreateManyAssetsDto extends CreateAssetDto {
