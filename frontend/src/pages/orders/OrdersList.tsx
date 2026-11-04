@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { api, qs } from '../../api/client';
 import type { OrdersSummary, WorkOrderSummary } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { OrderBadges } from '../../components/orders-shared';
-import { Empty, ErrorBox, Icon, PageHeader, SavedOfflineNotice, Select, Spinner } from '../../components/ui';
+import { AssignModal } from '../../components/AssignModal';
+import { Button, Empty, ErrorBox, Icon, PageHeader, SavedOfflineNotice, Select, Spinner } from '../../components/ui';
 import { date, dateTime } from '../../format';
 import { useUrlFilters } from '../../hooks';
 
@@ -43,6 +45,9 @@ export function OrdersList() {
   const [f, set] = useUrlFilters(['vista', 'tipo', 'estado', 'mias'] as const);
   const vista = f.vista || 'abiertas';
   const operario = user?.rol === 'OPERARIO';
+  // D-32: el jefe asigna desde la lista las órdenes que aún no tienen técnico, sin entrar a cada una.
+  const [asignar, setAsignar] = useState<WorkOrderSummary | null>(null);
+  const porAsignar = (o: WorkOrderSummary) => o.estado === 'ABIERTA' && !o.asignadoA && can('ADMIN');
 
   const list = useQuery({
     queryKey: ['ordenes', vista, f.tipo, f.estado, f.mias],
@@ -98,7 +103,7 @@ export function OrdersList() {
       ) : (
         <ul className="list">
           {list.data.map((o) => (
-            <li key={o.id}>
+            <li key={o.id} className={porAsignar(o) ? 'row-con-accion' : undefined}>
               <Link to={`/ordenes/${o.id}`} className="list-row">
                 <div className="list-main">
                   <span className="code">{o.codigo} · {o.activo?.codigo}</span>
@@ -113,11 +118,15 @@ export function OrdersList() {
                   </span>
                 </div>
               </Link>
+              {porAsignar(o) ? (
+                <Button variant="secondary" className="row-accion" onClick={() => setAsignar(o)} aria-label={`Asignar ${o.codigo}`}>Asignar</Button>
+              ) : null}
             </li>
           ))}
         </ul>
       )}
 
+      {asignar ? <AssignModal orden={asignar} open onClose={() => setAsignar(null)} /> : null}
       <Link to="/ordenes/reportar" className="fab" aria-label="Reportar falla">
         <Icon name="alert" /> Reportar falla
       </Link>

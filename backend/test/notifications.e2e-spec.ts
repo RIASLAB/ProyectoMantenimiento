@@ -346,3 +346,52 @@ describe('NOT-01 · Avisos al celular (Web Push)', () => {
     expect((await c.http.post('/api/notificaciones/push/prueba').set(c.auth(op.token))).body.suscripciones).toBe(0);
   });
 });
+
+describe('D-32 · Órdenes urgentes sin técnico y carga de cada técnico', () => {
+  const reportar = async (body: object) => (await c.http.post('/api/ordenes').set(c.auth(op.token)).send({ activoId, ...body }).expect(201)).body.id as string;
+  const urgentes = async (token: string) => (await nuevas(token)).filter((n) => n.tipo === 'URGENTE_SIN_ASIGNAR');
+  const enHoras = (h: number) => new Date(Date.now() + h * 3_600_000);
+  let parada: string;
+
+  it('un correctivo urgente sin técnico avisa al jefe después de 2 horas, una sola vez', async () => {
+    parada = await reportar({ descripcion: 'Se trabó el motor', maquinaParada: true });
+    const media = await reportar({ descripcion: 'Ruido leve en la tapa', maquinaParada: false });
+    const asignada = await reportar({ descripcion: 'Fuga de aceite fuerte', maquinaParada: true });
+    await c.http.post(`/api/ordenes/${asignada}/asignar`).set(c.auth(c.admin)).send({ tecnicoId: tec.id }).expect(201);
+    await limpiar(c.admin, tec.token, tec2.token);
+
+    await svc.revisarUrgentesSinAsignar(enHoras(1));
+    expect(await urgentes(c.admin)).toHaveLength(0);
+    await svc.revisarUrgentesSinAsignar(enHoras(2.5));
+    const avisos = await urgentes(c.admin);
+    expect(avisos.map((n) => n.enlace)).toContain(`/ordenes/${parada}`);
+    expect(avisos.map((n) => n.enlace)).not.toContain(`/ordenes/${media}`); // prioridad media
+    expect(avisos.map((n) => n.enlace)).not.toContain(`/ordenes/${asignada}`); // ya tiene técnico
+    const n = avisos.find((x) => x.enlace === `/ordenes/${parada}`)!;
+    expect(n.titulo).toBe('Orden urgente sin técnico: EMB-1 · Embutidora');
+    expect(n.cuerpo).toMatch(/^OT-\d{6} · Reportada hace 2 h con la máquina parada\. Asígnela a quien esté disponible\.$/);
+    expect(await urgentes(tec.token)).toHaveLength(0); // solo al jefe
+    const antes = avisos.length;
+    await svc.revisarUrgentesSinAsignar(enHoras(4));
+    expect(await urgentes(c.admin)).toHaveLength(antes);
+  });
+
+  it('un preventivo urgente avisa cuando llega su fecha y nadie lo tiene', async () => {
+    const r = await c.http.post('/api/planes').set(c.auth(c.admin)).send({ activoId, nombre: 'Revisión urgente de frenos', prioridad: 'ALTA', frecuenciaValor: 1, frecuenciaUnidad: 'MESES', primeraFecha: sumarDias(hoy(), 1), repuestos: [] }).expect(201);
+    await limpiar(c.admin);
+    await svc.revisarUrgentesSinAsignar(new Date());
+    expect((await urgentes(c.admin)).map((n) => n.enlace)).not.toContain(`/ordenes/${r.body.primeraOrden.id}`);
+    await svc.revisarUrgentesSinAsignar(enHoras(30));
+    const n = (await urgentes(c.admin)).find((x) => x.enlace === `/ordenes/${r.body.primeraOrden.id}`)!;
+    expect(n.cuerpo).toContain(`Preventivo para el ${sumarDias(hoy(), 1).split('-').reverse().join('/')}`);
+  });
+
+  it('la lista de técnicos trae lo que cada uno tiene pendiente', async () => {
+    await c.http.post(`/api/ordenes/${parada}/asignar`).set(c.auth(c.admin)).send({ tecnicoId: tec.id }).expect(201);
+    const ts = (await c.http.get('/api/usuarios/tecnicos').set(c.auth(c.admin))).body as Array<{ id: string; carga: { abiertas: number; urgentes: number; enCurso: number } }>;
+    const t = ts.find((x) => x.id === tec.id)!;
+    expect(t.carga.urgentes).toBeGreaterThanOrEqual(2);
+    expect(t.carga.abiertas).toBeGreaterThanOrEqual(t.carga.urgentes);
+    expect(ts.find((x) => x.id === tec2.id)!.carga).toEqual(expect.objectContaining({ enCurso: 0 }));
+  });
+});

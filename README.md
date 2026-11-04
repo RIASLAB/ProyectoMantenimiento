@@ -106,9 +106,9 @@ cd backend
 npm run test:e2e
 ```
 
-Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **221 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
+Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **224 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
 
-Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**112 verificaciones**):
+Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**116 verificaciones**):
 
 | Script | Qué recorre |
 |---|---|
@@ -121,6 +121,7 @@ Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritori
 | `e2e/formatos_planta.py` | Formatos de la planta: preoperacional B/R/M y su semana, hoja diaria C/NC, ronda y planilla de temperaturas con verificación, cierre de OT con verificaciones de entrega (celular), hoja de vida, iluminación y versión del formato en el PDF |
 | `e2e/lista_materiales.py` | Lista de materiales de cada máquina creada desde su ficha (con o sin tipo), sugerida en sus órdenes; volver a la del tipo |
 | `e2e/tareas_preventivo.py` | Catálogo de tareas; plan preventivo con tareas marcadas (y una creada ahí mismo), prioridad sin técnico; la orden sale con las tareas y el jefe la asigna |
+| `e2e/asignar_ordenes.py` | Asignar desde la lista viendo la carga de cada técnico (los libres primero); reasignar desde la orden; en el celular |
 | `e2e/tipos_equipo.py` | Tipos de equipo con lista de materiales, 3 aires iguales de una vez, cuántos hay en Bodega, preventivo por tipo y materiales en correctivos |
 | `e2e/eliminar_adjuntos.py` | Eliminar fotos de una orden (quién puede y cuándo) y documentos de una máquina |
 | `e2e/carga_masiva.py` | Descarga la plantilla, la llena, la sube con errores (fila y columna), la corrige y carga máquinas y repuestos con stock inicial |

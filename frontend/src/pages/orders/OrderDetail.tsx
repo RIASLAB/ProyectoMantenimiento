@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { api, ApiError, uuid } from '../../api/client';
-import type { MomentoFoto, PersonRef, Purchase, WorkOrderDetail } from '../../api/types';
+import type { MomentoFoto, Purchase, WorkOrderDetail } from '../../api/types';
 import { NewPurchaseModal } from '../purchases/NewPurchaseModal';
+import { AssignModal, useTecnicos } from '../../components/AssignModal';
 import { db } from '../../offline/db';
 import { comprimirFoto, enviarOEncolar, usePendientes } from '../../offline/outbox';
 import { useAuth } from '../../auth/AuthContext';
@@ -82,28 +83,6 @@ function useAccionOT(orden: WorkOrderDetail | undefined, onDone?: () => void) {
   });
 }
 
-function AssignModal({ o, open, onClose }: { o: WorkOrderDetail; open: boolean; onClose: () => void }) {
-  const tecnicos = useQuery({ queryKey: ['tecnicos'], queryFn: () => api.get<Array<PersonRef & { rol: string }>>('/usuarios/tecnicos'), enabled: open });
-  const [sel, setSel] = useState(o.asignadoA?.id ?? '');
-  const m = useOrderMutation(o.id, () => api.post(`/ordenes/${o.id}/asignar`, { tecnicoId: sel }), onClose);
-  return (
-    <Modal open={open} title={o.asignadoA ? 'Reasignar orden' : 'Asignar orden'} onClose={onClose}
-      footer={<><Button variant="ghost" onClick={onClose}>Cancelar</Button><Button busy={m.isPending} disabled={!sel || sel === o.asignadoA?.id} onClick={() => m.mutate(undefined)}>Asignar</Button></>}>
-      <div className="stack">
-        <Field label="Técnico">
-          {(i) => (
-            <Select id={i} value={sel} onChange={(e) => setSel(e.target.value)}>
-              <option value="" disabled>Seleccione…</option>
-              {tecnicos.data?.map((t) => <option key={t.id} value={t.id}>{t.nombre}{t.rol === 'ADMIN' ? ' (administrador)' : ''}</option>)}
-            </Select>
-          )}
-        </Field>
-        {m.isError ? <ErrorBox error={m.error} /> : null}
-      </div>
-    </Modal>
-  );
-}
-
 function NoteModal({ o, open, onClose, kind }: { o: WorkOrderDetail; open: boolean; onClose: () => void; kind: 'esperar' | 'cancelar' }) {
   const [texto, setTexto] = useState('');
   const cancelarM = useOrderMutation(o.id, () => api.post(`/ordenes/${o.id}/cancelar`, { motivo: texto }), () => { setTexto(''); onClose(); });
@@ -143,7 +122,7 @@ function PlannedPartsModal({ o, open, onClose }: { o: WorkOrderDetail; open: boo
 function CloseModal({ o, open, onClose }: { o: WorkOrderDetail; open: boolean; onClose: () => void }) {
   const { user } = useAuth();
   const lista = useMaterialesEquipo(open ? o.activo.id : null);
-  const tecnicos = useQuery({ queryKey: ['tecnicos'], queryFn: () => api.get<Array<PersonRef & { rol: string }>>('/usuarios/tecnicos'), enabled: open });
+  const tecnicos = useTecnicos(open);
   const [trabajo, setTrabajo] = useState('');
   const [rows, setRows] = useState<PartRow[]>([]);
   const [labor, setLabor] = useState<Array<{ tecnicoId: string; horas: string }>>([]);
@@ -506,7 +485,7 @@ export function OrderDetail() {
         </section>
       </div>
 
-      <AssignModal o={o} open={modal === 'asignar'} onClose={() => setModal(null)} />
+      <AssignModal orden={o} open={modal === 'asignar'} onClose={() => setModal(null)} />
       <NoteModal o={o} kind="esperar" open={modal === 'esperar'} onClose={() => setModal(null)} />
       <NoteModal o={o} kind="cancelar" open={modal === 'cancelar'} onClose={() => setModal(null)} />
       <PlannedPartsModal o={o} open={modal === 'repuestos'} onClose={() => setModal(null)} />

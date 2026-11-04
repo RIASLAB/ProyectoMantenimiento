@@ -56,6 +56,9 @@ const fechaCorta = (iso: string) => iso.split('-').reverse().join('/');
 const recortar = (s: string | null | undefined, n: number) => (s && s.length > n ? `${s.slice(0, n - 1)}…` : s ?? null);
 
 /** NOT-01/02: crea las notificaciones de cada evento y las envía al celular cuando hay avisos configurados. */
+/** Horas que puede estar un correctivo urgente sin técnico antes de avisarle al jefe (D-32). */
+export const HORAS_URGENTE_SIN_ASIGNAR = 2;
+
 @Injectable()
 export class NotificationsService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger('Notificaciones');
@@ -99,7 +102,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     const tareas = () => void this.tareasPeriodicas().catch((e) => this.log.error(e));
     this.timers.push(setTimeout(tareas, 10_000), setInterval(tareas, 3_600_000));
     // Rondas de temperatura y checklists diarios no hechos: cada 15 minutos (cada aviso llega una sola vez).
-    const calidad = () => void this.revisarCalidad().catch((e) => this.log.error(e));
+    const calidad = () => void this.revisarCalidad().then(() => this.revisarUrgentesSinAsignar()).catch((e) => this.log.error(e));
     this.timers.push(setTimeout(calidad, 20_000), setInterval(calidad, 15 * 60_000));
   }
 
@@ -229,6 +232,44 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
         cuerpo: 'El formato de hoy todavía no se ha diligenciado.',
         enlace: `/calidad/checklist/${c.id}`,
         clave: `checklist-pendiente:${c.id}:${l.fecha}`,
+      });
+    }
+    return enviados;
+  }
+
+  /**
+   * Órdenes urgentes (prioridad alta) sin técnico (D-32): un correctivo que lleva más de
+   * HORAS_URGENTE_SIN_ASIGNAR horas reportado, o un preventivo cuya fecha ya llegó. Avisa una vez al jefe
+   * (administradores), dentro del horario de producción; lo de la noche llega al iniciar la jornada.
+   */
+  async revisarUrgentesSinAsignar(ahora = new Date()) {
+    const s = await this.ds.getRepository(Setting).findOne({ where: { clave: PARAM_INDICADORES } });
+    let horario: ParametrosKpi = PARAMETROS_POR_DEFECTO;
+    try {
+      if (s?.valor) horario = { ...PARAMETROS_POR_DEFECTO, ...JSON.parse(s.valor) };
+    } catch { /* se usa el horario por defecto */ }
+    const l = localPlanta(ahora);
+    if (!horario.dias.includes(l.dia) || l.minutos < aMinutos(horario.horaInicio) || l.minutos >= aMinutos(horario.horaFin)) return 0;
+    const filas: Array<{ id: string; numero: number; tipo: string; codigo: string; nombre: string; parada: boolean; creado: Date; fecha: string | null }> = await this.ds.query(
+      `SELECT o.id, o.numero, o.tipo, a.codigo, a.nombre, o.maquina_parada AS parada, o.creado_en AS creado, to_char(o.fecha_programada, 'YYYY-MM-DD') AS fecha
+         FROM ordenes_trabajo o JOIN activos a ON a.id = o.activo_id
+        WHERE o.estado = 'ABIERTA' AND o.asignado_a_id IS NULL AND o.prioridad = 'ALTA'
+          AND ((o.tipo = 'CORRECTIVO' AND o.creado_en <= $1::timestamptz - make_interval(hours => $3))
+            OR (o.tipo = 'PREVENTIVO' AND o.fecha_programada <= $2::date))
+        ORDER BY o.creado_en`,
+      [ahora.toISOString(), l.fecha, HORAS_URGENTE_SIN_ASIGNAR],
+    );
+    let enviados = 0;
+    for (const f of filas) {
+      const horas = Math.floor((ahora.getTime() - new Date(f.creado).getTime()) / 3_600_000);
+      enviados += await this.notificar(null, { roles: [Rol.ADMIN] }, {
+        tipo: 'URGENTE_SIN_ASIGNAR',
+        titulo: `Orden urgente sin técnico: ${f.codigo} · ${f.nombre}`,
+        cuerpo: f.tipo === 'PREVENTIVO'
+          ? `${numeroOT(f.numero)} · Preventivo para el ${fechaCorta(f.fecha!)}. Asígnela a quien esté disponible.`
+          : `${numeroOT(f.numero)} · Reportada hace ${horas} h${f.parada ? ' con la máquina parada' : ''}. Asígnela a quien esté disponible.`,
+        enlace: `/ordenes/${f.id}`,
+        clave: `urgente-sin-asignar:${f.id}`,
       });
     }
     return enviados;

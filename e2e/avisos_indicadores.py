@@ -88,10 +88,10 @@ with sync_playwright() as p:
 
     # 5) El admin asigna la orden al técnico → al técnico le llega en su celular
     adm.locator('.notif', has_text='Máquina parada: EMB-002').click()
-    adm.get_by_role('button', name=re.compile('Asignar')).first.click()
+    adm.get_by_role('button', name='Asignar', exact=True).first.click()
     dlg = adm.locator('dialog[open]')
-    dlg.get_by_label('Técnico').select_option(label='Técnico Demo')
-    dlg.get_by_role('button', name=re.compile('Asignar')).click()
+    dlg.locator('.asignar-op', has_text='Técnico Demo').click()
+    dlg.get_by_role('button', name='Asignar', exact=True).click()
     expect(adm.locator('dialog[open]')).to_have_count(0)
     tcel = b.new_context(**p.devices['iPhone 13'], locale='es-CO', timezone_id='America/Bogota')
     tec = tcel.new_page(); track(tec)

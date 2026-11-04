@@ -21,9 +21,25 @@ export class UsersService {
     return this.repo.find({ order: { activo: 'DESC', nombre: 'ASC' } });
   }
 
+  /**
+   * Quienes pueden recibir órdenes, con su carga actual (órdenes asignadas sin cerrar, cuántas son urgentes
+   * y cuántas está haciendo ahora) para repartir el trabajo cuando todos están ocupados.
+   */
   async tecnicos() {
     const us = await this.repo.find({ where: { activo: true, rol: In([Rol.TECNICO, Rol.ADMIN]) }, order: { rol: 'DESC', nombre: 'ASC' } });
-    return us.map((u) => ({ id: u.id, nombre: u.nombre, rol: u.rol }));
+    const carga: Array<{ id: string; abiertas: string; urgentes: string; en_curso: string }> = await this.ds.query(
+      `SELECT asignado_a_id AS id, count(*) AS abiertas,
+              count(*) FILTER (WHERE prioridad = 'ALTA') AS urgentes,
+              count(*) FILTER (WHERE estado = 'EN_EJECUCION') AS en_curso
+         FROM ordenes_trabajo
+        WHERE asignado_a_id IS NOT NULL AND estado IN ('ASIGNADA', 'EN_EJECUCION', 'ESPERANDO_REPUESTO')
+        GROUP BY asignado_a_id`,
+    );
+    const porId = new Map(carga.map((c) => [c.id, c]));
+    return us.map((u) => {
+      const c = porId.get(u.id);
+      return { id: u.id, nombre: u.nombre, rol: u.rol, carga: { abiertas: Number(c?.abiertas ?? 0), urgentes: Number(c?.urgentes ?? 0), enCurso: Number(c?.en_curso ?? 0) } };
+    });
   }
 
   async get(id: string) {
