@@ -168,7 +168,7 @@ describe('NOT-01 · Compras: autorizador y solicitante', () => {
   it('la solicitud automática por faltante también le llega', async () => {
     await limpiar(aut.token);
     await c.http.post('/api/planes').set(c.auth(c.admin)).send({
-      activoId, nombre: 'Cambio de rodamientos', frecuenciaValor: 3, frecuenciaUnidad: 'MESES', tecnicoId: tec.id, primeraFecha: '2030-01-15', repuestos: [{ repuestoId: rodId, cantidad: 10 }],
+      activoId, nombre: 'Cambio de rodamientos', frecuenciaValor: 3, frecuenciaUnidad: 'MESES', primeraFecha: '2030-01-15', repuestos: [{ repuestoId: rodId, cantidad: 10 }],
     }).expect(201);
     expect((await nuevas(aut.token))[0].titulo).toMatch(/^Solicitud de compra SC-\d{6}: ROD-1 × 7$/);
   });
@@ -254,10 +254,12 @@ describe('MNT-06 · Preventivo próximo y vencido', () => {
 
   it('avisa al técnico asignado cuando entra en los días de aviso, una sola vez', async () => {
     const fecha = sumarDias(hoy(), 3);
-    const r = await c.http.post('/api/planes').set(c.auth(c.admin)).send({ activoId, nombre: 'Lubricación', frecuenciaValor: 1, frecuenciaUnidad: 'MESES', diasAviso: 5, tecnicoId: tec2.id, primeraFecha: fecha, repuestos: [] });
+    const r = await c.http.post('/api/planes').set(c.auth(c.admin)).send({ activoId, nombre: 'Lubricación', frecuenciaValor: 1, frecuenciaUnidad: 'MESES', diasAviso: 5, primeraFecha: fecha, repuestos: [] });
     expect(r.body).toHaveProperty('primeraOrden');
     prevId = r.body.primeraOrden.id;
     prevCodigo = r.body.primeraOrden.codigo;
+    // El plan no lleva técnico (D-31): el jefe asigna la orden.
+    await c.http.post(`/api/ordenes/${prevId}/asignar`).set(c.auth(c.admin)).send({ tecnicoId: tec2.id }).expect(201);
     await limpiar(tec2.token, c.admin);
 
     // 10 días antes todavía no avisa

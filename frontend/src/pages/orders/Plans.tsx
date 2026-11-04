@@ -2,11 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
-import type { Asset, EquipmentModel, PersonRef, Plan, UnidadFrecuencia } from '../../api/types';
+import type { Asset, EquipmentModel, Plan, Prioridad, UnidadFrecuencia } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { PartRow, PartRows, rowsToPayload, tituloLista, useMaterialesEquipo, useTipoEquipo } from '../../components/orders-shared';
 import { Badge, Button, Empty, ErrorBox, Field, Icon, Input, Modal, PageHeader, Select, Spinner, Textarea } from '../../components/ui';
-import { frecuencia, qty } from '../../format';
+import { frecuencia, PRIORIDAD_LABEL, PRIORIDAD_PLAN_LABEL, PRIORIDAD_TONE, qty } from '../../format';
+import { TareasPicker } from '../../components/tasks';
 import { OrdersTabs } from './OrdersList';
 
 const hoyLocal = () => {
@@ -31,17 +32,18 @@ function PlanModal({ plan, equiposDelTipo, open, onClose }: { plan: Plan | null;
   const editing = !!plan;
   const activos = useQuery({ queryKey: ['activos', '', '', ''], queryFn: () => api.get<Asset[]>('/activos'), enabled: open });
   const tipos = useQuery({ queryKey: ['tipos-equipo'], queryFn: () => api.get<EquipmentModel[]>('/tipos-equipo'), enabled: open });
-  const tecnicos = useQuery({ queryKey: ['tecnicos'], queryFn: () => api.get<PersonRef[]>('/usuarios/tecnicos'), enabled: open });
   const [destino, setDestino] = useState<Destino>('maquina');
-  const [f, setF] = useState({ activoId: '', modeloId: '', nombre: '', tareas: '', frecuenciaValor: '1', frecuenciaUnidad: 'MESES' as UnidadFrecuencia, diasAviso: '7', tecnicoId: '', primeraFecha: hoyLocal(), vigente: true });
+  const [f, setF] = useState({ activoId: '', modeloId: '', nombre: '', tareas: '', frecuenciaValor: '1', frecuenciaUnidad: 'MESES' as UnidadFrecuencia, diasAviso: '7', prioridad: 'MEDIA' as Prioridad, primeraFecha: hoyLocal(), vigente: true });
+  const [tareaIds, setTareaIds] = useState<string[]>([]);
   const [rows, setRows] = useState<PartRow[]>([]);
 
   useEffect(() => {
     if (!open) return;
     setDestino(plan?.modeloId ? 'tipo' : 'maquina');
     setF(plan
-      ? { activoId: plan.activoId ?? '', modeloId: plan.modeloId ?? '', nombre: plan.nombre, tareas: plan.tareas ?? '', frecuenciaValor: String(plan.frecuenciaValor), frecuenciaUnidad: plan.frecuenciaUnidad, diasAviso: String(plan.diasAviso), tecnicoId: plan.tecnicoId ?? '', primeraFecha: hoyLocal(), vigente: plan.vigente }
-      : { activoId: '', modeloId: '', nombre: '', tareas: '', frecuenciaValor: '1', frecuenciaUnidad: 'MESES', diasAviso: '7', tecnicoId: '', primeraFecha: hoyLocal(), vigente: true });
+      ? { activoId: plan.activoId ?? '', modeloId: plan.modeloId ?? '', nombre: plan.nombre, tareas: plan.tareas ?? '', frecuenciaValor: String(plan.frecuenciaValor), frecuenciaUnidad: plan.frecuenciaUnidad, diasAviso: String(plan.diasAviso), prioridad: plan.prioridad, primeraFecha: hoyLocal(), vigente: plan.vigente }
+      : { activoId: '', modeloId: '', nombre: '', tareas: '', frecuenciaValor: '1', frecuenciaUnidad: 'MESES', diasAviso: '7', prioridad: 'MEDIA', primeraFecha: hoyLocal(), vigente: true });
+    setTareaIds(plan ? [...plan.tareasPlan].sort((x, y) => x.orden - y.orden).map((t) => t.tareaId) : []);
     setRows(plan ? plan.repuestos.map((r) => ({ repuestoId: r.repuestoId, cantidad: String(r.cantidad) })) : []);
   }, [open, plan]);
 
@@ -69,11 +71,11 @@ function PlanModal({ plan, equiposDelTipo, open, onClose }: { plan: Plan | null;
     mutationFn: () => {
       const comunes = {
         nombre: f.nombre, tareas: f.tareas || (editing ? null : undefined), frecuenciaValor: Number(f.frecuenciaValor),
-        frecuenciaUnidad: f.frecuenciaUnidad, diasAviso: Number(f.diasAviso), tecnicoId: f.tecnicoId || null, repuestos: rowsToPayload(rows),
+        frecuenciaUnidad: f.frecuenciaUnidad, diasAviso: Number(f.diasAviso), prioridad: f.prioridad, tareaIds, repuestos: rowsToPayload(rows),
       };
       if (editing) return api.patch(`/planes/${plan!.id}`, { ...comunes, vigente: f.vigente });
       const destinoBody = destino === 'tipo' ? { modeloId: f.modeloId } : { activoId: f.activoId };
-      return api.post('/planes', { ...comunes, ...destinoBody, primeraFecha: f.primeraFecha, tecnicoId: f.tecnicoId || undefined });
+      return api.post('/planes', { ...comunes, ...destinoBody, primeraFecha: f.primeraFecha });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['planes'] });
@@ -116,7 +118,11 @@ function PlanModal({ plan, equiposDelTipo, open, onClose }: { plan: Plan | null;
           </Field>
         )}
         <Field label="Nombre *" hint="Ej. Lubricación mensual">{(i) => <Input id={i} value={f.nombre} onChange={set('nombre')} required minLength={3} maxLength={150} />}</Field>
-        <Field label="Tareas">{(i) => <Textarea id={i} value={f.tareas} onChange={set('tareas')} maxLength={4000} />}</Field>
+        <div>
+          <p className="subtle-head">Tareas a realizar</p>
+          <TareasPicker value={tareaIds} onChange={setTareaIds} conocidas={plan?.tareasPlan.map((t) => t.tarea)} />
+        </div>
+        <Field label="Indicaciones adicionales (opcional)" hint="Solo si hace falta algo que no está en las tareas.">{(i) => <Textarea id={i} value={f.tareas} onChange={set('tareas')} maxLength={4000} rows={2} />}</Field>
         <div className="form-grid">
           <Field label="Cada *">{(i) => <Input id={i} type="number" min="1" max="365" value={f.frecuenciaValor} onChange={set('frecuenciaValor')} required />}</Field>
           <Field label="Unidad *">
@@ -128,11 +134,10 @@ function PlanModal({ plan, equiposDelTipo, open, onClose }: { plan: Plan | null;
           </Field>
           <Field label="Avisar con (días)">{(i) => <Input id={i} type="number" min="0" max="90" value={f.diasAviso} onChange={set('diasAviso')} />}</Field>
           {!editing ? <Field label="Primer mantenimiento *">{(i) => <Input id={i} type="date" value={f.primeraFecha} onChange={set('primeraFecha')} required />}</Field> : null}
-          <Field label="Técnico responsable">
+          <Field label="Prioridad *" hint="Las órdenes salen con esta prioridad; el técnico se asigna en cada orden.">
             {(i) => (
-              <Select id={i} value={f.tecnicoId} onChange={set('tecnicoId')}>
-                <option value="">Sin asignar</option>
-                {tecnicos.data?.map((t) => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+              <Select id={i} value={f.prioridad} onChange={set('prioridad')}>
+                {(['ALTA', 'MEDIA', 'BAJA'] as Prioridad[]).map((p) => <option key={p} value={p}>{PRIORIDAD_PLAN_LABEL[p]}</option>)}
               </Select>
             )}
           </Field>
@@ -191,8 +196,11 @@ export function Plans() {
                   <strong>{p.nombre}</strong>
                   <span className="muted">
                     {deTipo ? <>{p.modeloEquipo?.nombre} · {equipos.length} equipo{equipos.length === 1 ? '' : 's'}</> : <Link to={`/maquinas/${p.activo?.id}`}>{p.activo?.nombre}</Link>}
-                    {' · '}{frecuencia(p.frecuenciaValor, p.frecuenciaUnidad)} · {p.tecnico?.nombre ?? 'Sin técnico'}
+                    {' · '}{frecuencia(p.frecuenciaValor, p.frecuenciaUnidad)}
                   </span>
+                  {p.tareasPlan.length ? (
+                    <ol className="plan-tareas">{[...p.tareasPlan].sort((x, y) => x.orden - y.orden).map((t) => <li key={t.id}>{t.tarea.nombre}</li>)}</ol>
+                  ) : null}
                   {kit(p)}
                   {deTipo && equipos.length ? (
                     <>
@@ -210,6 +218,7 @@ export function Plans() {
                   ) : null}
                 </div>
                 <div className="list-meta">
+                  <Badge tone={PRIORIDAD_TONE[p.prioridad]}>Prioridad {PRIORIDAD_LABEL[p.prioridad].toLowerCase()}</Badge>
                   {deTipo ? <Badge tone="info">Por tipo</Badge> : null}
                   {!p.vigente ? <Badge tone="muted">Inactivo</Badge> : <Badge tone="ok">Vigente</Badge>}
                   {can('ADMIN') ? <Button variant="ghost" onClick={() => { setEdit(p); setOpen(true); }}>Editar</Button> : null}

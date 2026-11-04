@@ -130,9 +130,10 @@ describe('Preventivo por tipo de equipo', () => {
   });
 
   it('se aplica a todos los equipos del tipo (no a los dados de baja), cada uno con su orden y su lista de materiales', async () => {
+    const tarea = (await post('/tareas-mantenimiento', { nombre: 'Limpiar filtros', grupo: 'Refrigeración' })).body.id;
     const r = await post('/planes', {
       modeloId: miniSplit, nombre: 'Limpieza de filtros y revisión de gas', frecuenciaValor: 2, frecuenciaUnidad: 'MESES',
-      primeraFecha: masDias(5), tecnicoId: tec.id, repuestos: [{ repuestoId: rep['RP-FIL'], cantidad: 2 }],
+      primeraFecha: masDias(5), prioridad: 'BAJA', tareaIds: [tarea], repuestos: [{ repuestoId: rep['RP-FIL'], cantidad: 2 }],
     });
     expect(r.status).toBe(201);
     plantilla = r.body.plan.id;
@@ -145,8 +146,10 @@ describe('Preventivo por tipo de equipo', () => {
 
     const ots = (await get('/ordenes?tipo=PREVENTIVO&vista=abiertas')).body as Array<{ id: string; activo: { codigo: string }; fechaProgramada: string; estado: string }>;
     const ot = ots.find((o) => o.activo.codigo === 'AA-009')!;
-    expect(ot).toMatchObject({ fechaProgramada: masDias(5), estado: 'ASIGNADA' });
+    expect(ot).toMatchObject({ fechaProgramada: masDias(5), estado: 'ABIERTA' });
     const d = await get(`/ordenes/${ot.id}`);
+    // Cada equipo hereda la prioridad y las tareas del plan del tipo
+    expect(d.body).toMatchObject({ prioridad: 'BAJA', descripcion: 'Limpieza de filtros y revisión de gas\nTareas:\n1. Limpiar filtros' });
     expect(d.body.repuestos.map((x: { repuesto: { codigo: string }; cantidadPlanificada: number }) => `${x.repuesto.codigo}×${x.cantidadPlanificada}`)).toEqual(['RP-FIL×2']);
   });
 
@@ -156,9 +159,11 @@ describe('Preventivo por tipo de equipo', () => {
     expect(r.status).toBe(400);
     expect(r.body.message).toContain('Mini split 12.000 BTU');
 
-    await patch(`/planes/${plantilla}`, { frecuenciaValor: 3, repuestos: [{ repuestoId: rep['RP-FIL'], cantidad: 2 }, { repuestoId: rep['RP-GAS'], cantidad: 1 }] }).expect(200);
-    const hijos = ((await get('/planes')).body as Array<{ plantillaId: string | null; frecuenciaValor: number; repuestos: unknown[] }>).filter((p) => p.plantillaId === plantilla);
-    expect(hijos.every((h) => h.frecuenciaValor === 3 && h.repuestos.length === 2)).toBe(true);
+    const gas = (await post('/tareas-mantenimiento', { nombre: 'Revisar presión del gas' })).body.id;
+    const filtros = ((await get('/planes')).body as Array<{ id: string; tareasPlan: Array<{ tareaId: string }> }>).find((p) => p.id === plantilla)!.tareasPlan[0].tareaId;
+    await patch(`/planes/${plantilla}`, { frecuenciaValor: 3, prioridad: 'MEDIA', tareaIds: [filtros, gas], repuestos: [{ repuestoId: rep['RP-FIL'], cantidad: 2 }, { repuestoId: rep['RP-GAS'], cantidad: 1 }] }).expect(200);
+    const hijos = ((await get('/planes')).body as Array<{ plantillaId: string | null; frecuenciaValor: number; prioridad: string; repuestos: unknown[]; tareasPlan: unknown[] }>).filter((p) => p.plantillaId === plantilla);
+    expect(hijos.every((h) => h.frecuenciaValor === 3 && h.repuestos.length === 2 && h.prioridad === 'MEDIA' && h.tareasPlan.length === 2)).toBe(true);
   });
 
   it('un equipo nuevo del tipo recibe el preventivo solo (también al crear varios)', async () => {

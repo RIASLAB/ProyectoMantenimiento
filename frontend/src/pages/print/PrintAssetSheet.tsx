@@ -77,7 +77,11 @@ export function PrintAssetSheet() {
             <tbody>
               {vigentes.length ? vigentes.map((p) => (
                 <tr key={p.id}>
-                  <td><strong>{p.nombre}</strong>{p.tareas ? <div className="ptxt">{p.tareas}</div> : null}</td>
+                  <td>
+                    <strong>{p.nombre}</strong>
+                    {p.tareasPlan?.length ? <div className="ptxt">{[...p.tareasPlan].sort((x, y) => x.orden - y.orden).map((t, i) => `${i + 1}. ${t.tarea.nombre}`).join(' · ')}</div> : null}
+                    {p.tareas ? <div className="ptxt">{p.tareas}</div> : null}
+                  </td>
                   <td>{frecuencia(p.frecuenciaValor, p.frecuenciaUnidad)}</td>
                   <td>{p.repuestos.map((r) => `${r.repuesto.descripcion} × ${qty(r.cantidad)} ${r.repuesto.unidad}`).join('; ')}</td>
                 </tr>

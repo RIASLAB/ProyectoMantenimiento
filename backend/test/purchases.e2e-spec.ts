@@ -33,12 +33,14 @@ let scId: string;
 describe('COM-01 · Solicitud automática por faltante', () => {
   it('stock 1 y el kit pide 3 → se solicita la diferencia (2) ligada a la OT', async () => {
     const r = await c.http.post('/api/planes').set(c.auth(c.admin)).send({
-      activoId, nombre: 'Cambio de rodamientos', frecuenciaValor: 3, frecuenciaUnidad: 'MESES', tecnicoId: tec.id,
+      activoId, nombre: 'Cambio de rodamientos', frecuenciaValor: 3, frecuenciaUnidad: 'MESES',
       primeraFecha: '2030-01-15', repuestos: [{ repuestoId: rodId, cantidad: 3 }],
     });
     expect(r.status).toBe(201);
     otId = r.body.primeraOrden.id;
     expect(r.body.primeraOrden.solicitudesCreadas).toHaveLength(1);
+    // El plan no lleva técnico (D-31): el jefe asigna la orden.
+    await c.http.post(`/api/ordenes/${otId}/asignar`).set(c.auth(c.admin)).send({ tecnicoId: tec.id }).expect(201);
 
     const l = await c.http.get(`/api/compras?ordenId=${otId}`).set(c.auth(c.admin));
     expect(l.body).toHaveLength(1);

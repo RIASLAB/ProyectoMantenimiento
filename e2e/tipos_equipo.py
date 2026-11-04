@@ -105,7 +105,8 @@ with sync_playwright() as p:
     expect(d.get_by_label('Repuesto', exact=True)).to_have_count(2)  # la lista de materiales se carga sola
     d.get_by_label('Nombre *').fill('Limpieza de filtros y revisión de gas')
     d.get_by_label('Cada *').fill('2')
-    elegir(d.get_by_label('Técnico responsable'), 'Técnico Demo')
+    d.get_by_label('Limpiar filtros').check()
+    d.get_by_label('Revisar la presión del gas refrigerante').check()
     a.screenshot(path=f'{SP}/tipo-05-plan-tipo.png', full_page=True)
     a.locator('dialog[open]').get_by_role('button', name='Crear plan').click()
     expect(a.locator('dialog[open]')).to_have_count(0)
@@ -119,6 +120,7 @@ with sync_playwright() as p:
     a.locator('.list-row', has_text='AA-012').first.click()
     expect(a.locator('.card', has_text='Repuestos').first).to_contain_text('RP-FIL-MS12')
     expect(a.locator('.card', has_text='Repuestos').first).to_contain_text('RP-GAS-410')
+    expect(a.locator('.desc')).to_contain_text('1. Limpiar filtros')
     ok('preventivo por tipo: 7 planes y 7 órdenes, cada una con la lista de materiales')
 
     a.goto(BASE + '/maquinas')

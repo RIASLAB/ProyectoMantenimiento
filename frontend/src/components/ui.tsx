@@ -89,7 +89,8 @@ export function Modal({ open, title, onClose, children, footer }: { open: boolea
     if (!open && d.open) d.close();
   }, [open]);
   return (
-    <dialog ref={ref} className="modal" onClose={onClose} onCancel={onClose}>
+    // Solo los eventos de este diálogo: los de un diálogo hijo (abierto desde este) no deben cerrarlo.
+    <dialog ref={ref} className="modal" onClose={(e) => { if (e.target === ref.current) onClose(); }} onCancel={(e) => { if (e.target === ref.current) onClose(); }}>
       <div className="modal-head">
         <h2>{title}</h2>
         <button type="button" className="icon-btn" aria-label="Cerrar" onClick={onClose}>

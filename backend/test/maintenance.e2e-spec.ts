@@ -310,17 +310,62 @@ describe('MNT-05/06/08 · Preventivos', () => {
     return d.toISOString().slice(0, 10);
   };
 
-  it('crear un plan genera la primera OT con el kit de repuestos y el técnico', async () => {
+  let tLub: string;
+  let tTorn: string;
+
+  it('D-31 · catálogo de tareas: el administrador las crea una vez (sin repetir nombres); todos las consultan', async () => {
+    const crear = (body: object, token = c.admin) => c.http.post('/api/tareas-mantenimiento').set(c.auth(token)).send(body);
+    const a = await crear({ nombre: 'Lubricar rodamientos', grupo: 'Lubricación', descripcion: 'Grasa grado alimenticio' });
+    expect(a.status).toBe(201);
+    tLub = a.body.id;
+    tTorn = (await crear({ nombre: '  Ajustar   tornillería ', grupo: 'Mecánico' })).body.id;
+    expect((await crear({ nombre: 'LUBRICAR RODAMIENTOS' })).status).toBe(409);
+    expect((await crear({ nombre: 'Otra tarea' }, tec1.token)).status).toBe(403);
+    const lista = await c.http.get('/api/tareas-mantenimiento').set(c.auth(tec1.token));
+    expect(lista.body.map((t: { nombre: string }) => t.nombre)).toEqual(['Lubricar rodamientos', 'Ajustar tornillería']);
+  });
+
+  it('crear un plan genera la primera OT abierta, con su prioridad, sus tareas y el kit (sin técnico: la asigna el jefe)', async () => {
     const r = await c.http.post('/api/planes').set(c.auth(c.admin)).send({
-      activoId, nombre: 'Lubricación mensual', tareas: 'Lubricar rodamientos', frecuenciaValor: 1, frecuenciaUnidad: 'MESES',
-      tecnicoId: tec2.id, primeraFecha: ayer(), repuestos: [{ repuestoId: rodId, cantidad: 2 }],
+      activoId, nombre: 'Lubricación mensual', tareaIds: [tLub, tTorn, tLub], tareas: 'Usar guantes', prioridad: 'ALTA', frecuenciaValor: 1, frecuenciaUnidad: 'MESES',
+      primeraFecha: ayer(), repuestos: [{ repuestoId: rodId, cantidad: 2 }],
     });
     expect(r.status).toBe(201);
     planId = r.body.plan.id;
     otPrev = r.body.primeraOrden.id;
     const o = await c.http.get(`/api/ordenes/${otPrev}`).set(c.auth(c.admin));
-    expect(o.body).toMatchObject({ tipo: 'PREVENTIVO', estado: 'ASIGNADA', asignadoA: { id: tec2.id }, fechaProgramada: ayer() });
+    expect(o.body).toMatchObject({ tipo: 'PREVENTIVO', estado: 'ABIERTA', prioridad: 'ALTA', asignadoA: null, fechaProgramada: ayer() });
+    expect(o.body.descripcion).toBe('Lubricación mensual\nTareas:\n1. Lubricar rodamientos — Grasa grado alimenticio\n2. Ajustar tornillería\nIndicaciones: Usar guantes');
     expect(o.body.repuestos[0]).toMatchObject({ cantidadPlanificada: 2, stock: 1, faltante: 1 });
+    const planes = await c.http.get('/api/planes').set(c.auth(c.admin));
+    const p = planes.body.find((x: { id: string }) => x.id === planId);
+    expect(p).toMatchObject({ prioridad: 'ALTA' });
+    expect(p.tareasPlan.map((t: { tarea: { nombre: string } }) => t.tarea.nombre)).toEqual(['Lubricar rodamientos', 'Ajustar tornillería']);
+    expect(p).not.toHaveProperty('tecnicoId');
+    // El plan ya no acepta técnico; las tareas deben existir
+    const conTec = await c.http.post('/api/planes').set(c.auth(c.admin)).send({ activoId, nombre: 'X', frecuenciaValor: 1, frecuenciaUnidad: 'MESES', primeraFecha: hoy(), repuestos: [], tecnicoId: tec2.id });
+    expect(conTec.status).toBe(400);
+    const falsa = await c.http.post('/api/planes').set(c.auth(c.admin)).send({ activoId, nombre: 'X plan', frecuenciaValor: 1, frecuenciaUnidad: 'MESES', primeraFecha: hoy(), repuestos: [], tareaIds: ['00000000-0000-4000-8000-000000000000'] });
+    expect(falsa.status).toBe(400);
+    // El jefe asigna la orden
+    await c.http.post(`/api/ordenes/${otPrev}/asignar`).set(c.auth(c.admin)).send({ tecnicoId: tec2.id }).expect(201);
+  });
+
+  it('D-31 · una tarea usada no se borra, se desactiva: deja de ofrecerse y el plan que la tiene la conserva', async () => {
+    const del = await c.http.delete(`/api/tareas-mantenimiento/${tTorn}`).set(c.auth(c.admin));
+    expect(del.status).toBe(400);
+    expect(del.body.message).toContain('desactívela');
+    await c.http.patch(`/api/tareas-mantenimiento/${tTorn}`).set(c.auth(c.admin)).send({ activa: false }).expect(200);
+    expect((await c.http.get('/api/tareas-mantenimiento').set(c.auth(c.admin))).body).toHaveLength(1);
+    expect((await c.http.get('/api/tareas-mantenimiento?todas=1').set(c.auth(c.admin))).body.find((t: { id: string }) => t.id === tTorn)).toMatchObject({ activa: false, planes: 1 });
+    // Editar el plan sin quitarla está permitido; agregarla a otro plan no
+    await c.http.patch(`/api/planes/${planId}`).set(c.auth(c.admin)).send({ tareaIds: [tTorn, tLub] }).expect(200);
+    const otro = await c.http.post('/api/planes').set(c.auth(c.admin)).send({ activoId, nombre: 'Otro plan', frecuenciaValor: 1, frecuenciaUnidad: 'MESES', primeraFecha: hoy(), repuestos: [], tareaIds: [tTorn] });
+    expect(otro.status).toBe(400);
+    await c.http.patch(`/api/tareas-mantenimiento/${tTorn}`).set(c.auth(c.admin)).send({ activa: true }).expect(200);
+    // Una sin usar sí se elimina
+    const nueva = (await c.http.post('/api/tareas-mantenimiento').set(c.auth(c.admin)).send({ nombre: 'Tarea de prueba' })).body;
+    await c.http.delete(`/api/tareas-mantenimiento/${nueva.id}`).set(c.auth(c.admin)).expect(200);
   });
 
   it('MNT-06 · el preventivo con fecha pasada aparece vencido', async () => {
@@ -345,7 +390,9 @@ describe('MNT-05/06/08 · Preventivos', () => {
     // Programado ayer + 1 mes: la cadencia se conserva
     expect(sig.fechaProgramada).toBe(sumarFrecuencia(ayer(), 1, UnidadFrecuencia.MESES));
     const o = await c.http.get(`/api/ordenes/${sig.id}`).set(c.auth(c.admin));
-    expect(o.body).toMatchObject({ estado: 'ASIGNADA', plan: { id: planId } });
+    // La siguiente sale abierta, con la prioridad y las tareas (ya reordenadas) del plan
+    expect(o.body).toMatchObject({ estado: 'ABIERTA', prioridad: 'ALTA', plan: { id: planId } });
+    expect(o.body.descripcion).toContain('1. Ajustar tornillería\n2. Lubricar rodamientos');
     expect(o.body.repuestos[0].cantidadPlanificada).toBe(2);
 
     const cerrada = await c.http.get(`/api/ordenes/${otPrev}`).set(c.auth(c.admin));

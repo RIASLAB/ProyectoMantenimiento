@@ -19,7 +19,7 @@ import { PurchasesService } from '../purchases/purchases.service';
 import { SettingsService } from '../settings/settings.service';
 import { User } from '../users/user.entity';
 import { AssignDto, CloseOrderDto, CreatePlanDto, ListOrdersQuery, PartQtyDto, ReportFaultDto, UpdatePlanDto } from './maintenance.dto';
-import { MaintenancePlan, PlanPart, WorkOrder, WorkOrderEvent, WorkOrderLabor, WorkOrderPart, WorkOrderPhoto } from './maintenance.entities';
+import { MaintenancePlan, MaintenanceTask, PlanPart, PlanTask, WorkOrder, WorkOrderEvent, WorkOrderLabor, WorkOrderPart, WorkOrderPhoto } from './maintenance.entities';
 
 /** Transiciones de estado permitidas (MNT-03). */
 export const TRANSICIONES: Record<EstadoOrden, EstadoOrden[]> = {
@@ -542,10 +542,11 @@ export class MaintenanceService {
       .leftJoin('p.activo', 'a').addSelect(['a.id', 'a.codigo', 'a.nombre', 'a.area'])
       .leftJoin('p.modeloEquipo', 'm').addSelect(['m.id', 'm.nombre'])
       .leftJoin('m.categoria', 'mc').addSelect(['mc.id', 'mc.nombre'])
-      .leftJoin('p.tecnico', 't').addSelect(['t.id', 't.nombre'])
+      .leftJoinAndSelect('p.tareasPlan', 'pt')
+      .leftJoin('pt.tarea', 'tt').addSelect(['tt.id', 'tt.nombre', 'tt.grupo', 'tt.descripcion', 'tt.activa'])
       .leftJoinAndSelect('p.repuestos', 'pr')
       .leftJoin('pr.repuesto', 'r').addSelect(['r.id', 'r.codigo', 'r.descripcion', 'r.unidad'])
-      .orderBy('m.nombre', 'ASC', 'NULLS LAST').addOrderBy('a.codigo').addOrderBy('p.nombre');
+      .orderBy('m.nombre', 'ASC', 'NULLS LAST').addOrderBy('a.codigo').addOrderBy('p.nombre').addOrderBy('pt.orden');
     if (activoId) qb.where('p.activoId = :activoId', { activoId });
     return qb.getMany();
   }
@@ -556,7 +557,6 @@ export class MaintenanceService {
    */
   async crearPlan(dto: CreatePlanDto, actor: SessionUser) {
     if (!!dto.activoId === !!dto.modeloId) throw new BadRequestException('Indique la máquina o el tipo de equipo del plan (uno de los dos)');
-    if (dto.tecnicoId) await this.validarTecnico(dto.tecnicoId);
     if (dto.modeloId) return this.crearPlanPorTipo(dto, actor);
 
     const activo = await this.assets.findOne({ where: { id: dto.activoId! } });
@@ -566,10 +566,12 @@ export class MaintenanceService {
 
     return this.ds.transaction(async (em) => {
       await this.validarRepuestos(em, dto.repuestos);
+      const tareaIds = await this.validarTareas(em, dto.tareaIds ?? []);
       const plan = await em.getRepository(MaintenancePlan).save(
         em.getRepository(MaintenancePlan).create({
           activoId: activo.id,
           ...this.camposPlan(dto),
+          tareasPlan: tareaIds.map((tareaId, orden) => em.getRepository(PlanTask).create({ tareaId, orden })),
           repuestos: this.agrupar(dto.repuestos).map((r) => em.getRepository(PlanPart).create({ repuestoId: r.repuestoId, cantidad: r.cantidad })),
         }),
       );
@@ -584,11 +586,13 @@ export class MaintenanceService {
     if (!modelo) throw new NotFoundException('Tipo de equipo no encontrado');
     return this.ds.transaction(async (em) => {
       await this.validarRepuestos(em, dto.repuestos);
+      const tareaIds = await this.validarTareas(em, dto.tareaIds ?? []);
       const plantilla = await em.getRepository(MaintenancePlan).save(
         em.getRepository(MaintenancePlan).create({
           modeloId: modelo.id,
           primeraFecha: dto.primeraFecha,
           ...this.camposPlan(dto),
+          tareasPlan: tareaIds.map((tareaId, orden) => em.getRepository(PlanTask).create({ tareaId, orden })),
           repuestos: this.agrupar(dto.repuestos).map((r) => em.getRepository(PlanPart).create({ repuestoId: r.repuestoId, cantidad: r.cantidad })),
         }),
       );
@@ -609,7 +613,6 @@ export class MaintenanceService {
     if (plan.plantillaId) {
       throw new BadRequestException(`Este plan viene del plan del tipo de equipo "${plan.plantilla?.modeloEquipo?.nombre ?? ''}": edítelo desde ese plan y se actualizan todos los equipos`);
     }
-    if (dto.tecnicoId) await this.validarTecnico(dto.tecnicoId);
     return this.ds.transaction(async (em) => {
       const cambios: Partial<MaintenancePlan> = {};
       if (dto.nombre !== undefined) cambios.nombre = dto.nombre.trim();
@@ -617,9 +620,12 @@ export class MaintenanceService {
       if (dto.frecuenciaValor !== undefined) cambios.frecuenciaValor = dto.frecuenciaValor;
       if (dto.frecuenciaUnidad !== undefined) cambios.frecuenciaUnidad = dto.frecuenciaUnidad;
       if (dto.diasAviso !== undefined) cambios.diasAviso = dto.diasAviso;
-      if (dto.tecnicoId !== undefined) cambios.tecnicoId = dto.tecnicoId;
+      if (dto.prioridad !== undefined) cambios.prioridad = dto.prioridad;
       if (dto.vigente !== undefined) cambios.vigente = dto.vigente;
       if (dto.repuestos) await this.validarRepuestos(em, dto.repuestos);
+      // Una tarea que se desactivó después puede seguir en el plan que ya la tenía.
+      const actuales = (await em.getRepository(PlanTask).find({ where: { planId: id } })).map((t) => t.tareaId);
+      const tareaIds = dto.tareaIds ? await this.validarTareas(em, dto.tareaIds, actuales) : null;
       // Un plan por tipo actualiza también el plan de cada uno de sus equipos.
       const hijos = plan.modeloId ? (await em.getRepository(MaintenancePlan).find({ where: { plantillaId: id }, select: { id: true } })).map((h) => h.id) : [];
       for (const pid of [id, ...hijos]) {
@@ -628,10 +634,14 @@ export class MaintenanceService {
           await em.getRepository(PlanPart).delete({ planId: pid });
           for (const r of this.agrupar(dto.repuestos)) await em.getRepository(PlanPart).save({ planId: pid, repuestoId: r.repuestoId, cantidad: r.cantidad });
         }
+        if (tareaIds) {
+          await em.getRepository(PlanTask).delete({ planId: pid });
+          if (tareaIds.length) await em.getRepository(PlanTask).insert(tareaIds.map((tareaId, orden) => ({ planId: pid, tareaId, orden })));
+        }
       }
       await this.audit.log({
         usuarioId: actor.id, accion: 'PLAN_ACTUALIZADO', entidad: 'plan', entidadId: id,
-        detalle: { ...cambios, repuestos: dto.repuestos ? 'actualizados' : undefined, equipos: plan.modeloId ? hijos.length : undefined } as Record<string, unknown>,
+        detalle: { ...cambios, repuestos: dto.repuestos ? 'actualizados' : undefined, tareas: tareaIds ? { antes: actuales.length, despues: tareaIds.length } : undefined, equipos: plan.modeloId ? hijos.length : undefined } as Record<string, unknown>,
       }, em);
       return em.getRepository(MaintenancePlan).findOneOrFail({ where: { id }, relations: { repuestos: true } });
     });
@@ -647,7 +657,7 @@ export class MaintenanceService {
     const activos = await em.getRepository(Asset).find({ where: { id: In(activoIds), estado: Not(In([EstadoActivo.DADO_DE_BAJA, EstadoActivo.EN_BODEGA])) } });
     const modelos = [...new Set(activos.map((a) => a.modeloId).filter((x): x is string => !!x))];
     if (!modelos.length) return 0;
-    const plantillas = await em.getRepository(MaintenancePlan).find({ where: { modeloId: In(modelos), vigente: true }, relations: { repuestos: true } });
+    const plantillas = await em.getRepository(MaintenancePlan).find({ where: { modeloId: In(modelos), vigente: true }, relations: { repuestos: true, tareasPlan: true } });
     let creados = 0;
     for (const a of activos) {
       for (const t of plantillas.filter((x) => x.modeloId === a.modeloId)) {
@@ -694,8 +704,9 @@ export class MaintenanceService {
         activoId: activo.id,
         plantillaId: plantilla.id,
         nombre: plantilla.nombre, tareas: plantilla.tareas, frecuenciaValor: plantilla.frecuenciaValor, frecuenciaUnidad: plantilla.frecuenciaUnidad,
-        diasAviso: plantilla.diasAviso, tecnicoId: plantilla.tecnicoId, vigente: true,
+        diasAviso: plantilla.diasAviso, prioridad: plantilla.prioridad, vigente: true,
         repuestos: (plantilla.repuestos ?? []).map((r) => em.getRepository(PlanPart).create({ repuestoId: r.repuestoId, cantidad: r.cantidad })),
+        tareasPlan: (plantilla.tareasPlan ?? []).map((t) => em.getRepository(PlanTask).create({ tareaId: t.tareaId, orden: t.orden })),
       }),
     );
     const ot = await this.generarPreventivo(em, plan, fecha, actor);
@@ -709,8 +720,30 @@ export class MaintenanceService {
       frecuenciaValor: dto.frecuenciaValor,
       frecuenciaUnidad: dto.frecuenciaUnidad,
       diasAviso: dto.diasAviso ?? 7,
-      tecnicoId: dto.tecnicoId ?? null,
+      prioridad: dto.prioridad ?? Prioridad.MEDIA,
     };
+  }
+
+  /** Tareas del catálogo sin repetir, en el orden dado; deben existir y estar activas (salvo las que el plan ya tenía). */
+  private async validarTareas(em: EntityManager, ids: string[], permitidas: string[] = []) {
+    const unicas = [...new Set(ids)];
+    if (!unicas.length) return [];
+    const encontradas = await em.getRepository(MaintenanceTask).find({ where: { id: In(unicas) } });
+    if (encontradas.length !== unicas.length) throw new BadRequestException('Una de las tareas no existe');
+    const inactiva = encontradas.find((t) => !t.activa && !permitidas.includes(t.id));
+    if (inactiva) throw new BadRequestException(`La tarea "${inactiva.nombre}" está desactivada`);
+    return unicas;
+  }
+
+  /** Texto de la orden preventiva: nombre del plan, sus tareas numeradas y las indicaciones adicionales. */
+  private async descripcionPreventivo(em: EntityManager, plan: MaintenancePlan) {
+    const tareas = await em.getRepository(PlanTask).find({ where: { planId: plan.id }, relations: { tarea: true }, order: { orden: 'ASC' } });
+    const partes = [plan.nombre];
+    if (tareas.length) {
+      partes.push('Tareas:', ...tareas.map((t, i) => `${i + 1}. ${t.tarea.nombre}${t.tarea.descripcion ? ` — ${t.tarea.descripcion}` : ''}`));
+    }
+    if (plan.tareas) partes.push(tareas.length ? `Indicaciones: ${plan.tareas}` : plan.tareas);
+    return partes.join('\n');
   }
 
   // ======================= Internos =======================
@@ -775,17 +808,17 @@ export class MaintenanceService {
   private async generarPreventivo(em: EntityManager, plan: MaintenancePlan, fecha: string, actor: SessionUser) {
     if (!plan.activoId) throw new Error('Un plan por tipo de equipo no genera órdenes: las generan sus planes por máquina');
     const repuestos = plan.repuestos ?? (await em.getRepository(PlanPart).find({ where: { planId: plan.id } }));
-    const estado = plan.tecnicoId ? EstadoOrden.ASIGNADA : EstadoOrden.ABIERTA;
+    // Sin técnico en el plan (D-31): la orden queda abierta con la prioridad del plan y el jefe la asigna.
+    const estado = EstadoOrden.ABIERTA;
     const o = await em.getRepository(WorkOrder).save(
       em.getRepository(WorkOrder).create({
         tipo: TipoOrden.PREVENTIVO,
         estado,
-        prioridad: Prioridad.MEDIA,
+        prioridad: plan.prioridad ?? Prioridad.MEDIA,
         activoId: plan.activoId,
         planId: plan.id,
-        descripcion: plan.tareas ? `${plan.nombre}\n${plan.tareas}` : plan.nombre,
+        descripcion: await this.descripcionPreventivo(em, plan),
         fechaProgramada: fecha,
-        asignadoAId: plan.tecnicoId,
         reportadoPorId: actor.id,
         repuestos: repuestos.map((r) => em.getRepository(WorkOrderPart).create({ repuestoId: r.repuestoId, cantidadPlanificada: r.cantidad })),
       }),
@@ -854,10 +887,5 @@ export class MaintenanceService {
     const m = new Map<string, number>();
     for (const i of items) if (i.cantidad > 0) m.set(i.repuestoId, (m.get(i.repuestoId) ?? 0) + i.cantidad);
     return [...m].map(([repuestoId, cantidad]) => ({ repuestoId, cantidad }));
-  }
-
-  private async validarTecnico(id: string) {
-    const t = await this.ds.getRepository(User).findOne({ where: { id } });
-    if (!t || !t.activo || ![Rol.TECNICO, Rol.ADMIN].includes(t.rol)) throw new BadRequestException('El responsable debe ser un técnico o administrador activo');
   }
 }

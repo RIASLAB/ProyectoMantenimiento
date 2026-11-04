@@ -201,11 +201,15 @@ export interface Plan {
   frecuenciaValor: number;
   frecuenciaUnidad: UnidadFrecuencia;
   diasAviso: number;
-  tecnico: PersonRef | null;
-  tecnicoId: string | null;
+  /** Prioridad con que salen sus órdenes; el plan no lleva técnico (D-31). */
+  prioridad: Prioridad;
+  tareasPlan: Array<{ id: string; tareaId: string; orden: number; tarea: MaintenanceTask }>;
   vigente: boolean;
   repuestos: Array<{ id: string; repuestoId: string; cantidad: number; repuesto: { id: string; codigo: string; descripcion: string; unidad: string } }>;
 }
+
+/** Tarea del catálogo de mantenimiento (D-31). */
+export interface MaintenanceTask { id: string; nombre: string; grupo: string | null; descripcion: string | null; activa: boolean; planes?: number }
 
 export interface AssetHistory {
   costos: { repuestos: number; manoObra: number; externos: number; total: number };

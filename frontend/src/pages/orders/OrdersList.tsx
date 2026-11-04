@@ -16,6 +16,7 @@ export function OrdersTabs() {
     <nav className="tabs" aria-label="Secciones de mantenimiento">
       <Link to="/ordenes" className={`tab ${location.pathname === '/ordenes' ? 'active' : ''}`}>Órdenes de trabajo</Link>
       <Link to="/ordenes/planes" className={`tab ${location.pathname === '/ordenes/planes' ? 'active' : ''}`}>Planes preventivos</Link>
+      <Link to="/ordenes/tareas" className={`tab ${location.pathname === '/ordenes/tareas' ? 'active' : ''}`}>Tareas</Link>
     </nav>
   );
 }

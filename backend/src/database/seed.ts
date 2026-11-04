@@ -18,7 +18,7 @@ import { PARAM_AUTORIZADOR_COMPRAS, PARAM_TARIFA_HORA, Setting } from '../settin
 import { PurchaseRequest } from '../purchases/purchase-request.entity';
 import { AuditLog } from '../audit/audit-log.entity';
 import { ChecklistTemplate, ControlPoint, TemperatureRecord } from '../quality/quality.entities';
-import { MaintenancePlan, PlanPart, WorkOrder, WorkOrderEvent, WorkOrderPart } from '../maintenance/maintenance.entities';
+import { MaintenancePlan, MaintenanceTask, PlanPart, PlanTask, WorkOrder, WorkOrderEvent, WorkOrderPart } from '../maintenance/maintenance.entities';
 import { hashCredencial } from '../users/credentials';
 import { User } from '../users/user.entity';
 import dataSource from './data-source';
@@ -135,15 +135,32 @@ async function main() {
         descripcion: 'Fuga de aceite en la bomba de vacío (datos de demostración)', reportadoPorId: operario.id,
       });
       await ds.getRepository(WorkOrderEvent).insert({ ordenId: falla.id, usuarioId: operario.id, estadoNuevo: EstadoOrden.ABIERTA, nota: 'Falla reportada' });
+      // Catálogo de tareas que el jefe elige al armar los preventivos (D-31).
+      const catalogo: Array<[string, string, string | null]> = [
+        ['Lubricación', 'Lubricar rodamientos', 'Grasa grado alimenticio; limpiar el exceso'],
+        ['Lubricación', 'Cambiar aceite del reductor', null],
+        ['Mecánico', 'Revisar holguras y ajustar tornillería', null],
+        ['Mecánico', 'Revisar el filo y el estado de cuchillas y placas', null],
+        ['Mecánico', 'Revisar bandas y poleas (tensión y desgaste)', null],
+        ['Eléctrico', 'Reapretar bornes y revisar conexiones eléctricas', 'Con la máquina desenergizada y bloqueada'],
+        ['Eléctrico', 'Medir el consumo del motor (amperaje)', 'Comparar con la placa del motor'],
+        ['Refrigeración', 'Limpiar filtros', null],
+        ['Refrigeración', 'Limpiar el serpentín del condensador', null],
+        ['Refrigeración', 'Revisar la presión del gas refrigerante', null],
+        ['Limpieza', 'Limpieza y desinfección general del equipo', null],
+      ];
+      const tareas = await ds.getRepository(MaintenanceTask).save(catalogo.map(([grupo, nombre, descripcion]) => ({ grupo, nombre, descripcion })));
+      const tarea = (n: string) => tareas.find((t) => t.nombre === n)!.id;
       const plan = await ds.getRepository(MaintenancePlan).save({
-        activoId: mol.id, nombre: 'Lubricación y revisión de rodamientos', tareas: 'Lubricar rodamientos y revisar holguras',
-        frecuenciaValor: 1, frecuenciaUnidad: UnidadFrecuencia.MESES, diasAviso: 7, tecnicoId: tecnico.id,
+        activoId: mol.id, nombre: 'Lubricación y revisión de rodamientos', prioridad: Prioridad.MEDIA,
+        frecuenciaValor: 1, frecuenciaUnidad: UnidadFrecuencia.MESES, diasAviso: 7,
       });
+      await ds.getRepository(PlanTask).save(['Lubricar rodamientos', 'Revisar holguras y ajustar tornillería'].map((n, orden) => ({ planId: plan.id, tareaId: tarea(n), orden })));
       await ds.getRepository(PlanPart).save([{ planId: plan.id, repuestoId: ace.id, cantidad: 1 }, { planId: plan.id, repuestoId: rod.id, cantidad: 2 }]);
       const fecha = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);
       const prev = await ds.getRepository(WorkOrder).save({
         tipo: TipoOrden.PREVENTIVO, estado: EstadoOrden.ASIGNADA, prioridad: Prioridad.MEDIA, activoId: mol.id, planId: plan.id,
-        descripcion: `${plan.nombre}\n${plan.tareas}`, fechaProgramada: fecha, asignadoAId: tecnico.id, reportadoPorId: admin.id,
+        descripcion: `${plan.nombre}\nTareas:\n1. Lubricar rodamientos — Grasa grado alimenticio; limpiar el exceso\n2. Revisar holguras y ajustar tornillería`, fechaProgramada: fecha, asignadoAId: tecnico.id, reportadoPorId: admin.id,
       });
       await ds.getRepository(WorkOrderPart).save([
         { ordenId: prev.id, repuestoId: ace.id, cantidadPlanificada: 1 },

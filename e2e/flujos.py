@@ -99,7 +99,7 @@ with sync_playwright() as p:
     page.get_by_label('Fin de garantía').fill('2027-05-01')
     page.get_by_role('button', name='Registrar máquina').click()
     expect(page.get_by_role('heading', name='Empacadora al vacío')).to_be_visible()
-    expect(page.get_by_text('EMP-010')).to_be_visible()
+    expect(page.get_by_text('EMP-010', exact=True)).to_be_visible()
     ok('crear máquina nueva')
 
     # Inventario

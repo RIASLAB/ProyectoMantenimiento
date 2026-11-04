@@ -60,13 +60,16 @@ export class MaintenancePlan {
   @Column({ name: 'dias_aviso', type: 'int', default: 7 })
   diasAviso: number;
 
-  /** Técnico al que se asignan por defecto las OT generadas. */
-  @ManyToOne(() => User, { nullable: true })
-  @JoinColumn({ name: 'tecnico_id' })
-  tecnico: User | null;
+  /**
+   * Prioridad con que salen sus órdenes (D-31). El plan no lleva técnico: el jefe asigna cada orden según
+   * la prioridad y la carga del día.
+   */
+  @Column({ type: 'enum', enum: Prioridad, enumName: 'prioridad_orden', default: Prioridad.MEDIA })
+  prioridad: Prioridad;
 
-  @Column({ name: 'tecnico_id', type: 'uuid', nullable: true })
-  tecnicoId: string | null;
+  /** Tareas del catálogo que se hacen en cada ejecución, en orden. */
+  @OneToMany(() => PlanTask, (t) => t.plan, { cascade: true })
+  tareasPlan: PlanTask[];
 
   /** Un plan inactivo deja de generar OT. */
   @Column({ default: true })
@@ -80,6 +83,59 @@ export class MaintenancePlan {
 
   @UpdateDateColumn({ name: 'actualizado_en', type: 'timestamptz' })
   actualizadoEn: Date;
+}
+
+/**
+ * Catálogo de tareas de mantenimiento (D-31): se escriben una vez y se eligen al armar un preventivo,
+ * para no redactarlas a mano en cada plan. Una tarea usada en planes no se borra: se desactiva.
+ */
+@Entity('tareas_mantenimiento')
+@Index('UQ_tarea_nombre', { synchronize: false })
+export class MaintenanceTask {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ length: 150 })
+  nombre: string;
+
+  /** Grupo para encontrarla rápido: Mecánico, Eléctrico, Lubricación, Refrigeración… */
+  @Column({ type: 'varchar', length: 60, nullable: true })
+  grupo: string | null;
+
+  /** Detalle o pasos de la tarea (opcional); sale en la orden debajo del nombre. */
+  @Column({ type: 'text', nullable: true })
+  descripcion: string | null;
+
+  @Column({ default: true })
+  activa: boolean;
+
+  @CreateDateColumn({ name: 'creado_en', type: 'timestamptz' })
+  creadoEn: Date;
+}
+
+/** Tareas del catálogo que lleva un plan preventivo. */
+@Entity('plan_tareas')
+@Index(['planId', 'tareaId'], { unique: true })
+export class PlanTask {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @ManyToOne(() => MaintenancePlan, (p) => p.tareasPlan, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'plan_id' })
+  plan: MaintenancePlan;
+
+  @Column({ name: 'plan_id', type: 'uuid' })
+  planId: string;
+
+  @ManyToOne(() => MaintenanceTask)
+  @JoinColumn({ name: 'tarea_id' })
+  tarea: MaintenanceTask;
+
+  @Column({ name: 'tarea_id', type: 'uuid' })
+  tareaId: string;
+
+  @Column({ type: 'int' })
+  orden: number;
 }
 
 /** Kit de repuestos de un plan preventivo (MNT-08). */
@@ -371,4 +427,4 @@ export class WorkOrderPhoto {
   creadoEn: Date;
 }
 
-export const MAINTENANCE_ENTITIES = [MaintenancePlan, PlanPart, WorkOrder, WorkOrderPart, WorkOrderLabor, WorkOrderEvent, WorkOrderPhoto];
+export const MAINTENANCE_ENTITIES = [MaintenancePlan, PlanPart, MaintenanceTask, PlanTask, WorkOrder, WorkOrderPart, WorkOrderLabor, WorkOrderEvent, WorkOrderPhoto];

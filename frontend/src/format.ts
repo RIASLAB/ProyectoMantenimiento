@@ -88,6 +88,9 @@ export const ORDEN_ESTADO_TONE: Record<EstadoOrden, 'ok' | 'warn' | 'bad' | 'mut
 
 export const TIPO_LABEL: Record<TipoOrden, string> = { CORRECTIVO: 'Correctivo', PREVENTIVO: 'Preventivo' };
 export const PRIORIDAD_LABEL: Record<Prioridad, string> = { BAJA: 'Baja', MEDIA: 'Media', ALTA: 'Alta' };
+/** Al programar un preventivo: la alta es la urgente. */
+export const PRIORIDAD_PLAN_LABEL: Record<Prioridad, string> = { ALTA: 'Alta · urgente', MEDIA: 'Media', BAJA: 'Baja · cuando haya tiempo' };
+export const PRIORIDAD_TONE: Record<Prioridad, 'bad' | 'warn' | 'muted'> = { ALTA: 'bad', MEDIA: 'warn', BAJA: 'muted' };
 
 export function frecuencia(valor: number, unidad: UnidadFrecuencia) {
   const u = { DIAS: ['día', 'días'], SEMANAS: ['semana', 'semanas'], MESES: ['mes', 'meses'] }[unidad];

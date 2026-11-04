@@ -152,6 +152,7 @@ export class CreatePlanDto {
   @IsString() @MinLength(3) @MaxLength(150)
   nombre: string;
 
+  /** Indicaciones adicionales (texto libre, opcional). */
   @IsOptional() @IsString() @MaxLength(4000)
   tareas?: string;
 
@@ -164,8 +165,13 @@ export class CreatePlanDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(90)
   diasAviso?: number;
 
-  @IsOptional() @IsUUID()
-  tecnicoId?: string | null;
+  /** Prioridad de sus órdenes (D-31). */
+  @IsOptional() @IsEnum(Prioridad)
+  prioridad?: Prioridad;
+
+  /** Tareas del catálogo, en el orden en que se hacen. */
+  @IsOptional() @IsArray() @ArrayMaxSize(40) @IsUUID('all', { each: true })
+  tareaIds?: string[];
 
   /** Fecha del primer mantenimiento. */
   @IsDateString()
@@ -191,12 +197,41 @@ export class UpdatePlanDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(90)
   diasAviso?: number;
 
-  @IsOptional() @IsUUID()
-  tecnicoId?: string | null;
+  @IsOptional() @IsEnum(Prioridad)
+  prioridad?: Prioridad;
+
+  @IsOptional() @IsArray() @ArrayMaxSize(40) @IsUUID('all', { each: true })
+  tareaIds?: string[];
 
   @IsOptional() @IsBoolean()
   vigente?: boolean;
 
   @IsOptional() @IsArray() @ArrayMaxSize(50) @ValidateNested({ each: true }) @Type(() => PartQtyDto)
   repuestos?: PartQtyDto[];
+}
+
+/** Tarea del catálogo de mantenimiento (D-31). */
+export class CreateTaskDto {
+  @IsString() @MinLength(3) @MaxLength(150)
+  nombre: string;
+
+  @IsOptional() @IsString() @MaxLength(60)
+  grupo?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(2000)
+  descripcion?: string | null;
+}
+
+export class UpdateTaskDto {
+  @IsOptional() @IsString() @MinLength(3) @MaxLength(150)
+  nombre?: string;
+
+  @IsOptional() @IsString() @MaxLength(60)
+  grupo?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(2000)
+  descripcion?: string | null;
+
+  @IsOptional() @IsBoolean()
+  activa?: boolean;
 }

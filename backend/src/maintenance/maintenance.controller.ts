@@ -6,9 +6,10 @@ import type { Response } from 'express';
 import { CurrentUser, Roles, SessionUser } from '../common/auth.decorators';
 import { MomentoFoto, Rol } from '../common/enums';
 import {
-  AssignDto, CancelDto, CloseOrderDto, CreatePlanDto, ListOrdersQuery, NoteDto, PlannedPartsDto, ReportFaultDto, UpdatePlanDto,
+  AssignDto, CancelDto, CloseOrderDto, CreatePlanDto, CreateTaskDto, UpdateTaskDto, ListOrdersQuery, NoteDto, PlannedPartsDto, ReportFaultDto, UpdatePlanDto,
 } from './maintenance.dto';
 import { MaintenanceService } from './maintenance.service';
+import { TasksService } from './tasks.service';
 
 const LIMITE_MULTER = Number(process.env.MAX_UPLOAD_MB ?? 20) * 1024 * 1024 + 1;
 
@@ -136,5 +137,34 @@ export class AssetHistoryController {
   @Get(':id/historial')
   historial(@Param('id', ParseUUIDPipe) id: string) {
     return this.svc.historialActivo(id);
+  }
+}
+
+/** Catálogo de tareas de mantenimiento (D-31): todos lo consultan; el administrador lo mantiene. */
+@Controller('tareas-mantenimiento')
+export class TasksController {
+  constructor(private readonly svc: TasksService) {}
+
+  @Get()
+  listar(@Query('todas') todas?: string) {
+    return this.svc.listar(todas === '1' || todas === 'true');
+  }
+
+  @Post()
+  @Roles(Rol.ADMIN)
+  crear(@Body() dto: CreateTaskDto, @CurrentUser() actor: SessionUser) {
+    return this.svc.crear(dto, actor);
+  }
+
+  @Patch(':id')
+  @Roles(Rol.ADMIN)
+  actualizar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateTaskDto, @CurrentUser() actor: SessionUser) {
+    return this.svc.actualizar(id, dto, actor);
+  }
+
+  @Delete(':id')
+  @Roles(Rol.ADMIN)
+  eliminar(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: SessionUser) {
+    return this.svc.eliminar(id, actor);
   }
 }

@@ -24,6 +24,7 @@ import { BulkImport } from './pages/admin/BulkImport';
 import { OrderDetail } from './pages/orders/OrderDetail';
 import { OrdersList } from './pages/orders/OrdersList';
 import { Plans } from './pages/orders/Plans';
+import { Tasks } from './pages/orders/Tasks';
 import { ReportFault } from './pages/orders/ReportFault';
 import { PurchaseDetail } from './pages/purchases/PurchaseDetail';
 import { PurchasesList } from './pages/purchases/PurchasesList';
@@ -91,6 +92,7 @@ export function App() {
         <Route path="ordenes" element={<OrdersList />} />
         <Route path="ordenes/reportar" element={<ReportFault />} />
         <Route path="ordenes/planes" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><Plans /></OnlyRoles>} />
+        <Route path="ordenes/tareas" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><Tasks /></OnlyRoles>} />
         <Route path="ordenes/:id" element={<OrderDetail />} />
         <Route path="calidad" element={<QualityHome />} />
         <Route path="calidad/temperatura" element={<RecordTemperature />} />

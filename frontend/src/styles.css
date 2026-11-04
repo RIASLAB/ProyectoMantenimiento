@@ -676,3 +676,18 @@ button.chip { font: inherit; cursor: pointer; }
 .cambio-head { color: #fff; padding-top: 24px; }
 .cambio-head h1 { margin: 0; color: #fff; }
 .cambio-head p { margin: 4px 0 0; color: rgba(255, 255, 255, .8); }
+
+/* Catálogo de tareas al armar un preventivo (D-31) */
+.tareas-picker { display: grid; gap: 8px; }
+.tareas-elegidas { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.tareas-elegidas li { display: grid; grid-template-columns: 28px 1fr 40px 40px; align-items: center; gap: 6px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.tareas-elegidas .icon-btn { width: 40px; height: 40px; }
+.tareas-n { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 999px; background: var(--brand); color: #fff; font-size: 0.8rem; font-weight: 700; }
+.tareas-nombre { min-width: 0; overflow-wrap: anywhere; }
+.tareas-catalogo { max-height: 260px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; padding: 4px 10px; }
+.tareas-catalogo fieldset { border: 0; margin: 0; padding: 6px 0; }
+.tareas-catalogo legend { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding: 0; }
+.tarea-op { display: flex; align-items: flex-start; gap: 10px; min-height: 40px; padding: 8px 0; cursor: pointer; }
+.tarea-op input { width: 20px; height: 20px; margin: 1px 0 0; flex: none; accent-color: var(--brand); }
+.plan-tareas { margin: 2px 0 0; padding-left: 20px; font-size: 0.9rem; }
+.tareas-grupo { margin-bottom: 18px; }

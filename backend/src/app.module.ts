@@ -18,7 +18,8 @@ import { ImportController } from './import/import.controller';
 import { ImportService } from './import/import.service';
 import { InventoryController, SparePartsController } from './inventory/inventory.controller';
 import { InventoryService } from './inventory/inventory.service';
-import { AssetHistoryController, PlansController, WorkOrdersController } from './maintenance/maintenance.controller';
+import { AssetHistoryController, PlansController, TasksController, WorkOrdersController } from './maintenance/maintenance.controller';
+import { TasksService } from './maintenance/tasks.service';
 import { MaintenanceService } from './maintenance/maintenance.service';
 import { KpiController } from './kpi/kpi.controller';
 import { KpiService } from './kpi/kpi.service';
@@ -68,11 +69,11 @@ class HealthController {
   ],
   controllers: [
     HealthController, AuthController, UsersController, SettingsController, AuditController,
-    AssetHistoryController, AssetsController, SparePartsController, InventoryController, WorkOrdersController, PlansController, PurchasesController, QualityController, NotificationsController, KpiController, ImportController, EquipmentController, LightingController, SignaturesController, InstrumentsController,
+    AssetHistoryController, AssetsController, SparePartsController, InventoryController, WorkOrdersController, PlansController, TasksController, PurchasesController, QualityController, NotificationsController, KpiController, ImportController, EquipmentController, LightingController, SignaturesController, InstrumentsController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: AuthGuard },
-    AuthService, UsersService, SettingsService, AuditService, AssetsService, InventoryService, MaintenanceService, PurchasesService, QualityService, NotificationsService, KpiService, ImportService, EquipmentService, LightingService, SignaturesService, InstrumentsService,
+    AuthService, UsersService, SettingsService, AuditService, AssetsService, InventoryService, MaintenanceService, TasksService, PurchasesService, QualityService, NotificationsService, KpiService, ImportService, EquipmentService, LightingService, SignaturesService, InstrumentsService,
   ],
 })
 export class AppModule {}
