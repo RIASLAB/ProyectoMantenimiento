@@ -706,3 +706,5 @@ button.chip { font: inherit; cursor: pointer; }
 .asignar-op input { width: 20px; height: 20px; flex: none; accent-color: var(--brand); }
 .asignar-nombre { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 4px; }
 .asignar-carga { flex-basis: 100%; }
+.tareas-orden { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
+.tareas-orden li strong { display: block; }

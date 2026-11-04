@@ -337,6 +337,9 @@ describe('MNT-05/06/08 · Preventivos', () => {
     expect(o.body).toMatchObject({ tipo: 'PREVENTIVO', estado: 'ABIERTA', prioridad: 'ALTA', asignadoA: null, fechaProgramada: ayer() });
     expect(o.body.descripcion).toBe('Lubricación mensual\nTareas:\n1. Lubricar rodamientos — Grasa grado alimenticio\n2. Ajustar tornillería\nIndicaciones: Usar guantes');
     expect(o.body.repuestos[0]).toMatchObject({ cantidadPlanificada: 2, stock: 1, faltante: 1 });
+    // Al tocar el plan en la orden se ven sus tareas
+    expect(o.body.plan).toMatchObject({ nombre: 'Lubricación mensual', prioridad: 'ALTA', tareas: 'Usar guantes', frecuenciaValor: 1, frecuenciaUnidad: 'MESES' });
+    expect(o.body.plan.tareasPlan.map((t: { tarea: { nombre: string } }) => t.tarea.nombre)).toEqual(['Lubricar rodamientos', 'Ajustar tornillería']);
     const planes = await c.http.get('/api/planes').set(c.auth(c.admin));
     const p = planes.body.find((x: { id: string }) => x.id === planId);
     expect(p).toMatchObject({ prioridad: 'ALTA' });

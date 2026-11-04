@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
+import { ChangeEvent, FormEvent, ReactNode, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { api, ApiError, uuid } from '../../api/client';
 import type { MomentoFoto, Purchase, WorkOrderDetail } from '../../api/types';
@@ -10,9 +10,9 @@ import { comprimirFoto, enviarOEncolar, usePendientes } from '../../offline/outb
 import { useAuth } from '../../auth/AuthContext';
 import { OrderBadges, PartRow, PartRows, rowsToPayload, tituloLista, useMaterialesEquipo, useProtectedImage } from '../../components/orders-shared';
 import { Badge, Button, Empty, ErrorBox, Field, Icon, Input, KeyValue, Modal, PageHeader, Select, Spinner, Textarea } from '../../components/ui';
-import { COMPRA_ESTADO_LABEL, COMPRA_ESTADO_TONE, date, dateTime, duration, money, ORDEN_ESTADO_LABEL, PRIORIDAD_LABEL, qty, TIPO_LABEL, toLocalInput, VERIFICACIONES_CIERRE } from '../../format';
+import { COMPRA_ESTADO_LABEL, COMPRA_ESTADO_TONE, date, dateTime, duration, frecuencia, money, ORDEN_ESTADO_LABEL, PRIORIDAD_LABEL, qty, TIPO_LABEL, toLocalInput, VERIFICACIONES_CIERRE } from '../../format';
 
-type ModalKind = 'asignar' | 'esperar' | 'cerrar' | 'cancelar' | 'repuestos' | 'compra' | null;
+type ModalKind = 'asignar' | 'esperar' | 'cerrar' | 'cancelar' | 'repuestos' | 'compra' | null | 'plan';
 const MOMENTO_LABEL: Record<MomentoFoto, string> = { REPORTE: 'Reporte', ANTES: 'Antes', DESPUES: 'Después' };
 
 function useOrderMutation<T>(id: string, fn: (body: T) => Promise<unknown>, onDone?: () => void) {
@@ -81,6 +81,37 @@ function useAccionOT(orden: WorkOrderDetail | undefined, onDone?: () => void) {
       onDone?.();
     },
   });
+}
+
+/** Lo que hay que hacer en el preventivo, según su plan: tareas numeradas, indicaciones, cada cuánto y prioridad. */
+function PlanTareasModal({ plan, open, onClose }: { plan: NonNullable<WorkOrderDetail['plan']>; open: boolean; onClose: () => void }) {
+  const { can } = useAuth();
+  const tareas = plan.tareasPlan ?? [];
+  return (
+    <Modal open={open} title={`Plan: ${plan.nombre}`} onClose={onClose} footer={<Button onClick={onClose}>Cerrar</Button>}>
+      <div className="stack">
+        <p className="muted small" style={{ margin: 0 }}>
+          {plan.frecuenciaValor && plan.frecuenciaUnidad ? frecuencia(plan.frecuenciaValor, plan.frecuenciaUnidad) : null}
+          {plan.prioridad ? ` · Prioridad ${PRIORIDAD_LABEL[plan.prioridad].toLowerCase()}` : null}
+        </p>
+        <div>
+          <p className="subtle-head">Tareas a realizar</p>
+          {tareas.length ? (
+            <ol className="tareas-orden">
+              {tareas.map((t) => (
+                <li key={t.tarea.id}>
+                  <strong>{t.tarea.nombre}</strong>
+                  {t.tarea.descripcion ? <span className="muted small">{t.tarea.descripcion}</span> : null}
+                </li>
+              ))}
+            </ol>
+          ) : <p className="muted" style={{ margin: 0 }}>Este plan no tiene tareas del catálogo.{plan.tareas ? '' : ' Revise el detalle de la orden.'}</p>}
+        </div>
+        {plan.tareas ? <div><p className="subtle-head">Indicaciones</p><p className="desc">{plan.tareas}</p></div> : null}
+        {can('ADMIN') ? <Link to="/ordenes/planes" className="link-btn">Editar el plan</Link> : null}
+      </div>
+    </Modal>
+  );
 }
 
 function NoteModal({ o, open, onClose, kind }: { o: WorkOrderDetail; open: boolean; onClose: () => void; kind: 'esperar' | 'cancelar' }) {
@@ -365,7 +396,7 @@ export function OrderDetail() {
             ['Técnico', o.asignadoA?.nombre ?? 'Sin asignar'],
             [o.tipo === 'PREVENTIVO' ? 'Programado para' : 'Reportado', o.tipo === 'PREVENTIVO' ? date(o.fechaProgramada) : `${dateTime(o.creadoEn)}${o.reportadoPor ? ` · ${o.reportadoPor.nombre}` : ''}`],
             ...(o.maquinaParada && o.inicioParada ? [['Tiempo parada', `${duration(o.inicioParada, o.finParada)}${o.finParada ? '' : ' (en curso)'}`] as [string, string]] : []),
-            ...(o.plan ? [['Plan', o.plan.nombre] as [string, string]] : []),
+            ...(o.plan ? [['Plan', <button type="button" className="link-btn" style={{ textAlign: 'left', padding: 0 }} onClick={() => setModal('plan')}>{o.plan.nombre} · ver tareas</button>] as [string, ReactNode]] : []),
           ]} />
           {o.motivoCancelacion ? <div className="alert alert-warn">Cancelada: {o.motivoCancelacion}</div> : null}
         </section>
@@ -486,6 +517,7 @@ export function OrderDetail() {
       </div>
 
       <AssignModal orden={o} open={modal === 'asignar'} onClose={() => setModal(null)} />
+      {o.plan ? <PlanTareasModal plan={o.plan} open={modal === 'plan'} onClose={() => setModal(null)} /> : null}
       <NoteModal o={o} kind="esperar" open={modal === 'esperar'} onClose={() => setModal(null)} />
       <NoteModal o={o} kind="cancelar" open={modal === 'cancelar'} onClose={() => setModal(null)} />
       <PlannedPartsModal o={o} open={modal === 'repuestos'} onClose={() => setModal(null)} />

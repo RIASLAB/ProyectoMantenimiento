@@ -132,7 +132,11 @@ export interface WorkOrderSummary {
 
 export interface WorkOrderDetail extends WorkOrderSummary {
   activo: Asset;
-  plan: { id: string; nombre: string; diasAviso: number } | null;
+  /** Plan del preventivo, con sus tareas (D-31). */
+  plan: {
+    id: string; nombre: string; diasAviso: number; frecuenciaValor?: number; frecuenciaUnidad?: UnidadFrecuencia; prioridad?: Prioridad;
+    tareas?: string | null; tareasPlan?: Array<{ orden: number; tarea: { id: string; nombre: string; grupo: string | null; descripcion: string | null } }>;
+  } | null;
   iniciadaEn: string | null;
   cerradaPor: PersonRef | null;
   trabajoRealizado: string | null;

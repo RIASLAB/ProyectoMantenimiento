@@ -183,7 +183,15 @@ export class MaintenanceService {
         return { ...rp, stock, faltante: o.estado === EstadoOrden.CERRADA ? 0 : Math.max(0, rp.cantidadPlanificada - Math.max(stock, 0)) };
       }),
     );
-    return { ...this.conVencimiento(o), codigo: numeroOT(o.numero), repuestos, acciones: this.acciones(o, actor) };
+    // Preventivo: las tareas del plan (D-31), para verlas al tocar el plan en la orden.
+    const plan = o.plan
+      ? {
+          ...o.plan,
+          tareasPlan: (await this.ds.getRepository(PlanTask).find({ where: { planId: o.plan.id }, relations: { tarea: true }, order: { orden: 'ASC' } }))
+            .map((t) => ({ orden: t.orden, tarea: { id: t.tarea.id, nombre: t.tarea.nombre, grupo: t.tarea.grupo, descripcion: t.tarea.descripcion } })),
+        }
+      : null;
+    return { ...this.conVencimiento(o), plan, codigo: numeroOT(o.numero), repuestos, acciones: this.acciones(o, actor) };
   }
 
   /** Hoja de vida (ACT-03) y costo acumulado (ACT-04) de una máquina. */
