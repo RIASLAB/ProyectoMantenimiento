@@ -144,6 +144,34 @@ with sync_playwright() as p:
     expect(m.locator('dialog[open]')).not_to_contain_text('Editar el plan')
     m.screenshot(path=f'{SP}/tar-06-tecnico-tareas.png')
     ok('el técnico ve el catálogo y, en su orden, toca el plan y ve las 3 tareas (sin poder editarlo)')
+
+    # 6) El técnico lo hizo ayer (estaba para hoy): al cerrar indica la fecha y el siguiente se cuenta desde ayer
+    from datetime import date, timedelta
+    import calendar
+    ayer = date.today() - timedelta(days=1)
+    mes = ayer.month % 12 + 1
+    anio = ayer.year + (1 if ayer.month == 12 else 0)
+    siguiente = date(anio, mes, min(ayer.day, calendar.monthrange(anio, mes)[1]))
+    dmy = lambda d: d.strftime('%d/%m/%Y')
+    m.locator('dialog[open] .modal-foot').get_by_role('button', name='Cerrar').click()
+    m.get_by_role('button', name='Iniciar trabajo').click()
+    m.get_by_role('button', name='Cerrar orden').click()
+    dlg = m.locator('dialog[open]')
+    dlg.get_by_label('Trabajo realizado *').fill('Se lubricaron rodamientos, se ajustó tornillería y se purgó la bomba')
+    campo = dlg.get_by_label('Fecha en que se realizó *')
+    expect(campo).to_have_value(date.today().isoformat())
+    campo.fill(ayer.isoformat())
+    expect(dlg).to_contain_text(f'El siguiente preventivo queda para el {dmy(siguiente)} (cada mes desde esta fecha). Estaba programado para el {dmy(date.today())}.')
+    for r_ in dlg.get_by_role('radio', name='Cumple', exact=True).all(): r_.click()
+    m.screenshot(path=f'{SP}/tar-07-cerrar-realizado.png', full_page=True)
+    m.get_by_role('button', name='Cerrar orden').last.click()
+    expect(m.locator('dialog[open]')).to_have_count(0)
+    kv = m.locator('.card', has_text='Detalle')
+    expect(kv).to_contain_text(f'Realizado el{dmy(ayer)}')
+    expect(kv).to_contain_text(dmy(siguiente))
+    kv.get_by_role('link', name=re.compile(r'^OT-\d{6} · ')).click()
+    expect(m.locator('.card', has_text='Detalle')).to_contain_text(f'Programado para{dmy(siguiente)}')
+    ok(f'hecho ayer (estaba para hoy): el siguiente queda para el {dmy(siguiente)}, un mes después de ayer')
     b.close()
 
 print('\n', len(results), 'verificaciones OK. Capturas en', SP)

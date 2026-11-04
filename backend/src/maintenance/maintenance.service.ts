@@ -44,6 +44,11 @@ export function hoy(tz = process.env.APP_TZ ?? 'America/Bogota'): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 }
 
+/** Hasta cuántos días atrás se puede registrar que un preventivo se hizo (D-33). */
+export const DIAS_ATRAS_REALIZACION = 60;
+
+const sumarDias = (fecha: string, n: number) => new Date(Date.parse(`${fecha}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+
 export function sumarFrecuencia(fecha: string, valor: number, unidad: UnidadFrecuencia): string {
   const d = new Date(`${fecha}T00:00:00Z`);
   if (unidad === UnidadFrecuencia.DIAS) d.setUTCDate(d.getUTCDate() + valor);
@@ -191,7 +196,13 @@ export class MaintenanceService {
             .map((t) => ({ orden: t.orden, tarea: { id: t.tarea.id, nombre: t.tarea.nombre, grupo: t.tarea.grupo, descripcion: t.tarea.descripcion } })),
         }
       : null;
-    return { ...this.conVencimiento(o), plan, codigo: numeroOT(o.numero), repuestos, acciones: this.acciones(o, actor) };
+    // Preventivo ya terminado: la orden que quedó programada después (D-33), para verla desde aquí.
+    let siguientePreventivo: { id: string; codigo: string; fechaProgramada: string | null } | null = null;
+    if (o.planId && !ABIERTAS.includes(o.estado)) {
+      const sig = await this.orders.createQueryBuilder('s').where('s.planId = :p AND s.numero > :n', { p: o.planId, n: o.numero }).orderBy('s.numero').getOne();
+      if (sig) siguientePreventivo = { id: sig.id, codigo: numeroOT(sig.numero), fechaProgramada: sig.fechaProgramada };
+    }
+    return { ...this.conVencimiento(o), plan, siguientePreventivo, codigo: numeroOT(o.numero), repuestos, acciones: this.acciones(o, actor) };
   }
 
   /** Hoja de vida (ACT-03) y costo acumulado (ACT-04) de una máquina. */
@@ -357,6 +368,17 @@ export class MaintenanceService {
         if (o.iniciadaEn && cerradaEn < o.iniciadaEn) cerradaEn = o.iniciadaEn;
       }
 
+      // D-33: en un preventivo, el día en que se hizo (antes o después de lo programado) define el siguiente.
+      let fechaRealizacion: string | null = null;
+      if (o.tipo === TipoOrden.PREVENTIVO) {
+        const diaCierre = new Intl.DateTimeFormat('en-CA', { timeZone: process.env.APP_TZ ?? 'America/Bogota' }).format(cerradaEn);
+        fechaRealizacion = dto.fechaRealizacion?.slice(0, 10) ?? diaCierre;
+        if (fechaRealizacion > hoy()) throw new BadRequestException('La fecha en que se realizó no puede estar en el futuro');
+        if (fechaRealizacion < sumarDias(hoy(), -DIAS_ATRAS_REALIZACION)) {
+          throw new BadRequestException(`La fecha en que se realizó no puede ser de hace más de ${DIAS_ATRAS_REALIZACION} días`);
+        }
+      }
+
       let finParada: Date | null = null;
       if (o.maquinaParada) {
         finParada = dto.finParada ? new Date(dto.finParada) : null;
@@ -416,6 +438,7 @@ export class MaintenanceService {
         observaciones,
         finParada,
         cerradaEn,
+        fechaRealizacion,
         cerradaPorId: actor.id,
         cierreClientId: dto.clientId ?? null,
         cerradaSinConexion: sinConexion,
@@ -440,7 +463,7 @@ export class MaintenanceService {
           cuerpo: `${numeroOT(o.numero)} · ${dto.trabajoRealizado.trim()}`, enlace: `/ordenes/${o.id}`,
         });
       }
-      const siguiente = o.tipo === TipoOrden.PREVENTIVO ? await this.programarSiguiente(em, o, actor) : null;
+      const siguiente = o.tipo === TipoOrden.PREVENTIVO ? await this.programarSiguiente(em, o, actor, fechaRealizacion) : null;
       return { ok: true, costoRepuestos: redondear(costoRepuestos), costoManoObra: redondear(costoManoObra), siguientePreventivo: siguiente };
     });
   }
@@ -840,15 +863,26 @@ export class MaintenanceService {
    * Programa la siguiente OT del plan (MNT-05). Se mantiene la cadencia desde la fecha programada;
    * si esa fecha ya pasó, se cuenta desde hoy para no generar preventivos nacidos vencidos.
    */
-  private async programarSiguiente(em: EntityManager, o: WorkOrder, actor: SessionUser) {
+  /**
+   * Siguiente preventivo del plan. Si se realizó (D-33), se cuenta desde el día en que se hizo, aunque haya sido
+   * antes o después de lo programado. Si se canceló, se conserva la cadencia desde la fecha programada.
+   * Nunca nace en el pasado: si la fecha calculada ya pasó, queda para hoy (cierre) o una frecuencia después de hoy (cancelación).
+   */
+  private async programarSiguiente(em: EntityManager, o: WorkOrder, actor: SessionUser, realizadoEl: string | null = null) {
     if (!o.planId) return null;
     const plan = await em.getRepository(MaintenancePlan).findOne({ where: { id: o.planId }, relations: { repuestos: true } });
     if (!plan || !plan.vigente) return null;
     const otraAbierta = await em.getRepository(WorkOrder).exists({ where: { planId: plan.id, estado: In(ABIERTAS), id: Not(o.id) } });
     if (otraAbierta) return null;
     const hoyStr = hoy();
-    let siguiente = sumarFrecuencia(o.fechaProgramada ?? hoyStr, plan.frecuenciaValor, plan.frecuenciaUnidad);
-    if (siguiente <= hoyStr) siguiente = sumarFrecuencia(hoyStr, plan.frecuenciaValor, plan.frecuenciaUnidad);
+    let siguiente: string;
+    if (realizadoEl) {
+      siguiente = sumarFrecuencia(realizadoEl, plan.frecuenciaValor, plan.frecuenciaUnidad);
+      if (siguiente < hoyStr) siguiente = hoyStr;
+    } else {
+      siguiente = sumarFrecuencia(o.fechaProgramada ?? hoyStr, plan.frecuenciaValor, plan.frecuenciaUnidad);
+      if (siguiente <= hoyStr) siguiente = sumarFrecuencia(hoyStr, plan.frecuenciaValor, plan.frecuenciaUnidad);
+    }
     return this.generarPreventivo(em, plan, siguiente, actor);
   }
 

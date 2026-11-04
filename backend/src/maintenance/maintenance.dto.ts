@@ -98,6 +98,10 @@ export class CloseOrderDto {
   @IsOptional() @IsDateString()
   cerradaEn?: string;
 
+  /** Preventivo: día en que se hizo (AAAA-MM-DD); por defecto, el día del cierre. El siguiente se cuenta desde aquí (D-33). */
+  @IsOptional() @IsDateString()
+  fechaRealizacion?: string;
+
   /** Verificaciones de entrega del formato (cumple / no cumple). */
   @IsOptional() @IsArray() @ArrayMaxSize(10) @ValidateNested({ each: true }) @Type(() => VerificationDto)
   verificaciones?: VerificationDto[];

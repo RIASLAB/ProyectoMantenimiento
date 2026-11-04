@@ -310,6 +310,7 @@ describe('MNT-05/06/08 · Preventivos', () => {
     return d.toISOString().slice(0, 10);
   };
 
+  let sigId: string;
   let tLub: string;
   let tTorn: string;
 
@@ -390,8 +391,9 @@ describe('MNT-05/06/08 · Preventivos', () => {
     });
     expect(r.status).toBe(201);
     const sig = r.body.siguientePreventivo;
-    // Programado ayer + 1 mes: la cadencia se conserva
-    expect(sig.fechaProgramada).toBe(sumarFrecuencia(ayer(), 1, UnidadFrecuencia.MESES));
+    // Estaba para ayer y se hizo hoy (D-33): el siguiente se cuenta desde hoy
+    expect(sig.fechaProgramada).toBe(sumarFrecuencia(hoy(), 1, UnidadFrecuencia.MESES));
+    sigId = sig.id;
     const o = await c.http.get(`/api/ordenes/${sig.id}`).set(c.auth(c.admin));
     // La siguiente sale abierta, con la prioridad y las tareas (ya reordenadas) del plan
     expect(o.body).toMatchObject({ estado: 'ABIERTA', prioridad: 'ALTA', plan: { id: planId } });
@@ -400,6 +402,24 @@ describe('MNT-05/06/08 · Preventivos', () => {
 
     const cerrada = await c.http.get(`/api/ordenes/${otPrev}`).set(c.auth(c.admin));
     expect(cerrada.body.repuestos[0]).toMatchObject({ cantidadPlanificada: 2, cantidadUsada: 1 });
+    expect(cerrada.body).toMatchObject({ fechaRealizacion: hoy(), siguientePreventivo: { id: sig.id, fechaProgramada: sig.fechaProgramada } });
+  });
+
+  it('D-33 · si se hace antes de lo programado, el siguiente se cuenta desde el día en que se hizo', async () => {
+    const hace = (n: number) => new Date(Date.parse(`${hoy()}T00:00:00Z`) - n * 86_400_000).toISOString().slice(0, 10);
+    await c.http.post(`/api/ordenes/${sigId}/asignar`).set(c.auth(c.admin)).send({ tecnicoId: tec2.id }).expect(201);
+    await c.http.post(`/api/ordenes/${sigId}/iniciar`).set(c.auth(c.admin)).expect(201);
+    const cerrar = (fechaRealizacion?: string) => c.http.post(`/api/ordenes/${sigId}/cerrar`).set(c.auth(c.admin)).send({ ...VERIF_OK,
+      trabajoRealizado: 'Lubricación realizada antes', repuestosUsados: [], manoObra: [], fechaRealizacion,
+    });
+    const manana = new Date(Date.parse(`${hoy()}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+    expect((await cerrar(manana)).body.message).toContain('no puede estar en el futuro');
+    expect((await cerrar(hace(61))).body.message).toContain('hace más de 60 días');
+    // Estaba para dentro de un mes y se hizo hace 2 días: el siguiente queda para (hace 2 días) + 1 mes
+    const r = await cerrar(hace(2));
+    expect(r.status).toBe(201);
+    expect(r.body.siguientePreventivo.fechaProgramada).toBe(sumarFrecuencia(hace(2), 1, UnidadFrecuencia.MESES));
+    expect((await c.http.get(`/api/ordenes/${sigId}`).set(c.auth(c.admin))).body.fechaRealizacion).toBe(hace(2));
   });
 
   it('un plan inactivo no genera más órdenes', async () => {

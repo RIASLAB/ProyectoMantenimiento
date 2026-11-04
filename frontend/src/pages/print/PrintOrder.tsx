@@ -42,7 +42,7 @@ export function PrintOrder() {
               </tr>
               <tr>
                 <td colSpan={2}><span className="plabel">FECHA INICIO:</span> {d.iniciadaEn ? dateTime(d.iniciadaEn) : d.fechaProgramada ? `Programada ${d.fechaProgramada.split('-').reverse().join('/')}` : dateTime(d.creadoEn)}</td>
-                <td><span className="plabel">FECHA DE CIERRE:</span> {d.cerradaEn ? dateTime(d.cerradaEn) : ''}</td>
+                <td><span className="plabel">{d.fechaRealizacion ? 'REALIZADO EL:' : 'FECHA DE CIERRE:'}</span> {d.fechaRealizacion ? d.fechaRealizacion.split('-').reverse().join('/') : d.cerradaEn ? dateTime(d.cerradaEn) : ''}</td>
               </tr>
               <tr>
                 <td><span className="plabel">EQUIPO:</span> {instalacion ? '' : `${d.activo.codigo} · ${d.activo.nombre}`}</td>

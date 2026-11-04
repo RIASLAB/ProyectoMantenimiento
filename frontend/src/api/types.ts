@@ -132,6 +132,10 @@ export interface WorkOrderSummary {
 
 export interface WorkOrderDetail extends WorkOrderSummary {
   activo: Asset;
+  /** Preventivo: día en que realmente se hizo; el siguiente se cuenta desde aquí (D-33). */
+  fechaRealizacion?: string | null;
+  /** Preventivo terminado: la orden que quedó programada después. */
+  siguientePreventivo?: { id: string; codigo: string; fechaProgramada: string | null } | null;
   /** Plan del preventivo, con sus tareas (D-31). */
   plan: {
     id: string; nombre: string; diasAviso: number; frecuenciaValor?: number; frecuenciaUnidad?: UnidadFrecuencia; prioridad?: Prioridad;

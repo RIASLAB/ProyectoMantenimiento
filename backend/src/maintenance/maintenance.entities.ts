@@ -235,6 +235,13 @@ export class WorkOrder {
   @Column({ name: 'cerrada_en', type: 'timestamptz', nullable: true })
   cerradaEn: Date | null;
 
+  /**
+   * Preventivo: día en que realmente se hizo (D-33). Puede ser antes o después de la fecha programada;
+   * el siguiente preventivo se cuenta desde aquí.
+   */
+  @Column({ name: 'fecha_realizacion', type: 'date', nullable: true })
+  fechaRealizacion: string | null;
+
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'cerrada_por_id' })
   cerradaPor: User | null;

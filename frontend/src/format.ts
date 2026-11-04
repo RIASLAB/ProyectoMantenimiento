@@ -92,6 +92,26 @@ export const PRIORIDAD_LABEL: Record<Prioridad, string> = { BAJA: 'Baja', MEDIA:
 export const PRIORIDAD_PLAN_LABEL: Record<Prioridad, string> = { ALTA: 'Alta · urgente', MEDIA: 'Media', BAJA: 'Baja · cuando haya tiempo' };
 export const PRIORIDAD_TONE: Record<Prioridad, 'bad' | 'warn' | 'muted'> = { ALTA: 'bad', MEDIA: 'warn', BAJA: 'muted' };
 
+/** Fecha (AAAA-MM-DD) más una frecuencia; igual que en el servidor (31 → último día del mes si no existe). */
+export function sumarFrecuencia(fecha: string, valor: number, unidad: UnidadFrecuencia) {
+  const d = new Date(`${fecha}T00:00:00Z`);
+  if (unidad === 'DIAS') d.setUTCDate(d.getUTCDate() + valor);
+  else if (unidad === 'SEMANAS') d.setUTCDate(d.getUTCDate() + valor * 7);
+  else {
+    const dia = d.getUTCDate();
+    d.setUTCDate(1);
+    d.setUTCMonth(d.getUTCMonth() + valor);
+    d.setUTCDate(Math.min(dia, new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate()));
+  }
+  return d.toISOString().slice(0, 10);
+}
+
+/** Hoy (AAAA-MM-DD) en la hora del dispositivo, desplazado n días. */
+export function diaLocal(n = 0) {
+  const d = new Date(Date.now() + n * 86_400_000);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export function frecuencia(valor: number, unidad: UnidadFrecuencia) {
   const u = { DIAS: ['día', 'días'], SEMANAS: ['semana', 'semanas'], MESES: ['mes', 'meses'] }[unidad];
   return valor === 1 ? `Cada ${u[0]}` : `Cada ${valor} ${u[1]}`;

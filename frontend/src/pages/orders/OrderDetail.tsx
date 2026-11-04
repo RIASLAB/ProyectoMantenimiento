@@ -10,7 +10,7 @@ import { comprimirFoto, enviarOEncolar, usePendientes } from '../../offline/outb
 import { useAuth } from '../../auth/AuthContext';
 import { OrderBadges, PartRow, PartRows, rowsToPayload, tituloLista, useMaterialesEquipo, useProtectedImage } from '../../components/orders-shared';
 import { Badge, Button, Empty, ErrorBox, Field, Icon, Input, KeyValue, Modal, PageHeader, Select, Spinner, Textarea } from '../../components/ui';
-import { COMPRA_ESTADO_LABEL, COMPRA_ESTADO_TONE, date, dateTime, duration, frecuencia, money, ORDEN_ESTADO_LABEL, PRIORIDAD_LABEL, qty, TIPO_LABEL, toLocalInput, VERIFICACIONES_CIERRE } from '../../format';
+import { COMPRA_ESTADO_LABEL, COMPRA_ESTADO_TONE, date, dateTime, diaLocal, duration, frecuencia, money, ORDEN_ESTADO_LABEL, PRIORIDAD_LABEL, qty, sumarFrecuencia, TIPO_LABEL, toLocalInput, VERIFICACIONES_CIERRE } from '../../format';
 
 type ModalKind = 'asignar' | 'esperar' | 'cerrar' | 'cancelar' | 'repuestos' | 'compra' | null | 'plan';
 const MOMENTO_LABEL: Record<MomentoFoto, string> = { REPORTE: 'Reporte', ANTES: 'Antes', DESPUES: 'Después' };
@@ -162,6 +162,11 @@ function CloseModal({ o, open, onClose }: { o: WorkOrderDetail; open: boolean; o
   const [finInicial, setFinInicial] = useState('');
   const [verif, setVerif] = useState<Record<string, boolean>>({});
   const [obsCierre, setObsCierre] = useState('');
+  // D-33: en un preventivo se indica el día en que se hizo; el siguiente se programa desde ese día.
+  const preventivo = o.tipo === 'PREVENTIVO';
+  const [realizado, setRealizado] = useState(diaLocal());
+  const plan = o.plan;
+  const siguiente = preventivo && plan?.frecuenciaValor && plan.frecuenciaUnidad && realizado ? sumarFrecuencia(realizado, plan.frecuenciaValor, plan.frecuenciaUnidad) : null;
   const faltanVerif = VERIFICACIONES_CIERRE.filter((v) => verif[v.id] === undefined);
   const noCumple = VERIFICACIONES_CIERRE.filter((v) => verif[v.id] === false);
 
@@ -172,6 +177,7 @@ function CloseModal({ o, open, onClose }: { o: WorkOrderDetail; open: boolean; o
     const ahora = toLocalInput(new Date());
     setFin(ahora);
     setFinInicial(ahora);
+    setRealizado(diaLocal());
   }, [open, o.repuestos, o.asignadoA, user]);
 
   const [clientId] = useState(() => uuid());
@@ -184,6 +190,7 @@ function CloseModal({ o, open, onClose }: { o: WorkOrderDetail; open: boolean; o
       // Si no se cambió la hora sugerida, se envía el momento exacto (con segundos).
       finParada: o.maquinaParada ? (fin === finInicial ? new Date() : new Date(fin)).toISOString() : undefined,
       cerradaEn: new Date().toISOString(),
+      fechaRealizacion: preventivo ? realizado : undefined,
       verificaciones: VERIFICACIONES_CIERRE.map((v) => ({ id: v.id, cumple: verif[v.id] })),
       observaciones: obsCierre.trim() || undefined,
       clientId,
@@ -198,6 +205,12 @@ function CloseModal({ o, open, onClose }: { o: WorkOrderDetail; open: boolean; o
         <Field label="Trabajo realizado *">
           {(i) => <Textarea id={i} value={trabajo} onChange={(e) => setTrabajo(e.target.value)} required minLength={5} maxLength={4000} />}
         </Field>
+        {preventivo ? (
+          <Field label="Fecha en que se realizó *"
+            hint={siguiente ? `El siguiente preventivo queda para ${siguiente < diaLocal() ? 'hoy' : `el ${date(siguiente)}`} (${frecuencia(plan!.frecuenciaValor!, plan!.frecuenciaUnidad!).toLowerCase()} desde esta fecha).${o.fechaProgramada ? ` Estaba programado para el ${date(o.fechaProgramada)}.` : ''}` : 'El siguiente preventivo se cuenta desde esta fecha.'}>
+            {(i) => <Input id={i} type="date" value={realizado} onChange={(e) => setRealizado(e.target.value)} required min={diaLocal(-60)} max={diaLocal()} />}
+          </Field>
+        ) : null}
         {o.maquinaParada ? (
           <Field label="¿Cuándo volvió a operar la máquina? *" hint={o.inicioParada ? `Parada desde ${dateTime(o.inicioParada)}` : undefined}>
             {(i) => <Input id={i} type="datetime-local" value={fin} onChange={(e) => setFin(e.target.value)} required max={toLocalInput(new Date(Date.now() + 60_000))} />}
@@ -396,6 +409,8 @@ export function OrderDetail() {
             ['Técnico', o.asignadoA?.nombre ?? 'Sin asignar'],
             [o.tipo === 'PREVENTIVO' ? 'Programado para' : 'Reportado', o.tipo === 'PREVENTIVO' ? date(o.fechaProgramada) : `${dateTime(o.creadoEn)}${o.reportadoPor ? ` · ${o.reportadoPor.nombre}` : ''}`],
             ...(o.maquinaParada && o.inicioParada ? [['Tiempo parada', `${duration(o.inicioParada, o.finParada)}${o.finParada ? '' : ' (en curso)'}`] as [string, string]] : []),
+            ...(o.tipo === 'PREVENTIVO' && o.fechaRealizacion ? [['Realizado el', date(o.fechaRealizacion)] as [string, string]] : []),
+            ...(o.siguientePreventivo ? [['Siguiente preventivo', <Link to={`/ordenes/${o.siguientePreventivo.id}`}>{o.siguientePreventivo.codigo} · {date(o.siguientePreventivo.fechaProgramada)}</Link>] as [string, ReactNode]] : []),
             ...(o.plan ? [['Plan', <button type="button" className="link-btn" style={{ textAlign: 'left', padding: 0 }} onClick={() => setModal('plan')}>{o.plan.nombre} · ver tareas</button>] as [string, ReactNode]] : []),
           ]} />
           {o.motivoCancelacion ? <div className="alert alert-warn">Cancelada: {o.motivoCancelacion}</div> : null}
