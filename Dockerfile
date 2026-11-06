@@ -20,7 +20,7 @@ RUN npm run build && npm prune --omit=dev --no-audit --no-fund
 # 3) Imagen final
 FROM node:22-alpine
 # Cliente de PostgreSQL y herramientas para los respaldos; tini para apagar limpio.
-RUN apk add --no-cache bash coreutils findutils tar openssl postgresql16-client tzdata tini
+RUN apk add --no-cache bash coreutils findutils tar openssl postgresql17-client tzdata tini
 ENV NODE_ENV=production \
     TZ=America/Bogota \
     PORT=3000 \

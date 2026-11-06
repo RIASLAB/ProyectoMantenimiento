@@ -1,0 +1,62 @@
+# Producción del CMMS usando el PostgreSQL que ya corre en este servidor (base cmms_produccion).
+# No levanta un contenedor de base de datos: se conecta a postgres_db por la red postgres_default.
+# Uso: docker compose -f docker-compose.prod.externo.yml --env-file .env.produccion up -d --build
+name: cmms
+
+services:
+  app:
+    build: .
+    image: ghcr.io/riaslab/proyectomantenimiento:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://cmms_prod:${DB_PASSWORD:?Defina DB_PASSWORD}@postgres_db:5432/cmms_produccion
+      TZ: ${APP_TZ:-America/Bogota}
+      APP_TZ: ${APP_TZ:-America/Bogota}
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET (al menos 32 caracteres aleatorios)}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-20}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+    ports:
+      - "172.30.0.98:8088:3000"
+    volumes:
+      - cmms-uploads:/datos/uploads
+    networks:
+      - default
+      - postgres
+
+  respaldo:
+    image: ghcr.io/riaslab/proyectomantenimiento:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_started
+    # UID/GID del usuario ub-admin del servidor: los respaldos quedan legibles para copiarlos al NAS.
+    user: "1000:1000"
+    command: ["bash", "scripts/respaldo-programado.sh"]
+    environment:
+      DATABASE_URL: postgres://cmms_prod:${DB_PASSWORD:?Defina DB_PASSWORD}@postgres_db:5432/cmms_produccion
+      TZ: ${APP_TZ:-America/Bogota}
+      APP_TZ: ${APP_TZ:-America/Bogota}
+      UPLOADS_DIR: /datos/uploads
+      BACKUP_DIR: /respaldos
+      RESPALDO_HORA: ${RESPALDO_HORA:-02:30}
+      RETENCION_DIAS: ${RETENCION_DIAS:-7}
+      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:?Defina BACKUP_PASSPHRASE (clave para cifrar los respaldos)}
+      BACKUP_COPIA_DIR: ${BACKUP_COPIA_DIR:-}
+    volumes:
+      - cmms-uploads:/datos/uploads:ro
+      - ${RESPALDOS_EN_SERVIDOR:-./respaldos}:/respaldos
+    networks:
+      - postgres
+    healthcheck:
+      disable: true
+
+networks:
+  postgres:
+    external: true
+    name: postgres_default
+
+volumes:
+  cmms-uploads:

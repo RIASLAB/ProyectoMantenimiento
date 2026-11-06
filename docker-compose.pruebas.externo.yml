@@ -1,0 +1,32 @@
+# Ambiente de pruebas del CMMS usando el PostgreSQL que ya corre en este servidor (base cmms_pruebas).
+# Usa la misma imagen que producción (se construye con docker-compose.prod.externo.yml).
+# Uso: docker compose -f docker-compose.pruebas.externo.yml --env-file .env.pruebas up -d
+name: cmms-pruebas
+
+services:
+  app:
+    image: ghcr.io/riaslab/proyectomantenimiento:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://cmms_test:${DB_PASSWORD:?Defina DB_PASSWORD}@postgres_db:5432/cmms_pruebas
+      TZ: ${APP_TZ:-America/Bogota}
+      APP_TZ: ${APP_TZ:-America/Bogota}
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET (al menos 32 caracteres aleatorios)}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-20}
+      TAREAS_PROGRAMADAS: "off"
+    ports:
+      - "172.30.0.98:8089:3000"
+    volumes:
+      - uploads:/datos/uploads
+    networks:
+      - default
+      - postgres
+
+networks:
+  postgres:
+    external: true
+    name: postgres_default
+
+volumes:
+  uploads:

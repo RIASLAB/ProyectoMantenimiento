@@ -1,6 +1,9 @@
 **/node_modules
 **/dist
 **/.env
+**/.env.produccion
+**/.env.pruebas
+**/.admin-password*
 **/uploads
 **/uploads-test
 **/coverage
@@ -8,5 +11,9 @@
 **/*.tsbuildinfo
 respaldos
 .git
+.github
+deploy
+docker
+docker-compose*.yml
 e2e
 docs

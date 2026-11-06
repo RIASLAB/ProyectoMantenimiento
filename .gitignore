@@ -2,4 +2,7 @@ node_modules
 .DS_Store
 *.log
 .env.produccion
+.env.pruebas
+.admin-password*
+.deploy.lock
 respaldos/
