@@ -106,9 +106,9 @@ cd backend
 npm run test:e2e
 ```
 
-Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **225 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
+Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **233 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
 
-Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**117 verificaciones**):
+Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**122 verificaciones**):
 
 | Script | Qué recorre |
 |---|---|
@@ -124,12 +124,13 @@ Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritori
 | `e2e/asignar_ordenes.py` | Asignar desde la lista viendo la carga de cada técnico (los libres primero); reasignar desde la orden; en el celular |
 | `e2e/tipos_equipo.py` | Tipos de equipo con lista de materiales, 3 aires iguales de una vez, cuántos hay en Bodega, preventivo por tipo y materiales en correctivos |
 | `e2e/eliminar_adjuntos.py` | Eliminar fotos de una orden (quién puede y cuándo) y documentos de una máquina |
+| `e2e/hoja_de_vida.py` | Carga la hoja de vida (AC-PMT-FR05) en Excel: revisión con avisos, fechas del primer preventivo, máquinas con fotos, planes con tareas, lista de materiales y repuestos; recargar sin duplicar |
 | `e2e/carga_masiva.py` | Descarga la plantilla, la llena, la sube con errores (fila y columna), la corrige y carga máquinas y repuestos con stock inicial |
 | `e2e/avisos_indicadores.py` | Falla y temperatura fuera de rango → campana y bandeja del admin; asignación → aviso al técnico; indicadores en el celular; horario y metas |
 | `e2e/rendimiento.py` | Mide la carga de las pantallas principales con 4G lenta y sin caché (NFR-02); no cuenta verificaciones |
 | `e2e/sin_conexion.py` | Se corta la red en el celular: la app abre, se cierra una OT, se registran temperatura y falla con foto; al volver la señal todo se envía solo y un conflicto queda a la vista |
 
-Cada script necesita los datos de demostración recién cargados (`npm run seed -- --demo` sobre una base limpia) y el frontend compilado y servido (`npm run build && npm run preview`).
+Los scripts usan Playwright para Python (`pip install playwright openpyxl pillow`). Cada script necesita los datos de demostración recién cargados (`npm run seed -- --demo` sobre una base limpia) y el frontend compilado y servido (`npm run build && npm run preview`).
 
 ## API (resumen)
 

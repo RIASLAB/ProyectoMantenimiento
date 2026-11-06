@@ -708,3 +708,19 @@ button.chip { font: inherit; cursor: pointer; }
 .asignar-carga { flex-basis: 100%; }
 .tareas-orden { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
 .tareas-orden li strong { display: block; }
+
+/* Carga de la hoja de vida (D-34) */
+.hv-card { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 10px; }
+.hv-card.hv-bad { border-color: var(--bad); }
+.hv-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+.hv-datos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 14px; margin: 0; }
+.hv-datos dt { font-size: 0.75rem; color: var(--muted); }
+.hv-datos dd { margin: 0; overflow-wrap: anywhere; }
+.hv-plan { border-top: 1px dashed var(--line); padding-top: 8px; }
+.hv-refs { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 0.9rem; }
+.hv-msgs { margin: 0; padding-left: 18px; font-size: 0.9rem; }
+.hv-msgs.bad { color: var(--bad); }
+.hv-msgs.warn { color: var(--warn); }
+.check-line { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.check-line input { width: 20px; height: 20px; margin-top: 2px; flex: none; accent-color: var(--brand); }
+.hv-acciones { display: flex; flex-wrap: wrap; gap: 8px; }

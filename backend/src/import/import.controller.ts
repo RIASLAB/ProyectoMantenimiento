@@ -1,9 +1,10 @@
-import { BadRequestException, Controller, Get, Param, ParseEnumPipe, Post, Res, StreamableFile, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, ParseEnumPipe, Post, Res, StreamableFile, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { CurrentUser, Roles, SessionUser } from '../common/auth.decorators';
 import { Rol } from '../common/enums';
 import { ImportService, MAX_BYTES, TipoCarga } from './import.service';
+import { HojaVidaService, MAX_BYTES_HV } from './hoja-vida.service';
 
 const TIPO = new ParseEnumPipe<{ maquinas: 'maquinas'; repuestos: 'repuestos' }>(
   { maquinas: 'maquinas', repuestos: 'repuestos' },
@@ -40,5 +41,33 @@ export class ImportController {
   @UseInterceptors(SUBIDA)
   cargar(@Param('tipo', TIPO) tipo: TipoCarga, @UploadedFile() file: Express.Multer.File | undefined, @CurrentUser() actor: SessionUser) {
     return this.svc.cargar(tipo, file, actor);
+  }
+}
+
+const SUBIDA_HV = FileInterceptor('archivo', { limits: { fileSize: MAX_BYTES_HV + 1, files: 1 } });
+
+/** D-34: carga de la hoja de vida de maquinaria (AC-PMT-FR05) en Excel. Solo el administrador. */
+@Controller('hojas-de-vida')
+@Roles(Rol.ADMIN)
+export class HojaVidaController {
+  constructor(private readonly svc: HojaVidaService) {}
+
+  /** Lee el archivo y muestra lo que se va a crear o actualizar, sin guardar nada. */
+  @Post('revisar')
+  @UseInterceptors(SUBIDA_HV)
+  revisar(@UploadedFile() file: Express.Multer.File | undefined) {
+    return this.svc.analizar(file);
+  }
+
+  /** Carga todas las hojas del archivo; si alguna tiene un error no carga nada. */
+  @Post('cargar')
+  @UseInterceptors(SUBIDA_HV)
+  cargar(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body('fechas') fechas: string | undefined,
+    @Body('crearRepuestos') crearRepuestos: string | undefined,
+    @CurrentUser() actor: SessionUser,
+  ) {
+    return this.svc.cargar(file, fechas, crearRepuestos !== 'false', actor);
   }
 }

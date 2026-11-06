@@ -56,6 +56,9 @@ export function AssetsList() {
               <Link to="/configuracion/carga-masiva?tipo=maquinas" className="btn btn-secondary">
                 <Icon name="upload" /> Desde Excel
               </Link>
+              <Link to="/maquinas/hoja-de-vida" className="btn btn-secondary">
+                <Icon name="file" /> Hoja de vida
+              </Link>
               <Link to="/maquinas/nueva" className="btn btn-primary">
                 <Icon name="plus" /> Nueva máquina
               </Link>

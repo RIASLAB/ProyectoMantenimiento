@@ -8,6 +8,7 @@ import { Settings } from './pages/admin/Settings';
 import { Users } from './pages/admin/Users';
 import { AssetDetail } from './pages/assets/AssetDetail';
 import { AssetForm } from './pages/assets/AssetForm';
+import { LifeSheetImport } from './pages/assets/LifeSheetImport';
 import { AssetsList } from './pages/assets/AssetsList';
 import { PartDetail } from './pages/inventory/PartDetail';
 import { PartForm } from './pages/inventory/PartForm';
@@ -107,6 +108,7 @@ export function App() {
         <Route path="maquinas/tipos" element={<EquipmentTypes />} />
         <Route path="maquinas/por-area" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><EquipmentSummary /></OnlyRoles>} />
         <Route path="maquinas/nueva" element={<OnlyRoles roles={['ADMIN']}><AssetForm /></OnlyRoles>} />
+        <Route path="maquinas/hoja-de-vida" element={<OnlyRoles roles={['ADMIN']}><LifeSheetImport /></OnlyRoles>} />
         <Route path="maquinas/:id" element={<AssetDetail />} />
         <Route path="maquinas/:id/editar" element={<OnlyRoles roles={['ADMIN']}><AssetForm /></OnlyRoles>} />
         <Route path="inventario" element={<PartsList />} />

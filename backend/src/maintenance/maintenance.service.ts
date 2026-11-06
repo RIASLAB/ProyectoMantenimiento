@@ -612,6 +612,25 @@ export class MaintenanceService {
     });
   }
 
+  /**
+   * Crea el plan de una máquina y su primera orden dentro de una transacción ya abierta (carga de hojas de vida, D-34).
+   * Las tareas deben existir; no se validan repuestos porque el plan se crea sin kit.
+   */
+  async crearPlanDeMaquinaEn(em: EntityManager, activo: Asset, dto: CreatePlanDto, actor: SessionUser) {
+    const tareaIds = await this.validarTareas(em, dto.tareaIds ?? []);
+    const plan = await em.getRepository(MaintenancePlan).save(
+      em.getRepository(MaintenancePlan).create({
+        activoId: activo.id,
+        ...this.camposPlan(dto),
+        tareasPlan: tareaIds.map((tareaId, orden) => em.getRepository(PlanTask).create({ tareaId, orden })),
+        repuestos: [],
+      }),
+    );
+    const ot = await this.generarPreventivo(em, plan, dto.primeraFecha, actor);
+    await this.audit.log({ usuarioId: actor.id, accion: 'PLAN_CREADO', entidad: 'plan', entidadId: plan.id, detalle: { nombre: plan.nombre, activo: activo.codigo, primeraOT: ot.codigo, origen: 'hoja de vida' } }, em);
+    return { plan, primeraOrden: ot };
+  }
+
   private async crearPlanPorTipo(dto: CreatePlanDto, actor: SessionUser) {
     const modelo = await this.ds.getRepository(EquipmentModel).findOne({ where: { id: dto.modeloId! } });
     if (!modelo) throw new NotFoundException('Tipo de equipo no encontrado');
