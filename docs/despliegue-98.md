@@ -1,6 +1,6 @@
 # Despliegue del CMMS en 172.30.0.98
 
-Fecha: 2026-11-04. Este servidor ya tenía PostgreSQL 17 en el contenedor `postgres_db`.
+Fecha: 2026-11-04 (actualizado 2026-11-06). Este servidor ya tenía PostgreSQL 17 en el contenedor `postgres_db`.
 El CMMS usa ese mismo PostgreSQL con dos bases independientes; no se instaló un segundo
 contenedor de base de datos.
 
