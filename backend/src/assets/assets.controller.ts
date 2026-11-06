@@ -40,6 +40,13 @@ export class AssetsController {
     return new StreamableFile(stream);
   }
 
+  /** Solo máquinas sin historial (creadas por error o de prueba); si no, se dan de baja. */
+  @Delete(':id')
+  @Roles(Rol.ADMIN)
+  eliminar(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: SessionUser) {
+    return this.assets.eliminar(id, actor);
+  }
+
   @Delete('documentos/:docId')
   @Roles(Rol.ADMIN)
   deleteDocument(@Param('docId', ParseUUIDPipe) docId: string, @CurrentUser() actor: SessionUser) {

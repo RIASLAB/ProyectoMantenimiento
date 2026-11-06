@@ -241,6 +241,59 @@ export class AssetsService {
     });
   }
 
+  /**
+   * Eliminar una máquina creada por error o de prueba (D-35). Solo si no tiene historial: ninguna orden con trabajo
+   * (iniciada, cerrada, con horas, repuestos usados, fotos, compras o firmas) ni registros de calidad. Se borran con
+   * ella sus órdenes abiertas sin trabajo, planes, documentos y lista de materiales; queda en la bitácora.
+   * Si tiene historial se da de baja: deja de operar y su historial se conserva.
+   */
+  async eliminar(id: string, actor: SessionUser) {
+    const a = await this.repo.findOne({ where: { id } });
+    if (!a) throw new NotFoundException('Máquina no encontrada');
+    const [h] = await this.ds.query(
+      `SELECT
+         (SELECT count(*) FROM ordenes_trabajo o WHERE o.activo_id = $1 AND o.estado NOT IN ('ABIERTA', 'ASIGNADA', 'CANCELADA'))::int AS trabajadas,
+         (SELECT count(*) FROM ordenes_trabajo o WHERE o.activo_id = $1 AND (
+            EXISTS (SELECT 1 FROM ot_mano_obra x WHERE x.orden_id = o.id)
+            OR EXISTS (SELECT 1 FROM ot_repuestos x WHERE x.orden_id = o.id AND x.cantidad_usada > 0)
+            OR EXISTS (SELECT 1 FROM ot_fotos x WHERE x.orden_id = o.id)
+            OR EXISTS (SELECT 1 FROM solicitudes_compra x WHERE x.orden_id = o.id)
+            OR EXISTS (SELECT 1 FROM firmas x WHERE x.entidad = 'OT' AND x.entidad_id = o.id::text)))::int AS con_registros,
+         (SELECT count(*) FROM registros_checklist r WHERE r.activo_id = $1)::int AS checklists,
+         (SELECT count(*) FROM puntos_control p WHERE p.activo_id = $1)::int AS puntos,
+         (SELECT count(*) FROM plantillas_checklist p WHERE p.activo_id = $1)::int AS plantillas`,
+      [id],
+    );
+    const motivos = [
+      h.trabajadas ? `${h.trabajadas} orden${h.trabajadas === 1 ? '' : 'es'} iniciada${h.trabajadas === 1 ? '' : 's'} o cerrada${h.trabajadas === 1 ? '' : 's'}` : null,
+      h.con_registros ? `órdenes con horas, repuestos, fotos, compras o firmas` : null,
+      h.checklists ? `${h.checklists} checklist${h.checklists === 1 ? '' : 's'} diligenciado${h.checklists === 1 ? '' : 's'}` : null,
+      h.puntos ? 'puntos de control de temperatura' : null,
+      h.plantillas ? 'plantillas de checklist propias' : null,
+    ].filter(Boolean);
+    if (motivos.length) {
+      throw new BadRequestException(`No se puede eliminar ${a.codigo} porque ya tiene historial (${motivos.join(', ')}). Para sacarla de servicio, edítela y póngale el estado "Dado de baja": su historial se conserva.`);
+    }
+    const docs = await this.docs.createQueryBuilder('d').addSelect('d.archivo').where('d.activoId = :id', { id }).getMany();
+    await this.ds.transaction(async (em) => {
+      const ordenes: Array<{ id: string; numero: number }> = await em.query('SELECT id, numero FROM ordenes_trabajo WHERE activo_id = $1', [id]);
+      if (ordenes.length) {
+        // El historial de eventos de una OT es de solo inserción; aquí se permite borrarlo junto con su orden sin trabajo.
+        await em.query(`SELECT set_config('cmms.borrar_maquina_sin_historial', 'on', true)`);
+        await em.query('DELETE FROM ot_eventos WHERE orden_id = ANY($1)', [ordenes.map((o) => o.id)]);
+        await em.query('DELETE FROM ordenes_trabajo WHERE id = ANY($1)', [ordenes.map((o) => o.id)]);
+      }
+      const planes = await em.query('DELETE FROM planes_mantenimiento WHERE activo_id = $1 RETURNING id', [id]);
+      await em.getRepository(Asset).delete(id);
+      await this.audit.log({
+        usuarioId: actor.id, accion: 'ACTIVO_ELIMINADO', entidad: 'activo', entidadId: id,
+        detalle: { codigo: a.codigo, nombre: a.nombre, area: a.area, ordenesSinTrabajo: ordenes.length, planes: (planes[0] as unknown[] | undefined)?.length ?? 0, documentos: docs.length },
+      }, em);
+    });
+    await Promise.all(docs.map((d) => unlink(join(this.dir, d.archivo)).catch(() => undefined)));
+    return { ok: true };
+  }
+
   async addDocument(activoId: string, file: Express.Multer.File | undefined, actor: SessionUser) {
     if (!(await this.repo.exists({ where: { id: activoId } }))) throw new NotFoundException('Máquina no encontrada');
     const tipo = validateUpload(file, this.maxBytes, ['application/pdf', 'image/jpeg', 'image/png']);

@@ -4,6 +4,7 @@
  */
 import ExcelJS from 'exceljs';
 import { bootstrap } from './util';
+import { DataSource } from 'typeorm';
 
 type Ctx = Awaited<ReturnType<typeof bootstrap>>;
 let c: Ctx;
@@ -324,5 +325,41 @@ describe('Lista de materiales propia de cada máquina (D-30)', () => {
     const vuelve = (await put(`/activos/${a.id}/materiales`, { materiales: [] })).body;
     expect(vuelve.origen).toBe('TIPO');
     expect(resumen(vuelve)).toEqual(['RP-FIL×3', 'RP-GAS×0.5']);
+  });
+});
+
+describe('D-35 · Eliminar una máquina sin historial', () => {
+  const del = (id: string, token = c.admin) => c.http.delete(`/api/activos/${id}`).set(c.auth(token));
+  const PDF = Buffer.from('%PDF-1.4\n%%EOF');
+
+  it('una máquina de prueba con plan, documento y materiales se elimina con todo lo suyo', async () => {
+    const a = (await post('/activos', { codigo: 'PRUEBA-01', nombre: 'Máquina de prueba', area: 'Pruebas' })).body;
+    const plan = (await post('/planes', { activoId: a.id, nombre: 'Plan de prueba', frecuenciaValor: 1, frecuenciaUnidad: 'MESES', primeraFecha: masDias(3), repuestos: [] })).body;
+    await c.http.post(`/api/ordenes/${plan.primeraOrden.id}/asignar`).set(c.auth(c.admin)).send({ tecnicoId: tec.id }).expect(201);
+    await c.http.post(`/api/activos/${a.id}/documentos`).set(c.auth(c.admin)).attach('archivo', PDF, { filename: 'manual.pdf', contentType: 'application/pdf' }).expect(201);
+    await c.http.put(`/api/activos/${a.id}/materiales`).set(c.auth(c.admin)).send({ materiales: [{ repuestoId: rep['RP-FIL'], cantidad: 1 }] }).expect(200);
+
+    expect((await del(a.id, tec.token)).status).toBe(403);
+    const r = await del(a.id);
+    expect(r.status).toBe(200);
+    expect((await get(`/activos/${a.id}`)).status).toBe(404);
+    expect((await get(`/ordenes/${plan.primeraOrden.id}`)).status).toBe(404);
+    expect(((await get('/planes')).body as Array<{ id: string }>).some((p) => p.id === plan.plan.id)).toBe(false);
+    const bit = (await get(`/bitacora?entidad=activo&entidadId=${a.id}`)).body;
+    expect(JSON.stringify(bit)).toContain('ACTIVO_ELIMINADO');
+    // El historial de eventos sigue siendo de solo inserción fuera de esta operación
+    await expect(c.app.get(DataSource).query('DELETE FROM ot_eventos')).rejects.toThrow('solo inserción');
+  });
+
+  it('una máquina con historial no se elimina: se indica darla de baja', async () => {
+    const a = (await post('/activos', { codigo: 'PRUEBA-02', nombre: 'Máquina usada', area: 'Pruebas' })).body;
+    const o = (await post('/ordenes', { activoId: a.id, descripcion: 'Ruido en el motor', maquinaParada: false })).body;
+    await c.http.post(`/api/ordenes/${o.id}/asignar`).set(c.auth(c.admin)).send({ tecnicoId: tec.id }).expect(201);
+    await c.http.post(`/api/ordenes/${o.id}/iniciar`).set(c.auth(tec.token)).expect(201);
+    const r = await del(a.id);
+    expect(r.status).toBe(400);
+    expect(r.body.message).toContain('ya tiene historial (1 orden iniciada o cerrada)');
+    expect(r.body.message).toContain('Dado de baja');
+    expect((await get(`/activos/${a.id}`)).status).toBe(200);
   });
 });

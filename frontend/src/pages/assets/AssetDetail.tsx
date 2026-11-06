@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChangeEvent, ReactNode, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, openProtectedFile } from '../../api/client';
 import type { Asset, AssetDocument, AssetHistory } from '../../api/types';
 import { OrderStateBadge, PartRow, PartRows, rowsToPayload, useMaterialesEquipo } from '../../components/orders-shared';
@@ -121,6 +121,34 @@ function MaterialesMaquina({ a }: { a: Asset }) {
   );
 }
 
+/**
+ * Eliminar una máquina creada por error o de prueba (D-35): solo si no tiene historial. Si lo tiene, el servidor
+ * explica por qué y se ofrece darla de baja (su historial se conserva).
+ */
+function EliminarMaquina({ a, open, onClose }: { a: Asset; open: boolean; onClose: () => void }) {
+  const qc = useQueryClient();
+  const nav = useNavigate();
+  const m = useMutation({
+    mutationFn: () => api.delete(`/activos/${a.id}`),
+    onSuccess: () => {
+      for (const k of ['activos', 'ordenes', 'ordenes-resumen', 'planes', 'bitacora']) qc.invalidateQueries({ queryKey: [k] });
+      nav('/maquinas', { replace: true });
+    },
+  });
+  const cerrar = () => { m.reset(); onClose(); };
+  return (
+    <Modal open={open} title={`Eliminar ${a.codigo}`} onClose={cerrar}
+      footer={<><Button variant="ghost" onClick={cerrar}>Cancelar</Button>
+        {m.isError ? <Link to={`/maquinas/${a.id}/editar`} className="btn btn-secondary">Dar de baja</Link> : <Button variant="danger" busy={m.isPending} onClick={() => m.mutate()}>Eliminar</Button>}</>}>
+      <div className="stack">
+        <p style={{ margin: 0 }}>¿Eliminar <strong>{a.codigo} · {a.nombre}</strong>? Se borran también sus planes, documentos, lista de materiales y órdenes abiertas sin trabajo.</p>
+        <p className="muted small" style={{ margin: 0 }}>Es para máquinas creadas por error o de prueba. Una máquina con historial (órdenes trabajadas o cerradas, checklists…) no se elimina: se da de baja y su historial se conserva.</p>
+        {m.isError ? <ErrorBox error={m.error} /> : null}
+      </div>
+    </Modal>
+  );
+}
+
 export function AssetDetail() {
   const { id } = useParams<{ id: string }>();
   const { can } = useAuth();
@@ -130,6 +158,7 @@ export function AssetDetail() {
   const [openError, setOpenError] = useState('');
   const [aBorrar, setABorrar] = useState<AssetDocument | null>(null);
   const [instalar, setInstalar] = useState(false);
+  const [eliminar, setEliminar] = useState(false);
 
   const q = useQuery({ queryKey: ['activo', id], queryFn: () => api.get<Asset>(`/activos/${id}`) });
 
@@ -193,6 +222,9 @@ export function AssetDetail() {
               <Link to={`/maquinas/${a.id}/editar`} className="btn btn-secondary">
                 <Icon name="edit" /> Editar
               </Link>
+            ) : null}
+            {can('ADMIN') ? (
+              <Button variant="ghost" onClick={() => setEliminar(true)}><Icon name="trash" /> Eliminar</Button>
             ) : null}
           </>
         }
@@ -272,6 +304,7 @@ export function AssetDetail() {
         </section>
       </div>
       <InstallModal equipo={instalar ? a : null} onClose={() => setInstalar(false)} />
+      <EliminarMaquina a={a} open={eliminar} onClose={() => setEliminar(false)} />
       <Modal open={!!aBorrar} title="Eliminar documento" onClose={cerrarBorrar}
         footer={<><Button variant="ghost" onClick={cerrarBorrar}>Cancelar</Button><Button variant="danger" busy={borrar.isPending} onClick={() => aBorrar && borrar.mutate(aBorrar.id)}>Eliminar</Button></>}>
         <p style={{ marginTop: 0 }}>¿Eliminar <strong>{aBorrar?.nombreOriginal}</strong> de esta máquina?</p>
