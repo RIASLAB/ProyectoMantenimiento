@@ -20,7 +20,7 @@ git pull --ff-only origin main
 
 # 1) Pruebas primero: si la imagen nueva no arranca, producción no se toca.
 log "Actualizando pruebas…"
-docker compose -f docker-compose.pruebas.externo.yml --env-file .env.pruebas pull app
+docker compose -f docker-compose.pruebas.externo.yml --env-file .env.pruebas pull --quiet app
 docker compose -f docker-compose.pruebas.externo.yml --env-file .env.pruebas up -d
 for _ in $(seq 1 12); do
   curl -fsS http://172.30.0.98:8089/api/salud >/dev/null 2>&1 && break
@@ -39,7 +39,7 @@ IMAGEN="ghcr.io/riaslab/proyectomantenimiento:$IMAGE_TAG"
 
 ANTERIOR=$(docker inspect -f '{{.Image}}' cmms-app-1 2>/dev/null || true)
 log "Actualizando producción…"
-docker compose -f docker-compose.prod.externo.yml --env-file .env.produccion pull app respaldo
+docker compose -f docker-compose.prod.externo.yml --env-file .env.produccion pull --quiet app respaldo
 NUEVA=$(docker image inspect -f '{{.Id}}' "$IMAGEN")
 
 if [ -n "$ANTERIOR" ] && [ "$ANTERIOR" != "$NUEVA" ]; then

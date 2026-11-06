@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths-ignore:
       - 'docs/**'
+      - 'deploy/**'
       - 'e2e/**'
       - '**.md'
   workflow_dispatch:
