@@ -6,7 +6,7 @@ import type { Response } from 'express';
 import { CurrentUser, Roles, SessionUser } from '../common/auth.decorators';
 import { MomentoFoto, Rol } from '../common/enums';
 import {
-  AssignDto, CancelDto, CloseOrderDto, CreatePlanDto, CreateTaskDto, UpdateTaskDto, ListOrdersQuery, NoteDto, PlannedPartsDto, ReportFaultDto, UpdatePlanDto,
+  AssignDto, CancelDto, CloseOrderDto, CreatePlanDto, CreateTaskDto, RescheduleDto, UpdateTaskDto, ListOrdersQuery, NoteDto, PlannedPartsDto, ReportFaultDto, UpdatePlanDto,
 } from './maintenance.dto';
 import { MaintenanceService } from './maintenance.service';
 import { TasksService } from './tasks.service';
@@ -80,6 +80,13 @@ export class WorkOrdersController {
   @Roles(Rol.ADMIN, Rol.TECNICO)
   cerrar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CloseOrderDto, @CurrentUser() actor: SessionUser) {
     return this.svc.cerrar(id, dto, actor);
+  }
+
+  /** Reprogramar un preventivo con su motivo (D-36). */
+  @Post(':id/reprogramar')
+  @Roles(Rol.ADMIN)
+  reprogramar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: RescheduleDto, @CurrentUser() actor: SessionUser) {
+    return this.svc.reprogramar(id, dto.fecha, dto.motivo, actor);
   }
 
   @Post(':id/cancelar')

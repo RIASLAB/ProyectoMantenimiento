@@ -154,7 +154,7 @@ export interface WorkOrderDetail extends WorkOrderSummary {
   manoObra: Array<{ id: string; horas: number; tarifaHora: number; tecnico: PersonRef }>;
   eventos: Array<{ id: string; estadoAnterior: EstadoOrden | null; estadoNuevo: EstadoOrden; nota: string | null; creadoEn: string; usuario: PersonRef | null }>;
   fotos: Array<{ id: string; momento: MomentoFoto; creadoEn: string; subidoPor: PersonRef | null }>;
-  acciones: Record<'asignar' | 'tomar' | 'iniciar' | 'esperarRepuesto' | 'reanudar' | 'cerrar' | 'cancelar' | 'editarRepuestos' | 'subirFotos', boolean>;
+  acciones: Record<'asignar' | 'tomar' | 'iniciar' | 'esperarRepuesto' | 'reanudar' | 'cerrar' | 'cancelar' | 'reprogramar' | 'editarRepuestos' | 'subirFotos', boolean>;
 }
 
 export interface OrdersSummary {

@@ -23,6 +23,8 @@ import { AssetHistoryController, PlansController, TasksController, WorkOrdersCon
 import { TasksService } from './maintenance/tasks.service';
 import { MaintenanceService } from './maintenance/maintenance.service';
 import { KpiController } from './kpi/kpi.controller';
+import { PlannerController } from './planner/planner.controller';
+import { PlannerService } from './planner/planner.service';
 import { KpiService } from './kpi/kpi.service';
 import { NotificationsController } from './notifications/notifications.controller';
 import { NotificationsService } from './notifications/notifications.service';
@@ -70,11 +72,11 @@ class HealthController {
   ],
   controllers: [
     HealthController, AuthController, UsersController, SettingsController, AuditController,
-    AssetHistoryController, AssetsController, SparePartsController, InventoryController, WorkOrdersController, PlansController, TasksController, PurchasesController, QualityController, NotificationsController, KpiController, ImportController, HojaVidaController, EquipmentController, LightingController, SignaturesController, InstrumentsController,
+    AssetHistoryController, AssetsController, SparePartsController, InventoryController, WorkOrdersController, PlansController, TasksController, PurchasesController, QualityController, NotificationsController, KpiController, PlannerController, ImportController, HojaVidaController, EquipmentController, LightingController, SignaturesController, InstrumentsController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: AuthGuard },
-    AuthService, UsersService, SettingsService, AuditService, AssetsService, InventoryService, MaintenanceService, TasksService, PurchasesService, QualityService, NotificationsService, KpiService, ImportService, HojaVidaService, EquipmentService, LightingService, SignaturesService, InstrumentsService,
+    AuthService, UsersService, SettingsService, AuditService, AssetsService, InventoryService, MaintenanceService, TasksService, PurchasesService, QualityService, NotificationsService, KpiService, PlannerService, ImportService, HojaVidaService, EquipmentService, LightingService, SignaturesService, InstrumentsService,
   ],
 })
 export class AppModule {}

@@ -724,3 +724,58 @@ button.chip { font: inherit; cursor: pointer; }
 .check-line { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
 .check-line input { width: 20px; height: 20px; margin-top: 2px; flex: none; accent-color: var(--brand); }
 .hv-acciones { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Planeador anual de mantenimiento (AC-PMT-CR01, D-36) */
+.pl-filtros { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 14px; }
+.pl-filtros > * { flex: 0 1 auto; min-width: 0; }
+.pl-filtros select, .pl-filtros input { height: auto; }
+.kpi-ok { border-color: var(--ok); }
+.pl-leyenda { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); max-width: 100%; }
+.pl { border-collapse: collapse; font-size: 0.78rem; min-width: max-content; }
+.pl th, .pl td { border: 1px solid var(--line); padding: 2px 4px; text-align: center; vertical-align: middle; }
+.pl thead th { background: var(--surface-2); font-weight: 700; position: sticky; top: 0; z-index: 1; }
+.pl .pl-eq { position: sticky; left: 0; z-index: 2; background: var(--surface); text-align: left; min-width: 170px; max-width: 220px; }
+.pl thead .pl-eq { z-index: 3; background: var(--surface-2); }
+.pl-plan { font-weight: 400; color: var(--muted); font-size: 0.72rem; }
+.pl-toggle { font-weight: 700; text-align: left; padding: 0; }
+.pl-act { min-width: 220px; max-width: 260px; text-align: left !important; }
+.pl-act-txt { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.pl-obs { min-width: 220px; max-width: 320px; text-align: left !important; }
+.pl-obs ul { margin: 0; padding-left: 14px; }
+.pl-tipo { white-space: nowrap; color: var(--muted); text-align: left !important; }
+.pl-w { width: 22px; min-width: 22px; padding: 1px !important; }
+.pl-mes { font-size: 0.68rem; letter-spacing: 0.03em; }
+.pl-corte { box-shadow: inset 2px 0 0 var(--brand), inset -2px 0 0 var(--brand); }
+.pl-futuro { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+.pl-p, .pl-e, .pl-proy { display: inline-grid; place-items: center; min-width: 16px; height: 16px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-decoration: none; }
+.pl-p { background: var(--brand); color: #fff; }
+.pl-e { background: var(--ok); color: #fff; }
+.pl-proy { border: 1.5px dashed var(--brand); color: var(--brand); }
+.pl-ejec td, .pl-ejec th { border-bottom: 2px solid var(--line-strong, var(--line)); }
+.pl-num { font-weight: 700; }
+.pl-bajo { color: var(--bad); }
+.pl-estado { font-size: 0.72rem; min-width: 90px; }
+.pl-cumplidas { color: var(--ok); }
+.pl-pendientes { color: var(--bad); }
+.pl-maq td, .pl-maq th { background: var(--surface-2); }
+.pl-maq-nombre { padding-left: 18px !important; }
+.pl-cab { width: 100%; border-collapse: collapse; margin: 4px 0 6px; font-size: 8pt; }
+.pl-cab td { border: 1px solid #999; padding: 2px 4px; }
+.pl-impreso.pl-wrap { overflow: visible; border: 0; border-radius: 0; }
+.pl-impreso .pl { font-size: 5.5pt; min-width: 0; width: 100%; }
+.pl-impreso .pl th, .pl-impreso .pl td { border-color: #888; padding: 1px; }
+.pl-impreso .pl .pl-eq { position: static; min-width: 0; max-width: 26mm; }
+.pl-impreso .pl thead th { position: static; }
+.pl-impreso .pl-act { min-width: 0; max-width: 40mm; }
+.pl-impreso .pl-obs { min-width: 0; max-width: 34mm; }
+.pl-impreso .pl-w { width: 3.4mm; min-width: 0; }
+.pl-impreso .pl-plan, .pl-impreso .pl-estado, .pl-impreso .pl-mes, .pl-impreso .pl-tipo { font-size: 5pt; }
+.pl-impreso .pl-p, .pl-impreso .pl-e, .pl-impreso .pl-proy { min-width: 0; height: auto; padding: 0 1px; border-radius: 1px; font-size: 5pt; }
+.pl-impreso .pl-act-txt { -webkit-line-clamp: 4; }
+@media print {
+  .pl-impreso .pl-p { background: #1f4e9c !important; }
+  .pl-impreso .pl-e { background: #1b7f3a !important; }
+  .pl-impreso .pl-futuro { background: #f2f2f2 !important; }
+}
+}

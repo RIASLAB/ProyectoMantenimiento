@@ -26,6 +26,7 @@ import { OrderDetail } from './pages/orders/OrderDetail';
 import { OrdersList } from './pages/orders/OrdersList';
 import { Plans } from './pages/orders/Plans';
 import { Tasks } from './pages/orders/Tasks';
+import { Planner } from './pages/orders/Planner';
 import { ReportFault } from './pages/orders/ReportFault';
 import { PurchaseDetail } from './pages/purchases/PurchaseDetail';
 import { PurchasesList } from './pages/purchases/PurchasesList';
@@ -40,6 +41,7 @@ import { PrintAssetSheet } from './pages/print/PrintAssetSheet';
 import { PrintChecklist, PrintChecklistWeek } from './pages/print/PrintChecklist';
 import { PrintLighting } from './pages/print/PrintLighting';
 import { PrintOrder } from './pages/print/PrintOrder';
+import { PrintPlanner } from './pages/print/PrintPlanner';
 import { PrintTemperatures } from './pages/print/PrintTemperatures';
 import { PrintMonthly } from './pages/print/PrintMonthly';
 
@@ -71,6 +73,7 @@ export function App() {
       <Route path="/ingresar" element={<Login />} />
       {/* Formatos en hoja completa, para ver e imprimir (sin el menú de la aplicación). */}
       <Route path="/imprimir/ot/:id" element={<RequireAuth><PrintOrder /></RequireAuth>} />
+      <Route path="/imprimir/planeador" element={<RequireAuth><PrintPlanner /></RequireAuth>} />
       <Route path="/imprimir/hoja-de-vida/:id" element={<RequireAuth><PrintAssetSheet /></RequireAuth>} />
       <Route path="/imprimir/checklist/:id" element={<RequireAuth><PrintChecklist /></RequireAuth>} />
       <Route path="/calidad/semana" element={<RequireAuth><PrintChecklistWeek /></RequireAuth>} />
@@ -94,6 +97,7 @@ export function App() {
         <Route path="ordenes/reportar" element={<ReportFault />} />
         <Route path="ordenes/planes" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><Plans /></OnlyRoles>} />
         <Route path="ordenes/tareas" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><Tasks /></OnlyRoles>} />
+        <Route path="ordenes/planeador" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><Planner /></OnlyRoles>} />
         <Route path="ordenes/:id" element={<OrderDetail />} />
         <Route path="calidad" element={<QualityHome />} />
         <Route path="calidad/temperatura" element={<RecordTemperature />} />

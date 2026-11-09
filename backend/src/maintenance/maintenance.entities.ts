@@ -394,6 +394,42 @@ export class WorkOrderEvent {
   creadoEn: Date;
 }
 
+/**
+ * Reprogramaciones de una orden preventiva (D-36): de qué fecha a cuál y por qué. Solo inserción;
+ * el motivo sale en la columna "Observación" del planeador anual.
+ */
+@Entity('ot_reprogramaciones')
+export class WorkOrderReschedule {
+  @PrimaryGeneratedColumn('increment', { type: 'bigint' })
+  id: string;
+
+  @ManyToOne(() => WorkOrder, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'orden_id' })
+  orden: WorkOrder;
+
+  @Column({ name: 'orden_id', type: 'uuid' })
+  ordenId: string;
+
+  @Column({ name: 'fecha_anterior', type: 'date' })
+  fechaAnterior: string;
+
+  @Column({ name: 'fecha_nueva', type: 'date' })
+  fechaNueva: string;
+
+  @Column({ type: 'varchar', length: 300 })
+  motivo: string;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'usuario_id' })
+  usuario: User;
+
+  @Column({ name: 'usuario_id', type: 'uuid' })
+  usuarioId: string;
+
+  @CreateDateColumn({ name: 'creado_en', type: 'timestamptz' })
+  creadoEn: Date;
+}
+
 /** Fotos de la OT: al reportar, antes y después del trabajo (MNT-11). */
 @Entity('ot_fotos')
 export class WorkOrderPhoto {
@@ -434,4 +470,4 @@ export class WorkOrderPhoto {
   creadoEn: Date;
 }
 
-export const MAINTENANCE_ENTITIES = [MaintenancePlan, PlanPart, MaintenanceTask, PlanTask, WorkOrder, WorkOrderPart, WorkOrderLabor, WorkOrderEvent, WorkOrderPhoto];
+export const MAINTENANCE_ENTITIES = [MaintenancePlan, PlanPart, MaintenanceTask, PlanTask, WorkOrderReschedule, WorkOrder, WorkOrderPart, WorkOrderLabor, WorkOrderEvent, WorkOrderPhoto];

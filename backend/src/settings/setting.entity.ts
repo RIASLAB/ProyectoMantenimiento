@@ -32,4 +32,5 @@ export const FORMATOS_POR_DEFECTO: Record<string, FormatoDocumental> = {
   HOJA_VIDA: { nombre: 'Hoja de vida de maquinaria y equipos', codigo: 'AC-PMT-FR05', version: '2', fechaElaboracion: '2019-10-29', fechaActualizacion: null },
   TEMPERATURA: { nombre: 'Registro de temperatura de cuartos fríos y áreas', codigo: 'AC-PMT-FR01', version: '2', fechaElaboracion: '2024-01-09', fechaActualizacion: '2025-10-08' },
   ILUMINACION: { nombre: 'Formato de registro de medición de iluminación', codigo: 'AC-PMT-MI01', version: '1', fechaElaboracion: '2024-10-09', fechaActualizacion: '2025-08-12' },
+  PLANEADOR: { nombre: 'Planeador de mantenimiento', codigo: 'AC-PMT-CR01', version: '4', fechaElaboracion: '2019-12-09', fechaActualizacion: '2025-10-14' },
 };

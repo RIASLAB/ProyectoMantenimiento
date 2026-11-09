@@ -19,7 +19,7 @@ import { PurchasesService } from '../purchases/purchases.service';
 import { SettingsService } from '../settings/settings.service';
 import { User } from '../users/user.entity';
 import { AssignDto, CloseOrderDto, CreatePlanDto, ListOrdersQuery, PartQtyDto, ReportFaultDto, UpdatePlanDto } from './maintenance.dto';
-import { MaintenancePlan, MaintenanceTask, PlanPart, PlanTask, WorkOrder, WorkOrderEvent, WorkOrderLabor, WorkOrderPart, WorkOrderPhoto } from './maintenance.entities';
+import { MaintenancePlan, MaintenanceTask, PlanPart, PlanTask, WorkOrder, WorkOrderReschedule, WorkOrderEvent, WorkOrderLabor, WorkOrderPart, WorkOrderPhoto } from './maintenance.entities';
 
 /** Transiciones de estado permitidas (MNT-03). */
 export const TRANSICIONES: Record<EstadoOrden, EstadoOrden[]> = {
@@ -484,6 +484,36 @@ export class MaintenanceService {
     });
   }
 
+  /**
+   * Reprogramar un preventivo que no se ha empezado (D-36): nueva fecha (desde hoy hasta un año) y motivo.
+   * Queda en su historial y en la observación del planeador; el siguiente se sigue contando desde que se haga.
+   */
+  async reprogramar(id: string, fecha: string, motivo: string, actor: SessionUser) {
+    return this.ds.transaction(async (em) => {
+      const o = await this.bloquear(em, id);
+      if (o.tipo !== TipoOrden.PREVENTIVO) throw new BadRequestException('Solo se reprograman las órdenes preventivas');
+      if (![EstadoOrden.ABIERTA, EstadoOrden.ASIGNADA].includes(o.estado)) throw new BadRequestException('Solo se reprograma un preventivo que aún no se ha empezado');
+      const nueva = fecha.slice(0, 10);
+      const hoyStr = hoy();
+      const limite = new Date(Date.parse(`${hoyStr}T00:00:00Z`) + 366 * 86_400_000).toISOString().slice(0, 10);
+      if (nueva < hoyStr) throw new BadRequestException('La nueva fecha no puede estar en el pasado');
+      if (nueva > limite) throw new BadRequestException('La nueva fecha no puede ser de más de un año');
+      if (nueva === o.fechaProgramada) throw new BadRequestException('Elija una fecha distinta a la programada');
+      const anterior = o.fechaProgramada ?? hoyStr;
+      await em.getRepository(WorkOrder).update(o.id, { fechaProgramada: nueva });
+      await em.getRepository(WorkOrderReschedule).insert({ ordenId: o.id, fechaAnterior: anterior, fechaNueva: nueva, motivo: motivo.trim(), usuarioId: actor.id });
+      const dmy = (f: string) => f.split('-').reverse().join('/');
+      await this.evento(em, o.id, actor, o.estado, o.estado, `Reprogramado del ${dmy(anterior)} al ${dmy(nueva)}: ${motivo.trim()}`);
+      await this.audit.log({ usuarioId: actor.id, accion: 'OT_REPROGRAMADA', entidad: 'orden', entidadId: o.id, detalle: { codigo: numeroOT(o.numero), de: anterior, a: nueva, motivo: motivo.trim() } }, em);
+      if (o.asignadoAId && o.asignadoAId !== actor.id) {
+        await this.notif.notificar(em, { usuarios: [o.asignadoAId] }, {
+          tipo: 'OT_REPROGRAMADA', titulo: `${numeroOT(o.numero)} reprogramada para el ${dmy(nueva)}`, cuerpo: motivo.trim(), enlace: `/ordenes/${o.id}`,
+        });
+      }
+      return { ok: true, fechaProgramada: nueva };
+    });
+  }
+
   /** Reemplaza los repuestos planificados de una OT que no se ha cerrado. */
   async setRepuestosPlanificados(id: string, repuestos: PartQtyDto[], actor: SessionUser) {
     return this.ds.transaction(async (em) => {
@@ -930,6 +960,7 @@ export class MaintenanceService {
       reanudar: ejecutor && o.estado === EstadoOrden.ESPERANDO_REPUESTO,
       cerrar: ejecutor && o.estado === EstadoOrden.EN_EJECUCION,
       cancelar: admin && abierta,
+      reprogramar: admin && o.tipo === TipoOrden.PREVENTIVO && [EstadoOrden.ABIERTA, EstadoOrden.ASIGNADA].includes(o.estado),
       editarRepuestos: ejecutor && abierta,
       subirFotos: abierta && (ejecutor || o.reportadoPorId === actor.id),
     };

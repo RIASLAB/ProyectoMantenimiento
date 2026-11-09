@@ -281,6 +281,7 @@ export class AssetsService {
         // El historial de eventos de una OT es de solo inserción; aquí se permite borrarlo junto con su orden sin trabajo.
         await em.query(`SELECT set_config('cmms.borrar_maquina_sin_historial', 'on', true)`);
         await em.query('DELETE FROM ot_eventos WHERE orden_id = ANY($1)', [ordenes.map((o) => o.id)]);
+        await em.query('DELETE FROM ot_reprogramaciones WHERE orden_id = ANY($1)', [ordenes.map((o) => o.id)]);
         await em.query('DELETE FROM ordenes_trabajo WHERE id = ANY($1)', [ordenes.map((o) => o.id)]);
       }
       const planes = await em.query('DELETE FROM planes_mantenimiento WHERE activo_id = $1 RETURNING id', [id]);

@@ -12,7 +12,7 @@ import { OrderBadges, PartRow, PartRows, rowsToPayload, tituloLista, useMaterial
 import { Badge, Button, Empty, ErrorBox, Field, Icon, Input, KeyValue, Modal, PageHeader, Select, Spinner, Textarea } from '../../components/ui';
 import { COMPRA_ESTADO_LABEL, COMPRA_ESTADO_TONE, date, dateTime, diaLocal, duration, frecuencia, money, ORDEN_ESTADO_LABEL, PRIORIDAD_LABEL, qty, sumarFrecuencia, TIPO_LABEL, toLocalInput, VERIFICACIONES_CIERRE } from '../../format';
 
-type ModalKind = 'asignar' | 'esperar' | 'cerrar' | 'cancelar' | 'repuestos' | 'compra' | null | 'plan';
+type ModalKind = 'asignar' | 'esperar' | 'cerrar' | 'cancelar' | 'repuestos' | 'compra' | null | 'plan' | 'reprogramar';
 const MOMENTO_LABEL: Record<MomentoFoto, string> = { REPORTE: 'Reporte', ANTES: 'Antes', DESPUES: 'Después' };
 
 function useOrderMutation<T>(id: string, fn: (body: T) => Promise<unknown>, onDone?: () => void) {
@@ -109,6 +109,32 @@ function PlanTareasModal({ plan, open, onClose }: { plan: NonNullable<WorkOrderD
         </div>
         {plan.tareas ? <div><p className="subtle-head">Indicaciones</p><p className="desc">{plan.tareas}</p></div> : null}
         {can('ADMIN') ? <Link to="/ordenes/planes" className="link-btn">Editar el plan</Link> : null}
+      </div>
+    </Modal>
+  );
+}
+
+/** Mover un preventivo a otra fecha con su motivo (D-36); el motivo sale en la observación del planeador. */
+function ReprogramarModal({ o, open, onClose }: { o: WorkOrderDetail; open: boolean; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [fecha, setFecha] = useState('');
+  const [motivo, setMotivo] = useState('');
+  useEffect(() => { if (open) { setFecha(''); setMotivo(''); } }, [open]);
+  const m = useMutation({
+    mutationFn: () => api.post(`/ordenes/${o.id}/reprogramar`, { fecha, motivo }),
+    onSuccess: () => { for (const k of ['orden', 'ordenes', 'ordenes-resumen', 'planeador', 'bitacora']) qc.invalidateQueries({ queryKey: [k] }); onClose(); },
+  });
+  useEffect(() => { if (open) m.reset(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <Modal open={open} title={`Reprogramar ${o.codigo}`} onClose={onClose}
+      footer={<><Button variant="ghost" onClick={onClose}>Volver</Button><Button busy={m.isPending} disabled={!fecha || motivo.trim().length < 5} onClick={() => m.mutate()}>Reprogramar</Button></>}>
+      <div className="stack">
+        <p className="muted small" style={{ margin: 0 }}>Programado para el {o.fechaProgramada ? date(o.fechaProgramada) : '—'}. El motivo queda en el historial de la orden y en la observación del planeador.</p>
+        <Field label="Nueva fecha *">{(i) => <Input id={i} type="date" value={fecha} min={diaLocal()} max={diaLocal(366)} onChange={(e) => setFecha(e.target.value)} />}</Field>
+        <Field label="Motivo *" hint="Ej.: producción no libera el cuarto, falta el repuesto, se pasa para la última semana del mes.">
+          {(i) => <Textarea id={i} value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={300} rows={2} />}
+        </Field>
+        {m.isError ? <ErrorBox error={m.error} /> : null}
       </div>
     </Modal>
   );
@@ -382,7 +408,7 @@ export function OrderDetail() {
         </div>
       ) : null}
 
-      {(a.tomar || a.asignar || a.iniciar || a.esperarRepuesto || a.reanudar || a.cerrar || a.cancelar) ? (
+      {(a.tomar || a.asignar || a.iniciar || a.esperarRepuesto || a.reanudar || a.cerrar || a.cancelar || a.reprogramar) ? (
         <div className="action-bar">
           {a.tomar ? <Button busy={tomar.isPending} onClick={() => tomar.mutate(user!.id)}><Icon name="wrench" /> Tomar esta orden</Button> : null}
           {a.iniciar ? <Button busy={simple.isPending} onClick={() => simple.mutate({ accion: 'iniciar' })}>Iniciar trabajo</Button> : null}
@@ -390,6 +416,7 @@ export function OrderDetail() {
           {a.cerrar ? <Button onClick={() => setModal('cerrar')}>Cerrar orden</Button> : null}
           {a.esperarRepuesto ? <Button variant="secondary" onClick={() => setModal('esperar')}>Esperar repuesto</Button> : null}
           {a.asignar ? <Button variant="secondary" onClick={() => setModal('asignar')}>{o.asignadoA ? 'Reasignar' : 'Asignar'}</Button> : null}
+          {a.reprogramar ? <Button variant="ghost" onClick={() => setModal('reprogramar')}><Icon name="calendar" /> Reprogramar</Button> : null}
           {a.cancelar ? <Button variant="ghost" onClick={() => setModal('cancelar')}>Cancelar orden</Button> : null}
         </div>
       ) : null}
@@ -535,6 +562,7 @@ export function OrderDetail() {
       {o.plan ? <PlanTareasModal plan={o.plan} open={modal === 'plan'} onClose={() => setModal(null)} /> : null}
       <NoteModal o={o} kind="esperar" open={modal === 'esperar'} onClose={() => setModal(null)} />
       <NoteModal o={o} kind="cancelar" open={modal === 'cancelar'} onClose={() => setModal(null)} />
+      <ReprogramarModal o={o} open={modal === 'reprogramar'} onClose={() => setModal(null)} />
       <PlannedPartsModal o={o} open={modal === 'repuestos'} onClose={() => setModal(null)} />
       <CloseModal o={o} open={modal === 'cerrar'} onClose={() => setModal(null)} />
       <NewPurchaseModal open={modal === 'compra'} onClose={() => setModal(null)} ordenId={o.id} ordenCodigo={o.codigo} />

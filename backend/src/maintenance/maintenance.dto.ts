@@ -45,6 +45,15 @@ export class CancelDto {
   motivo: string;
 }
 
+/** Mover un preventivo a otra fecha, con el motivo (D-36). */
+export class RescheduleDto {
+  @IsDateString()
+  fecha: string;
+
+  @IsString() @MinLength(5) @MaxLength(300)
+  motivo: string;
+}
+
 export class PartQtyDto {
   @IsUUID()
   repuestoId: string;
