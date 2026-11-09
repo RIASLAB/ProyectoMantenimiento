@@ -1,8 +1,5 @@
 import { Type } from 'class-transformer';
-import {
-  ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min,
-  MinLength, ValidateIf, ValidateNested,
-} from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested } from 'class-validator';
 
 export class CreateControlPointDto {
   @IsUUID()
@@ -42,8 +39,18 @@ export class CreateTemperatureDto {
   @IsUUID()
   puntoId: string;
 
+  /** Obligatorio si el estado es LECTURA (o no se envía estado). */
+  @ValidateIf((o: CreateTemperatureDto) => !o.estado || o.estado === 'LECTURA')
   @Type(() => Number) @IsNumber({ maxDecimalPlaces: 2 }) @Min(-100) @Max(400)
-  valor: number;
+  valor?: number | null;
+
+  /** D-37: DESCANSO (D) o DANADO (F, fuera de servicio) en lugar de la temperatura. */
+  @IsOptional() @IsIn(['LECTURA', 'DESCANSO', 'DANADO'])
+  estado?: 'LECTURA' | 'DESCANSO' | 'DANADO';
+
+  /** Qué tiene el equipo (obligatorio si está dañado). */
+  @IsOptional() @IsString() @MaxLength(2000)
+  observacion?: string;
 
   /** Obligatoria cuando el valor queda fuera de los límites (CAL-03); se valida en el servicio. */
   @IsOptional() @IsString() @MaxLength(2000)

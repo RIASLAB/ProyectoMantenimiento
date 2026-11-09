@@ -112,6 +112,15 @@ export function diaLocal(n = 0) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** D-37: letra de la planilla y texto de cada estado de una lectura de temperatura. */
+export const CODIGO_LECTURA = { DESCANSO: 'D', DANADO: 'F' } as const;
+export const ESTADO_LECTURA_LABEL = { DESCANSO: 'Descanso', DANADO: 'Dañado (fuera de servicio)' } as const;
+/** "2,5 °C", "D · Descanso" o "F · Dañado". */
+export function lecturaTexto(l: { valor: number | null; estado?: 'LECTURA' | 'DESCANSO' | 'DANADO' }) {
+  if (!l.estado || l.estado === 'LECTURA') return `${qty(l.valor ?? 0)} °C`;
+  return `${CODIGO_LECTURA[l.estado]} · ${l.estado === 'DESCANSO' ? 'Descanso' : 'Dañado'}`;
+}
+
 export function frecuencia(valor: number, unidad: UnidadFrecuencia) {
   const u = { DIAS: ['día', 'días'], SEMANAS: ['semana', 'semanas'], MESES: ['mes', 'meses'] }[unidad];
   return valor === 1 ? `Cada ${u[0]}` : `Cada ${valor} ${u[1]}`;

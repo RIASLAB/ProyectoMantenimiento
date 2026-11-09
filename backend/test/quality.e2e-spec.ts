@@ -108,6 +108,37 @@ describe('CAL-05 · Registros inalterables', () => {
   });
 });
 
+describe('D-37 · Descanso (D) y dañado (F) en lugar de la temperatura', () => {
+  const temp = (body: object) => c.http.post('/api/calidad/temperaturas').set(c.auth(op.token)).send({ puntoId, ...body });
+
+  it('descanso se registra sin temperatura y cuenta como registro de la ronda', async () => {
+    const r = await temp({ estado: 'DESCANSO' });
+    expect(r.status).toBe(201);
+    expect(r.body).toMatchObject({ estado: 'DESCANSO', valor: null, fueraDeRango: false, orden: null });
+    const p = (await c.http.get('/api/calidad/puntos').set(c.auth(c.admin))).body.find((x: { id: string }) => x.id === puntoId);
+    expect(p).toMatchObject({ atrasado: false, ultimo: { estado: 'DESCANSO', valor: null } });
+    expect((await temp({ estado: 'LECTURA' })).status).toBe(400); // una lectura lleva temperatura
+    expect((await temp({ estado: 'OTRO' })).status).toBe(400);
+  });
+
+  it('dañado exige qué tiene y crea un correctivo con la máquina parada (uno solo mientras siga abierto)', async () => {
+    expect((await temp({ estado: 'DANADO' })).body.message).toContain('Describa qué tiene');
+    const r = await temp({ estado: 'DANADO', observacion: 'No enfría, el ventilador no gira' });
+    expect(r.status).toBe(201);
+    expect(r.body.orden.codigo).toMatch(/^OT-\d{6}$/);
+    const o = (await c.http.get(`/api/ordenes/${r.body.orden.id}`).set(c.auth(c.admin))).body;
+    expect(o).toMatchObject({ tipo: 'CORRECTIVO', maquinaParada: true, prioridad: 'ALTA', descripcion: 'Marcado dañado en la ronda de temperaturas: No enfría, el ventilador no gira' });
+    const otra = await temp({ estado: 'DANADO', observacion: 'Sigue sin enfriar' });
+    expect(otra.body.orden.id).toBe(r.body.orden.id);
+    const csv = await c.http.get('/api/calidad/exportar/temperaturas').set(c.auth(c.admin));
+    expect(csv.text).toContain('F (dañado: Sigue sin enfriar)');
+    expect(csv.text).toContain('D (descanso)');
+    // Un estado sin temperatura no puede quedar con un valor, ni una lectura sin él
+    const ds = c.app.get(DataSource);
+    await expect(ds.query(`INSERT INTO registros_temperatura (punto_id, activo_id, valor, estado, fuera_de_rango, registrado_en, usuario_id) VALUES ($1, $2, 5, 'DESCANSO', false, now(), $3)`, [puntoId, activoId, op.id])).rejects.toThrow(/CHK_temperatura_estado/);
+  });
+});
+
 describe('CAL-04 · Checklists', () => {
   it('el administrador crea una plantilla con preguntas Sí/No, numéricas y de texto', async () => {
     const r = await c.http.post('/api/calidad/plantillas').set(c.auth(c.admin)).send({

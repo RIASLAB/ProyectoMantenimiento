@@ -8,12 +8,13 @@ import { SessionUser } from '../common/auth.decorators';
 import { EstadoActivo, Rol } from '../common/enums';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.service';
+import { MaintenanceService, numeroOT } from '../maintenance/maintenance.service';
 import {
   ChecklistItemDto, CreateChecklistDto, CreateControlPointDto, CreateTemperatureDto, CreateTemplateDto, PlanillaQuery, RecordsQuery, VerifyPlanillaDto,
   UpdateControlPointDto, UpdateTemplateDto, VoidDto,
 } from './quality.dto';
 import {
-  ChecklistAnswer, ChecklistItem, ChecklistRecord, ChecklistTemplate, ControlPoint, QualityVoid, TemperatureRecord, TemperatureVerification, VALORES_ESCALA,
+  ChecklistAnswer, ChecklistItem, ChecklistRecord, ChecklistTemplate, ControlPoint, QualityVoid, TemperatureRecord, TemperatureVerification, VALORES_ESCALA, CODIGO_ESTADO,
 } from './quality.entities';
 
 const TOLERANCIA_FUTURO_MS = 5 * 60_000;
@@ -40,6 +41,7 @@ export class QualityService {
     private readonly audit: AuditService,
     private readonly notif: NotificationsService,
     private readonly settings: SettingsService,
+    private readonly maintenance: MaintenanceService,
   ) {}
 
   // ======================= Puntos de control =======================
@@ -49,11 +51,11 @@ export class QualityService {
     const rows: Array<Record<string, unknown>> = await this.ds.query(
       `SELECT p.id, p.nombre, p.minimo, p.maximo, p.frecuencia_horas, p.vigente, p.activo_id,
               a.codigo AS activo_codigo, a.nombre AS activo_nombre, a.area AS activo_area,
-              u.valor AS ultimo_valor, u.registrado_en AS ultimo_en, u.fuera_de_rango AS ultimo_fuera
+              u.valor AS ultimo_valor, u.estado AS ultimo_estado, u.registrado_en AS ultimo_en, u.fuera_de_rango AS ultimo_fuera
        FROM puntos_control p
        JOIN activos a ON a.id = p.activo_id
        LEFT JOIN LATERAL (
-         SELECT t.valor, t.registrado_en, t.fuera_de_rango FROM registros_temperatura t
+         SELECT t.valor, t.estado, t.registrado_en, t.fuera_de_rango FROM registros_temperatura t
          WHERE t.punto_id = p.id AND NOT EXISTS (SELECT 1 FROM anulaciones_calidad n WHERE n.tipo = 'TEMPERATURA' AND n.registro_id = t.id)
          ORDER BY t.registrado_en DESC LIMIT 1
        ) u ON true
@@ -70,7 +72,7 @@ export class QualityService {
         id: r.id, nombre: r.nombre, vigente: r.vigente, activoId: r.activo_id,
         minimo: r.minimo === null ? null : Number(r.minimo), maximo: r.maximo === null ? null : Number(r.maximo), frecuenciaHoras,
         activo: { id: r.activo_id, codigo: r.activo_codigo, nombre: r.activo_nombre, area: r.activo_area },
-        ultimo: ultimoEn ? { valor: Number(r.ultimo_valor), registradoEn: ultimoEn, fueraDeRango: r.ultimo_fuera } : null,
+        ultimo: ultimoEn ? { valor: r.ultimo_valor === null ? null : Number(r.ultimo_valor), estado: r.ultimo_estado ?? 'LECTURA', registradoEn: ultimoEn, fueraDeRango: r.ultimo_fuera } : null,
         atrasado,
       };
     });
@@ -125,17 +127,29 @@ export class QualityService {
     if (!p.vigente) throw new BadRequestException('El punto de control está inactivo');
     const registradoEn = this.momento(dto.registradoEn);
 
-    const fuera = (p.minimo !== null && dto.valor < p.minimo) || (p.maximo !== null && dto.valor > p.maximo);
-    const accion = dto.accionCorrectiva?.trim() || null;
+    const estado = dto.estado ?? 'LECTURA';
+    const valor = estado === 'LECTURA' ? dto.valor! : null;
+    const observacion = estado === 'DANADO' ? dto.observacion?.trim() || null : null;
+    if (estado === 'DANADO' && (!observacion || observacion.length < 5)) {
+      throw new BadRequestException(`Describa qué tiene ${p.activo.nombre}: se reporta a mantenimiento`);
+    }
+    const fuera = valor !== null && ((p.minimo !== null && valor < p.minimo) || (p.maximo !== null && valor > p.maximo));
+    const accion = fuera ? dto.accionCorrectiva?.trim() || null : null;
     if (fuera && (!accion || accion.length < 5)) {
       throw new BadRequestException(`El valor ${dto.valor} °C está fuera del rango (${this.textoRango(p)}). Describa la acción correctiva.`);
     }
 
-    return this.ds.transaction(async (em) => {
+    const r = await this.ds.transaction(async (em) => {
       const r = await em.getRepository(TemperatureRecord).save({
-        puntoId: p.id, activoId: p.activoId, valor: dto.valor, limiteMinimo: p.minimo, limiteMaximo: p.maximo,
+        puntoId: p.id, activoId: p.activoId, valor, estado, observacion, limiteMinimo: p.minimo, limiteMaximo: p.maximo,
         fueraDeRango: fuera, accionCorrectiva: accion, registradoEn, usuarioId: actor.id, clientId: dto.clientId ?? null,
       });
+      if (estado !== 'LECTURA') {
+        await this.audit.log({
+          usuarioId: actor.id, accion: estado === 'DANADO' ? 'CUARTO_DANADO' : 'CUARTO_EN_DESCANSO', entidad: 'calidad', entidadId: r.id,
+          detalle: { punto: p.nombre, activo: p.activo.codigo, observacion },
+        }, em);
+      }
       if (fuera) {
         // CAL-02: la desviación queda en bitácora (y en el resumen de calidad); las notificaciones llegan con ese módulo.
         await this.audit.log({
@@ -150,8 +164,25 @@ export class QualityService {
           enlace: '/calidad?vista=temperaturas&desviaciones=1',
         });
       }
-      return { ...r, duplicado: false };
+      return r;
     });
+    // D-37: marcado dañado en la ronda → correctivo para mantenimiento, si la máquina no tiene uno abierto.
+    let orden: { id: string; codigo: string } | null = null;
+    if (estado === 'DANADO') {
+      const [abierta] = await this.ds.query(
+        `SELECT id, numero FROM ordenes_trabajo WHERE activo_id = $1 AND tipo = 'CORRECTIVO' AND estado NOT IN ('CERRADA', 'CANCELADA') ORDER BY numero DESC LIMIT 1`,
+        [p.activoId],
+      );
+      if (abierta) orden = { id: abierta.id, codigo: numeroOT(abierta.numero) };
+      else if (p.activo.estado !== EstadoActivo.DADO_DE_BAJA && p.activo.estado !== EstadoActivo.EN_BODEGA) {
+        const o = await this.maintenance.reportarFalla({
+          activoId: p.activoId, descripcion: `Marcado dañado en la ronda de temperaturas: ${observacion}`,
+          maquinaParada: true, reportadoEn: registradoEn.toISOString(), clientId: dto.clientId ? dto.clientId : undefined,
+        }, actor);
+        orden = { id: o.id, codigo: o.codigo };
+      }
+    }
+    return { ...r, duplicado: false, orden };
   }
 
   async listTemperaturas(q: RecordsQuery) {
@@ -199,7 +230,7 @@ export class QualityService {
       [q.area, fecha, tz],
     );
     const lecturas: Array<Record<string, unknown>> = puntos.length ? await this.ds.query(
-      `SELECT t.id, t.punto_id, t.valor, t.fuera_de_rango, t.accion_correctiva, t.registrado_en,
+      `SELECT t.id, t.punto_id, t.valor, t.estado, t.observacion, t.fuera_de_rango, t.accion_correctiva, t.registrado_en,
               to_char(t.registrado_en AT TIME ZONE $3, 'HH24:MI') AS hora, extract(hour FROM t.registrado_en AT TIME ZONE $3)::int AS h, u.nombre AS usuario
          FROM registros_temperatura t JOIN usuarios u ON u.id = t.usuario_id
         WHERE t.punto_id = ANY($1::uuid[]) AND (t.registrado_en AT TIME ZONE $3)::date = $2::date
@@ -219,7 +250,8 @@ export class QualityService {
       })),
       // Franja de 3 horas del formato en papel (00:00, 03:00 … 21:00) a la que corresponde cada lectura.
       lecturas: lecturas.map((l) => ({
-        id: l.id, puntoId: l.punto_id, valor: Number(l.valor), fueraDeRango: l.fuera_de_rango, accionCorrectiva: l.accion_correctiva,
+        id: l.id, puntoId: l.punto_id, valor: l.valor === null ? null : Number(l.valor), estado: l.estado, observacion: l.observacion,
+        fueraDeRango: l.fuera_de_rango, accionCorrectiva: l.accion_correctiva,
         registradoEn: l.registrado_en, hora: l.hora, franja: Math.floor(Number(l.h) / 3) * 3, usuario: l.usuario,
       })),
       realizadoPor: [...new Set(lecturas.map((l) => l.usuario as string))],
@@ -453,7 +485,7 @@ export class QualityService {
       header = ['Fecha lectura', 'Recibido en servidor', 'Máquina', 'Punto de control', 'Valor °C', 'Mínimo', 'Máximo', 'Fuera de rango', 'Acción correctiva', 'Usuario', 'Anulado', 'Motivo anulación'];
       lines = items.map((t) => {
         const n = (t as unknown as { anulacion?: QualityVoid }).anulacion;
-        return [fecha(t.registradoEn), fecha(t.creadoEn), `${t.activo.codigo} ${t.activo.nombre}`, t.punto?.nombre, num(t.valor), num(t.limiteMinimo), num(t.limiteMaximo), t.fueraDeRango ? 'Sí' : 'No', t.accionCorrectiva, t.usuario?.nombre, n ? 'Sí' : 'No', n?.motivo].map(esc).join(';');
+        return [fecha(t.registradoEn), fecha(t.creadoEn), `${t.activo.codigo} ${t.activo.nombre}`, t.punto?.nombre, t.estado === 'LECTURA' ? num(t.valor) : `${CODIGO_ESTADO[t.estado]} (${t.estado === 'DESCANSO' ? 'descanso' : `dañado: ${t.observacion ?? ''}`})`, num(t.limiteMinimo), num(t.limiteMaximo), t.fueraDeRango ? 'Sí' : 'No', t.accionCorrectiva, t.usuario?.nombre, n ? 'Sí' : 'No', n?.motivo].map(esc).join(';');
       });
     }
     return '﻿' + [header.join(';'), ...lines].join('\r\n');

@@ -5,7 +5,7 @@ import { api, openProtectedFile, qs } from '../../api/client';
 import type { ChecklistRecordInfo, ChecklistTemplateInfo, ControlPointInfo, QualitySummary, TemperatureRecordInfo } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { SavedOfflineNotice, Badge, Button, Empty, ErrorBox, Field, Icon, Input, Modal, PageHeader, Spinner, Textarea } from '../../components/ui';
-import { dateTime, hace, qty, rangoTexto, valorChecklist } from '../../format';
+import { dateTime, hace, rangoTexto, valorChecklist, lecturaTexto } from '../../format';
 import { useUrlFilters } from '../../hooks';
 
 function VoidModal({ target, onClose }: { target: { tipo: 'TEMPERATURA' | 'CHECKLIST'; id: string; resumen: string } | null; onClose: () => void }) {
@@ -120,7 +120,7 @@ export function QualityHome() {
                     <div className="point-last">
                       {p.ultimo ? (
                         <>
-                          <span className={`point-val ${p.ultimo.fueraDeRango ? 'text-bad' : ''}`}>{qty(p.ultimo.valor)} °C</span>
+                          <span className={`point-val ${p.ultimo.fueraDeRango || p.ultimo.estado === 'DANADO' ? 'text-bad' : ''}`}>{lecturaTexto(p.ultimo)}</span>
                           <span className="muted small">{hace(p.ultimo.registradoEn)}</span>
                         </>
                       ) : <span className="muted small">Sin lecturas</span>}
@@ -182,13 +182,13 @@ export function QualityHome() {
                     <tr key={t.id} className={t.anulacion ? 'voided' : ''}>
                       <td data-label="Lectura">{dateTime(t.registradoEn)}</td>
                       <td data-label="Equipo">{t.activo.codigo} · {t.punto.nombre}</td>
-                      <td data-label="Valor" className={`num ${t.fueraDeRango ? 'text-bad' : ''}`}><strong>{qty(t.valor)} °C</strong></td>
+                      <td data-label="Valor" className={`num ${t.fueraDeRango || t.estado === 'DANADO' ? 'text-bad' : ''}`}><strong>{lecturaTexto(t)}</strong></td>
                       <td data-label="Rango">{rangoTexto(t.limiteMinimo, t.limiteMaximo)}{t.fueraDeRango ? <> <Badge tone="bad">Fuera</Badge></> : null}</td>
-                      <td data-label="Acción">{t.accionCorrectiva ?? '—'}</td>
+                      <td data-label="Acción">{t.accionCorrectiva ?? t.observacion ?? '—'}</td>
                       <td data-label="Usuario">{t.usuario.nombre}</td>
                       <td data-label="">
                         {t.anulacion ? <Badge tone="muted">Anulado: {t.anulacion.motivo}</Badge>
-                          : can('ADMIN') ? <Button variant="ghost" onClick={() => setAnular({ tipo: 'TEMPERATURA', id: t.id, resumen: `${t.activo.codigo} · ${t.punto.nombre}: ${qty(t.valor)} °C (${dateTime(t.registradoEn)})` })}>Anular</Button> : null}
+                          : can('ADMIN') ? <Button variant="ghost" onClick={() => setAnular({ tipo: 'TEMPERATURA', id: t.id, resumen: `${t.activo.codigo} · ${t.punto.nombre}: ${lecturaTexto(t)} (${dateTime(t.registradoEn)})` })}>Anular</Button> : null}
                       </td>
                     </tr>
                   ))}

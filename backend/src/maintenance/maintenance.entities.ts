@@ -399,6 +399,7 @@ export class WorkOrderEvent {
  * el motivo sale en la columna "Observación" del planeador anual.
  */
 @Entity('ot_reprogramaciones')
+@Index('IDX_ot_reprogramaciones_orden', ['ordenId'])
 export class WorkOrderReschedule {
   @PrimaryGeneratedColumn('increment', { type: 'bigint' })
   id: string;

@@ -637,7 +637,16 @@ button.chip.chip-on { color: #fff; }
   .print-sheet tr, .pfirmas { break-inside: avoid; }
 }
 .ronda { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.ronda-item { display: grid; grid-template-columns: 1fr 110px; gap: 6px 12px; align-items: center; }
+.ronda-item { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; }
+.ronda-item.descanso { background: var(--surface-2); }
+.ronda-entrada { display: flex; gap: 6px; align-items: center; }
+.ronda-entrada .ronda-val { width: 96px; }
+.ronda-cod { width: 44px; height: 44px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--surface); color: var(--muted); font-weight: 800; font-size: 1rem; cursor: pointer; }
+.ronda-cod.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.ronda-cod.bad.on { background: var(--bad); border-color: var(--bad); }
+.ronda-estado { width: 96px; height: 44px; display: inline-grid; place-items: center; border-radius: 10px; background: var(--surface-2); font-weight: 700; }
+.ronda-estado.bad { color: var(--bad); background: var(--bad-bg); }
+@media (max-width: 420px) { .ronda-item { grid-template-columns: 1fr; } .ronda-entrada { justify-content: flex-end; } }
 .ronda-item.nc { border-color: var(--bad); background: var(--bad-bg); }
 .ronda-info { display: flex; flex-direction: column; min-width: 0; }
 .ronda-val { font-size: 1.25rem; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }

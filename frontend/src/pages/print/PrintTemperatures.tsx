@@ -6,7 +6,7 @@ import type { PlanillaTemperaturas } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { FirmaCasilla, FormatHeader, PieSistema, PrintPage } from '../../components/print';
 import { Button, ErrorBox, Field, Input, Modal, Select, Textarea } from '../../components/ui';
-import { dateTime, qty, rangoTexto } from '../../format';
+import { dateTime, qty, rangoTexto, CODIGO_LECTURA } from '../../format';
 import { useUrlFilters } from '../../hooks';
 
 const FRANJAS = [0, 3, 6, 9, 12, 15, 18, 21];
@@ -29,7 +29,7 @@ export function HojaTemperaturas({ p, fecha, claveFirma }: { p: PlanillaTemperat
   for (const l of p.lecturas) celda.set(`${l.puntoId}:${l.franja}`, l);
   const grupos: Array<PlanillaTemperaturas['puntos']> = [];
   for (let i = 0; i < p.puntos.length; i += POR_TABLA) grupos.push(p.puntos.slice(i, i + POR_TABLA));
-  const desviaciones = p.lecturas.filter((l) => l.fueraDeRango || l.accionCorrectiva);
+  const desviaciones = p.lecturas.filter((l) => l.fueraDeRango || l.accionCorrectiva || l.estado === 'DANADO');
   const nombrePunto = (id: string) => p.puntos.find((x) => x.id === id)?.activo.nombre ?? '';
   return (
     <>
@@ -48,7 +48,7 @@ export function HojaTemperaturas({ p, fecha, claveFirma }: { p: PlanillaTemperat
                       <td className="c">{String(h).padStart(2, '0')}:00</td>
                       {g.map((x) => {
                         const l = celda.get(`${x.id}:${h}`);
-                        return <td key={x.id} className={`c ${l?.fueraDeRango ? 'pfuera' : ''}`} title={l ? `${l.hora} · ${l.usuario}` : undefined}>{l ? qty(l.valor) : ''}</td>;
+                        return <td key={x.id} className={`c ${l?.fueraDeRango || l?.estado === 'DANADO' ? 'pfuera' : ''}`} title={l ? `${l.hora} · ${l.usuario}` : undefined}>{l ? (l.estado && l.estado !== 'LECTURA' ? CODIGO_LECTURA[l.estado] : qty(l.valor ?? 0)) : ''}</td>;
                       })}
                     </tr>
                   ))}
@@ -62,13 +62,13 @@ export function HojaTemperaturas({ p, fecha, claveFirma }: { p: PlanillaTemperat
               <tr><th>OBSERVACIONES</th></tr>
               <tr>
                 <td className="ptxt" style={{ minHeight: 36 }}>
-                  {[...desviaciones.map((l) => `${l.hora} ${nombrePunto(l.puntoId)}: ${qty(l.valor)} °C${l.fueraDeRango ? ' (fuera de rango)' : ''}${l.accionCorrectiva ? ` — ${l.accionCorrectiva}` : ''}`),
+                  {[...desviaciones.map((l) => `${l.hora} ${nombrePunto(l.puntoId)}: ${l.estado === 'DANADO' ? `F · dañado — ${l.observacion ?? ''}` : `${qty(l.valor ?? 0)} °C${l.fueraDeRango ? ' (fuera de rango)' : ''}${l.accionCorrectiva ? ` — ${l.accionCorrectiva}` : ''}`}`),
                     p.verificacion?.observaciones ? `Verificación: ${p.verificacion.observaciones}` : null].filter(Boolean).join('\n')}
                 </td>
               </tr>
             </tbody>
           </table>
-          <p style={{ fontSize: '8pt' }}>* Fuera del rango permitido. Si en una franja hay varias lecturas se muestra la última.</p>
+          <p style={{ fontSize: '8pt' }}>* Fuera del rango permitido. <strong>D</strong>: descanso. <strong>F</strong>: dañado (fuera de servicio). Si en una franja hay varias lecturas se muestra la última.</p>
           <div className="pfirmas dos">
             <FirmaCasilla entidad="PLANILLA" entidadId={claveFirma} casilla="REALIZO" cargo="Realizó" nombre={p.realizadoPor.join(', ') || null} />
             <FirmaCasilla entidad="PLANILLA" entidadId={claveFirma} casilla="VERIFICO" cargo="Verificó" soloJefe
@@ -106,7 +106,7 @@ export function PrintTemperatures() {
   const p = q.data;
   // La firma de la planilla se guarda con el área tal como está registrada.
   const claveFirma = p ? `${fecha}|${areas.data?.find((x) => x.toLowerCase() === p.area.toLowerCase()) ?? p.area}` : '';
-  const desviaciones = (p?.lecturas ?? []).filter((l) => l.fueraDeRango || l.accionCorrectiva);
+  const desviaciones = (p?.lecturas ?? []).filter((l) => l.fueraDeRango || l.accionCorrectiva || l.estado === 'DANADO');
 
   const controles = (
     <>

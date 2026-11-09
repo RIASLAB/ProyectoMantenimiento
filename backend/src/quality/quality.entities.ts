@@ -1,7 +1,12 @@
-import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Check, Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { Asset } from '../assets/asset.entity';
 import { numeric } from '../common/numeric.transformer';
 import { User } from '../users/user.entity';
+
+export type EstadoLectura = 'LECTURA' | 'DESCANSO' | 'DANADO';
+export const ESTADOS_LECTURA: EstadoLectura[] = ['LECTURA', 'DESCANSO', 'DANADO'];
+/** Letra con que se anota en la planilla en lugar de la temperatura. */
+export const CODIGO_ESTADO: Record<Exclude<EstadoLectura, 'LECTURA'>, string> = { DESCANSO: 'D', DANADO: 'F' };
 
 /** Punto de control de temperatura de un equipo, con sus límites críticos (CAL-02, D-06). */
 @Entity('puntos_control')
@@ -46,6 +51,7 @@ export class ControlPoint {
  * Guarda los límites vigentes al momento del registro, para que la evaluación no cambie si luego se ajustan.
  */
 @Entity('registros_temperatura')
+@Check('CHK_temperatura_estado', `(estado = 'LECTURA' AND valor IS NOT NULL) OR (estado = 'DESCANSO' AND valor IS NULL) OR (estado = 'DANADO' AND valor IS NULL AND observacion IS NOT NULL)`)
 @Index(['registradoEn'])
 @Index(['puntoId', 'registradoEn'])
 export class TemperatureRecord {
@@ -62,8 +68,20 @@ export class TemperatureRecord {
   @Column({ name: 'activo_id', type: 'uuid' })
   activoId: string;
 
-  @Column({ type: 'numeric', precision: 6, scale: 2, transformer: numeric })
-  valor: number;
+  /** Vacío si el cuarto estaba en descanso o dañado (D-37). */
+  @Column({ type: 'numeric', precision: 6, scale: 2, nullable: true, transformer: numeric })
+  valor: number | null;
+
+  /**
+   * LECTURA: se tomó la temperatura. DESCANSO ("D" en la planilla): el cuarto está apagado o desocupado.
+   * DANADO ("F", fuera de servicio): el equipo está dañado; se reporta a mantenimiento (D-37).
+   */
+  @Column({ type: 'varchar', length: 12, default: 'LECTURA' })
+  estado: EstadoLectura;
+
+  /** Qué tiene el equipo, cuando se marca dañado. */
+  @Column({ type: 'text', nullable: true })
+  observacion: string | null;
 
   @Column({ name: 'limite_minimo', type: 'numeric', precision: 6, scale: 2, nullable: true, transformer: numeric })
   limiteMinimo: number | null;

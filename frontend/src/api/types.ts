@@ -270,15 +270,20 @@ export interface ControlPointInfo {
   maximo: number | null;
   frecuenciaHoras: number | null;
   activo: { id: string; codigo: string; nombre: string; area: string };
-  ultimo: { valor: number; registradoEn: string; fueraDeRango: boolean } | null;
+  ultimo: { valor: number | null; estado: EstadoLectura; registradoEn: string; fueraDeRango: boolean } | null;
   atrasado: boolean;
 }
 
 export interface QualityVoidInfo { motivo: string; creadoEn: string; usuario: PersonRef }
 
+/** D-37: lectura con temperatura, cuarto en descanso (D) o dañado (F, fuera de servicio). */
+export type EstadoLectura = 'LECTURA' | 'DESCANSO' | 'DANADO';
+
 export interface TemperatureRecordInfo {
   id: string;
-  valor: number;
+  valor: number | null;
+  estado: EstadoLectura;
+  observacion: string | null;
   limiteMinimo: number | null;
   limiteMaximo: number | null;
   fueraDeRango: boolean;
@@ -337,7 +342,7 @@ export interface PlanillaTemperaturas {
   area: string;
   formato: FormatoDocumental | null;
   puntos: Array<{ id: string; nombre: string; minimo: number | null; maximo: number | null; frecuenciaHoras: number | null; activo: { id: string; codigo: string; nombre: string; ubicacion: string | null } }>;
-  lecturas: Array<{ id: string; puntoId: string; valor: number; fueraDeRango: boolean; accionCorrectiva: string | null; registradoEn: string; hora: string; franja: number; usuario: string }>;
+  lecturas: Array<{ id: string; puntoId: string; valor: number | null; estado: EstadoLectura; observacion: string | null; fueraDeRango: boolean; accionCorrectiva: string | null; registradoEn: string; hora: string; franja: number; usuario: string }>;
   realizadoPor: string[];
   verificacion: { usuario: string; creadoEn: string; observaciones: string | null } | null;
 }
