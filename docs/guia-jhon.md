@@ -7,18 +7,22 @@ Tu equipo ──git push──▶ GitHub (main)
                            │
                            ▼
                     GitHub Actions
-                    construye la imagen
+                    construye la imagen (sha-xxxxxxx y latest)
                            │
                            ▼
                  GHCR (imagen privada)
                            │
                            ▼
-       .98, cron de ub-admin cada 5 minutos:
-       git pull → docker compose pull → up -d
+   .98, cron de ub-admin cada 5 minutos: actualiza SOLO PRUEBAS (:8089)
+                           │
+              se revisa en http://172.30.0.98:8089
+                           │
+                           ▼
+   ./deploy/pasar-a-produccion.sh  →  respaldo + PRODUCCIÓN (:8088)
 ```
 
-No hace falta entrar al servidor para publicar un cambio: con hacer `git push` a `main`
-el servidor se actualiza solo, primero en pruebas y después en producción.
+Un cambio subido a `main` llega solo a **pruebas** en unos minutos. A **producción** pasa únicamente
+cuando alguien lo aprueba y corre `./deploy/pasar-a-produccion.sh` en el servidor (D-39).
 
 ## 1. Publicar un cambio en GitHub
 
@@ -173,7 +177,7 @@ Servicios del stack:
 | `respaldo` | Respaldo diario cifrado (solo producción) |
 | `postgres_db` | PostgreSQL 17 existente del servidor; no es parte del stack |
 
-## 5. Actualización automática
+## 5. Actualización de pruebas (automática)
 
 El cron de `ub-admin` corre cada 5 minutos:
 
@@ -184,61 +188,34 @@ HOME=/home/ub-admin
 */5 * * * * /home/ub-admin/apps/cmms/deploy/cmms-actualizar.sh >> /home/ub-admin/apps/cmms/deploy/actualizar.log 2>&1
 ```
 
-El script hace:
-
-1. `git pull --ff-only origin main`.
-2. Actualiza `cmms_pruebas` y verifica su salud.
-3. Si pruebas está bien, respalda producción cuando la imagen cambió.
-4. Actualiza producción y verifica su salud.
-5. Usa `flock` para que dos ejecuciones no se pisen.
-
-Revisar el log:
+El script hace `git pull --ff-only`, baja la imagen `latest` y actualiza **solo pruebas**. Cuando hay
+una versión nueva lo anota en el log con su código (`sha-xxxxxxx`) y el cambio. **No toca producción.**
 
 ```bash
-tail -n 100 ~/apps/cmms/deploy/actualizar.log
+tail -n 20 ~/apps/cmms/deploy/actualizar.log
 ```
 
-Ejecutar la actualización a mano (sin esperar los 5 minutos):
+## 6. Pasar a producción (y volver atrás)
 
-```bash
-~/apps/cmms/deploy/cmms-actualizar.sh
-```
-
-Si el log crece demasiado, se puede rotar con `logrotate`; el archivo está en
-`~/apps/cmms/deploy/actualizar.log`.
-
-## 6. Actualización manual y rollback
-
-Actualización manual:
+Cuando la versión de pruebas está revisada:
 
 ```bash
 cd ~/apps/cmms
-git pull --ff-only origin main
-docker compose -f docker-compose.prod.externo.yml --env-file .env.produccion pull
-docker compose -f docker-compose.prod.externo.yml --env-file .env.produccion up -d
+./deploy/pasar-a-produccion.sh
 ```
 
-Rollback de la imagen:
+Muestra la versión que tiene producción, la que va a entrar y la lista de cambios; pregunta
+`(s/n)`; hace un **respaldo** de producción; fija `IMAGE_TAG=sha-xxxxxxx` en `.env.produccion`;
+actualiza y verifica que responda. Con `-y` no pregunta.
+
+Volver a una versión anterior (el código está en el log o en la pestaña Actions):
 
 ```bash
-# 1. Busca el tag corto del commit bueno en GitHub Actions o en GHCR.
-# 2. En .98:
-nano .env.produccion
-# IMAGE_TAG=sha-xxxxxxxx
-docker compose -f docker-compose.prod.externo.yml --env-file .env.produccion pull
-docker compose -f docker-compose.prod.externo.yml --env-file .env.produccion up -d
+./deploy/pasar-a-produccion.sh sha-xxxxxxx
 ```
 
-También puedes revertir el commit en GitHub:
-
-```bash
-git revert <commit>
-git push origin main
-```
-
-El CI construye la versión anterior. **Ojo:** las migraciones de base de datos no se
-revierten solas; para cambios de esquema, prueba primero en `cmms_pruebas` y ten un
-respaldo de producción.
+**Ojo:** las migraciones de base de datos no se revierten solas. Si una versión nueva dañó datos,
+restaura el respaldo que se sacó justo antes (ver `docs/despliegue-98.md`).
 
 ## 7. Respaldos
 

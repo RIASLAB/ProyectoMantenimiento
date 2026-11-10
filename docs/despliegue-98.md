@@ -103,34 +103,24 @@ rm -rf restaurado
 
 ## Actualización
 
-La actualización normal es automática: GitHub Actions publica la imagen en
-`ghcr.io/riaslab/proyectomantenimiento` y el cron de `ub-admin` la baja cada 5 minutos
-(primero pruebas, después producción). La guía para publicar cambios está en
-[guia-jhon.md](guia-jhon.md).
-
-Para forzarla a mano:
+GitHub Actions publica la imagen en `ghcr.io/riaslab/proyectomantenimiento` con las etiquetas
+`latest` y `sha-xxxxxxx`. El cron de `ub-admin` (cada 5 minutos, `deploy/cmms-actualizar.sh`) actualiza
+**solo pruebas** con `latest`. **Producción** se actualiza a mano, después de revisar pruebas:
 
 ```bash
 cd /home/ub-admin/apps/cmms
-./deploy/cmms-actualizar.sh
+./deploy/pasar-a-produccion.sh            # la versión que está en pruebas, con respaldo previo
+./deploy/pasar-a-produccion.sh sha-xxxxxxx   # una versión puntual (volver atrás)
 ```
 
-O hacerlo paso a paso:
-
-```bash
-cd /home/ub-admin/apps/cmms
-git pull --ff-only origin main
-docker compose -f docker-compose.prod.externo.yml --env-file .env.produccion pull
-docker compose -f docker-compose.prod.externo.yml --env-file .env.produccion up -d
-docker compose -f docker-compose.pruebas.externo.yml --env-file .env.pruebas pull
-docker compose -f docker-compose.pruebas.externo.yml --env-file .env.pruebas up -d
-```
+El script fija `IMAGE_TAG` en `.env.produccion`, así que producción nunca cambia sola. La guía
+completa está en [guia-jhon.md](guia-jhon.md).
 
 El `Dockerfile` de este despliegue usa `postgresql17-client` para que `pg_dump` coincida
 con PostgreSQL 17. Los compose externos, el workflow y la guía están versionados en el
 repositorio. El paquete de GHCR es privado; el servidor necesita un token con
-`read:packages` y `docker login ghcr.io` como `ub-admin`. Para rollback, define
-`IMAGE_TAG=sha-xxxxxxxx` en `.env.produccion` y vuelve a ejecutar la actualización.
+`read:packages` y `docker login ghcr.io` como `ub-admin`. Para volver atrás:
+`./deploy/pasar-a-produccion.sh sha-xxxxxxx`.
 
 ## Pendiente para producción definitiva
 
