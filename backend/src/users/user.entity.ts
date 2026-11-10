@@ -40,6 +40,13 @@ export class User {
   @Column({ name: 'debe_cambiar_credencial', default: false })
   debeCambiarCredencial: boolean;
 
+  /**
+   * Administrador principal (dueño del sistema, D-41): solo él enciende o apaga módulos y solo él modifica su
+   * propia cuenta. Se marca desde el servidor (database/administrador-principal.js), no desde la app.
+   */
+  @Column({ name: 'administrador_principal', default: false })
+  principal: boolean;
+
   @CreateDateColumn({ name: 'creado_en', type: 'timestamptz' })
   creadoEn: Date;
 

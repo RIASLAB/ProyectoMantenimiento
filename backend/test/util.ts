@@ -28,7 +28,7 @@ export async function bootstrap() {
   await ds.runMigrations();
   // Las pruebas cubren inventario y compras: se encienden (en una planta nueva arrancan apagados, D-40).
   await ds.query(`UPDATE parametros SET valor = '{"inventario":true,"compras":true}' WHERE clave = 'modulos_activos'`);
-  await ds.getRepository(User).save({ nombre: 'Admin Pruebas', usuario: 'admin', rol: Rol.ADMIN, ...(await hashCredencial(Rol.ADMIN, 'Admin12345')) });
+  await ds.getRepository(User).save({ nombre: 'Admin Pruebas', usuario: 'admin', rol: Rol.ADMIN, principal: true, ...(await hashCredencial(Rol.ADMIN, 'Admin12345')) });
   await ds.destroy();
 
   const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();

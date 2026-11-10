@@ -34,7 +34,7 @@ Sistema de mantenimiento e inventario de repuestos: hoja de vida de máquinas, m
 | Calibración de instrumentos de medición con certificado, vencimientos y avisos | ✅ |
 | Paquete mensual para auditoría por planta (un solo PDF) | ✅ |
 | Cambio obligatorio de contraseña o PIN al primer ingreso; tope de intentos fallidos por equipo | ✅ |
-| Módulos de inventario y compras que se encienden o apagan según lo que use la planta (Ajustes → Módulos) | ✅ |
+| Módulos de inventario y compras que se encienden o apagan según lo que use la planta (Ajustes → Módulos), solo por el administrador principal | ✅ |
 | Producción con Docker y HTTPS, respaldos diarios cifrados con prueba de restauración | ✅ Sprint 3 |
 
 ### Roles en el área de mantenimiento
@@ -107,9 +107,9 @@ cd backend
 npm run test:e2e
 ```
 
-Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **253 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
+Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **256 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
 
-Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**136 verificaciones**):
+Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**137 verificaciones**):
 
 | Script | Qué recorre |
 |---|---|
@@ -127,7 +127,7 @@ Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritori
 | `e2e/eliminar_adjuntos.py` | Eliminar fotos de una orden (quién puede y cuándo) y documentos de una máquina |
 | `e2e/hoja_de_vida.py` | Carga la hoja de vida (AC-PMT-FR05) en Excel: revisión con avisos, fechas del primer preventivo, máquinas con fotos, planes con tareas, lista de materiales y repuestos; recargar sin duplicar; eliminar una máquina sin historial |
 | `e2e/planeador.py` | Planeador anual por planta (AC-PMT-CR01): programadas, proyectadas y ejecutadas por semana, filas agrupadas que se abren por máquina, reprogramar con motivo, semana de corte, impreso y celular |
-| `e2e/modulos.py` | Inventario y compras apagados: fuera del menú (queda Bodega), de la orden, el cierre, el plan, la ficha y los indicadores; aviso en sus páginas; encender y apagar en Ajustes → Módulos |
+| `e2e/modulos.py` | Inventario y compras apagados: fuera del menú (queda Bodega), de la orden, el cierre, el plan, la ficha y los indicadores; aviso en sus páginas; encender y apagar en Ajustes → Módulos; otra administradora no puede cambiarlos ni editar al administrador principal |
 | `e2e/carga_masiva.py` | Descarga la plantilla, la llena, la sube con errores (fila y columna), la corrige y carga máquinas y repuestos con stock inicial |
 | `e2e/avisos_indicadores.py` | Falla y temperatura fuera de rango → campana y bandeja del admin; asignación → aviso al técnico; indicadores en el celular; horario y metas |
 | `e2e/rendimiento.py` | Mide la carga de las pantallas principales con 4G lenta y sin caché (NFR-02); no cuenta verificaciones |

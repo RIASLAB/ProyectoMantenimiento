@@ -119,6 +119,34 @@ with sync_playwright() as p:
     assert any(x['accion'] == 'MODULOS_CAMBIADOS' for x in bit)
     ok('cada cambio de módulos queda en la bitácora')
 
+    # 6) D-41: otra administradora ve los módulos bloqueados y no puede tocar la cuenta del principal
+    aux = post('/usuarios', {'nombre': 'Auxiliar Administrativa', 'usuario': 'auxiliar', 'rol': 'ADMIN', 'credencial': 'Auxiliar2026'}).json()
+    c2 = b.new_context(viewport={'width': 1366, 'height': 900}, locale='es-CO', timezone_id='America/Bogota')
+    x = c2.new_page(); track(x)
+    x.goto(BASE + '/ingresar')
+    x.get_by_label('Usuario').fill('auxiliar'); x.get_by_label('Contraseña o PIN').fill('Auxiliar2026')
+    x.get_by_role('button', name='Ingresar').click()
+    # Primer ingreso: cambia la contraseña que le asignó el administrador.
+    if True:
+        x.get_by_label('Contraseña actual *').fill('Auxiliar2026')
+        x.get_by_label('Nueva contraseña *', exact=True).fill('Auxiliar2027x')
+        x.get_by_label('Repita la nueva contraseña *').fill('Auxiliar2027x')
+        x.get_by_role('button', name='Cambiar contraseña').click()
+        expect(x.get_by_label('Contraseña actual *')).to_have_count(0)
+    x.goto(BASE + '/configuracion')
+    card = x.locator('#modulos')
+    expect(card.get_by_text('Solo el administrador principal puede encender o apagar módulos.')).to_be_visible()
+    expect(card.get_by_role('checkbox', name=re.compile('Inventario de repuestos'))).to_be_disabled()
+    x.goto(BASE + '/usuarios')
+    fila_admin = x.locator('li.list-row', has=x.get_by_text('admin', exact=True))
+    expect(fila_admin.get_by_text('Principal')).to_be_visible()
+    expect(fila_admin.get_by_role('button', name='Editar')).to_have_count(0)
+    fila_yo = x.locator('li.list-row', has=x.get_by_text('auxiliar', exact=True))
+    expect(fila_yo.get_by_role('button', name='Editar')).to_be_visible()
+    x.screenshot(path=f'{SP}/usuarios-auxiliar.png', full_page=False)
+    c2.close()
+    ok('otra administradora ve los módulos bloqueados y no puede editar la cuenta del principal')
+
     api.put(BASE + '/api/parametros/modulos', data={'inventario': True, 'compras': True}, headers=H)
     b.close()
 

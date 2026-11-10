@@ -10,6 +10,8 @@ export interface SessionUser {
   rol: Rol;
   /** La contraseña o el PIN los puso un administrador: hay que cambiarlos antes de seguir. */
   debeCambiarCredencial?: boolean;
+  /** Administrador principal, el dueño del sistema (D-41): enciende o apaga módulos. */
+  principal?: boolean;
 }
 
 export interface User extends SessionUser {

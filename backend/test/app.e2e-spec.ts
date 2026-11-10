@@ -46,8 +46,10 @@ beforeAll(async () => {
   await ds.initialize();
   await ds.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
   await ds.runMigrations();
+  // Estas pruebas cubren el inventario: se enciende (en una planta nueva arranca apagado, D-40).
+  await ds.query(`UPDATE parametros SET valor = '{"inventario":true,"compras":true}' WHERE clave = 'modulos_activos'`);
   const u = await ds.getRepository(User).save({
-    nombre: 'Admin Pruebas', usuario: 'admin', rol: Rol.ADMIN, ...(await hashCredencial(Rol.ADMIN, 'Admin12345')),
+    nombre: 'Admin Pruebas', usuario: 'admin', rol: Rol.ADMIN, principal: true, ...(await hashCredencial(Rol.ADMIN, 'Admin12345')),
   });
   adminId = u.id;
   await ds.destroy();

@@ -48,6 +48,33 @@ describe('Consulta y cambio de módulos', () => {
   });
 });
 
+describe('D-41 · Administrador principal', () => {
+  let aux: U;
+  beforeAll(async () => { aux = await c.usuario('aux', 'ADMIN', 'Auxiliar2026'); });
+
+  it('la sesión dice quién es el principal', async () => {
+    expect((await c.http.get('/api/auth/yo').set(c.auth(c.admin))).body.principal).toBe(true);
+    expect((await c.http.get('/api/auth/yo').set(c.auth(aux.token))).body.principal).toBe(false);
+  });
+
+  it('otro administrador ve los módulos pero no los cambia', async () => {
+    expect((await c.http.get('/api/parametros/modulos').set(c.auth(aux.token))).status).toBe(200);
+    const r = await c.http.put('/api/parametros/modulos').set(c.auth(aux.token)).send({ inventario: false, compras: false });
+    expect(r.status).toBe(403);
+    expect(r.body.message).toBe('Solo el administrador principal puede encender o apagar módulos.');
+  });
+
+  it('otro administrador no puede modificar la cuenta del principal', async () => {
+    const yo = (await c.http.get('/api/auth/yo').set(c.auth(c.admin))).body.id;
+    for (const cambio of [{ credencial: 'Robada2026x' }, { activo: false }, { rol: 'AUTORIZADOR', credencial: 'Otra2026xx' }, { nombre: 'Otro' }]) {
+      const r = await c.http.patch(`/api/usuarios/${yo}`).set(c.auth(aux.token)).send(cambio);
+      expect(r.status).toBe(403);
+    }
+    // El principal sí modifica a los demás administradores.
+    expect((await c.http.patch(`/api/usuarios/${aux.id}`).set(c.auth(c.admin)).send({ nombre: 'Auxiliar administrativa' })).status).toBe(200);
+  });
+});
+
 describe('Compras apagado', () => {
   beforeAll(async () => { await modulos(true, false).expect(200); });
 
@@ -66,7 +93,7 @@ describe('Compras apagado', () => {
   it('no se pueden crear solicitudes a mano', async () => {
     const r = await c.http.post('/api/compras').set(c.auth(c.admin)).send({ repuestoId: rodId, cantidad: 2 });
     expect(r.status).toBe(400);
-    expect(r.body.message).toBe('El módulo de Compras está apagado. El administrador lo puede encender en Ajustes → Módulos.');
+    expect(r.body.message).toBe('El módulo de Compras está apagado. El administrador principal lo puede encender en Ajustes → Módulos.');
   });
 });
 

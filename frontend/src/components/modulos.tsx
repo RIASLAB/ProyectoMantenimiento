@@ -23,13 +23,13 @@ const NOMBRE: Record<keyof Modulos, string> = { inventario: 'Inventario de repue
 /** Envuelve una página de un módulo: si está apagado muestra un aviso en vez de la página. */
 export function ConModulo({ modulo, children }: { modulo: keyof Modulos; children: ReactNode }) {
   const m = useModulos();
-  const { can } = useAuth();
+  const { user } = useAuth();
   if (m.cargando) return <Spinner />;
   if (m[modulo]) return <>{children}</>;
   return (
     <Empty title={`El módulo de ${NOMBRE[modulo]} está apagado`}>
       La planta no lo está usando por ahora.{' '}
-      {can('ADMIN') ? <>Lo puede encender en <Link to="/configuracion">Ajustes → Módulos</Link>.</> : 'El administrador lo puede encender en Ajustes.'}
+      {user?.principal ? <>Lo puede encender en <Link to="/configuracion">Ajustes → Módulos</Link>.</> : 'El administrador principal lo puede encender en Ajustes.'}
     </Empty>
   );
 }

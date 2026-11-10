@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { Rol } from '../common/enums';
@@ -74,6 +74,10 @@ export class UsersService {
 
   async update(id: string, dto: UpdateUserDto, actor: SessionUser) {
     const user = await this.get(id);
+    // D-41: la cuenta del administrador principal solo la modifica un administrador principal.
+    if (user.principal && !actor.principal) {
+      throw new ForbiddenException('Esta es la cuenta del administrador principal: solo él la puede modificar.');
+    }
 
     if (id === actor.id && (dto.activo === false || (dto.rol && dto.rol !== user.rol))) {
       throw new BadRequestException('No puede desactivarse ni cambiarse el rol a sí mismo');

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
@@ -37,11 +37,13 @@ export class SettingsService {
   /** Corta la operación si el módulo está apagado. */
   async exigirModulo(m: keyof Modulos, em?: EntityManager) {
     if (!(await this.moduloActivo(m, em))) {
-      throw new BadRequestException(`El módulo de ${NOMBRE_MODULO[m]} está apagado. El administrador lo puede encender en Ajustes → Módulos.`);
+      throw new BadRequestException(`El módulo de ${NOMBRE_MODULO[m]} está apagado. El administrador principal lo puede encender en Ajustes → Módulos.`);
     }
   }
 
   async setModulos(m: Modulos, actor: SessionUser) {
+    // D-41: los módulos los decide el administrador principal (el dueño del sistema), no cualquier administrador.
+    if (!actor.principal) throw new ForbiddenException('Solo el administrador principal puede encender o apagar módulos.');
     const estado = (v: boolean) => (v ? 'Encendido' : 'Apagado');
     if (m.compras && !m.inventario) throw new BadRequestException('Compras necesita el inventario encendido: lo que se compra entra al inventario');
     const antes = await this.getModulos();

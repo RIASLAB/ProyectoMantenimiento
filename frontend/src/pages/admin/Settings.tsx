@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { api, qs } from '../../api/client';
 import type { AuditItem, FormatoDocumental, KpiParams, User } from '../../api/types';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../auth/AuthContext';
 import { useModulos } from '../../components/modulos';
 import { Button, Empty, ErrorBox, Field, Icon, Input, Modal, PageHeader, Select, Spinner } from '../../components/ui';
 import { date, dateTime } from '../../format';
@@ -57,6 +58,8 @@ const ACCION_LABEL: Record<string, string> = {
   PUNTO_ILUMINACION_ACTUALIZADO: 'Modificó punto de medición de iluminación',
   MEDICION_ILUMINACION_REGISTRADA: 'Registró medición de iluminación',
   MODULOS_CAMBIADOS: 'Encendió o apagó los módulos de inventario y compras',
+  PRINCIPAL_ASIGNADO: 'Marcó al administrador principal (desde el servidor)',
+  PRINCIPAL_QUITADO: 'Quitó un administrador principal (desde el servidor)',
   ACCESO_RESTABLECIDO: 'Restableció el acceso de un usuario',
 };
 
@@ -80,6 +83,8 @@ function resumen(d: Record<string, unknown> | null): string {
 /** D-40: la planta puede no usar todavía el inventario de repuestos ni las compras. */
 function Modulos() {
   const qc = useQueryClient();
+  // D-41: solo el administrador principal los cambia; los demás administradores los ven.
+  const puede = !!useAuth().user?.principal;
   const q = useQuery({ queryKey: ['parametros', 'modulos'], queryFn: () => api.get<{ inventario: boolean; compras: boolean }>('/parametros/modulos') });
   const m = useMutation({
     mutationFn: (v: { inventario: boolean; compras: boolean }) => api.put('/parametros/modulos', v),
@@ -90,15 +95,16 @@ function Modulos() {
     <section className="card" id="modulos">
       <h2>Módulos</h2>
       <p className="muted">Encienda solo lo que la planta está usando. Apagado, el módulo desaparece del menú y de las órdenes; lo que ya se registró no se borra y vuelve a verse al encenderlo.</p>
+      {!puede ? <div className="alert alert-warn">Solo el administrador principal puede encender o apagar módulos.</div> : null}
       {q.isPending ? <Spinner /> : q.isError ? <ErrorBox error={q.error} /> : v ? (
         <div className="stack" style={{ gap: 4 }}>
           <label className="toggle">
-            <input type="checkbox" checked={v.inventario} disabled={m.isPending}
+            <input type="checkbox" checked={v.inventario} disabled={!puede || m.isPending}
               onChange={(e) => m.mutate({ inventario: e.target.checked, compras: e.target.checked ? v.compras : false })} />
             <span><strong>Inventario de repuestos</strong> <span className="muted">· existencias, materiales de cada máquina y repuestos usados en las órdenes</span></span>
           </label>
           <label className="toggle">
-            <input type="checkbox" checked={v.compras} disabled={m.isPending || !v.inventario}
+            <input type="checkbox" checked={v.compras} disabled={!puede || m.isPending || !v.inventario}
               onChange={(e) => m.mutate({ inventario: v.inventario, compras: e.target.checked })} />
             <span><strong>Compras</strong> <span className="muted">· {v.inventario ? 'solicitudes, aprobación y recepción de repuestos' : 'necesita el inventario encendido'}</span></span>
           </label>

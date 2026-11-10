@@ -20,6 +20,8 @@ export interface SessionUser {
   rol: Rol;
   /** Debe cambiar la contraseña o el PIN que le asignó un administrador antes de usar el sistema. */
   debeCambiarCredencial?: boolean;
+  /** Administrador principal (D-41). */
+  principal?: boolean;
 }
 
 /** Usuario autenticado de la petición actual. */

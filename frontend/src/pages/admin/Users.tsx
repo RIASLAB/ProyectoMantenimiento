@@ -134,15 +134,17 @@ export function Users() {
                 </div>
                 <div className="list-meta">
                   <Badge tone="info">{ROL_LABEL[u.rol]}</Badge>
+                  {u.principal ? <Badge tone="ok">Principal</Badge> : null}
                   {!u.activo ? <Badge tone="muted">Inactivo</Badge> : bloqueado ? <Badge tone="bad">Bloqueado</Badge> : null}
-                  <div className="row-actions">
+                  {/* D-41: la cuenta del administrador principal solo la modifica él. */}
+                  {u.principal && !me?.principal ? null : <div className="row-actions">
                     <Button variant="ghost" onClick={() => { setEditing(u); setOpen(true); }}>Editar</Button>
                     {u.id !== me?.id ? (
                       <Button variant="ghost" busy={toggle.isPending && toggle.variables?.id === u.id} onClick={() => toggle.mutate(u)}>
                         {u.activo ? 'Desactivar' : 'Activar'}
                       </Button>
                     ) : null}
-                  </div>
+                  </div>}
                 </div>
               </li>
             );

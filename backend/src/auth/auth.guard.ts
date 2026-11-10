@@ -39,7 +39,7 @@ export class AuthGuard implements CanActivate {
     const user = await this.users.findOne({ where: { id: payload.sub } });
     if (!user || !user.activo) throw new UnauthorizedException('Usuario inactivo');
 
-    const session: SessionUser = { id: user.id, nombre: user.nombre, usuario: user.usuario, rol: user.rol, debeCambiarCredencial: user.debeCambiarCredencial };
+    const session: SessionUser = { id: user.id, nombre: user.nombre, usuario: user.usuario, rol: user.rol, debeCambiarCredencial: user.debeCambiarCredencial, principal: user.principal };
     req.user = session;
 
     // Con una credencial puesta por otra persona solo se puede ver la sesión y cambiarla.

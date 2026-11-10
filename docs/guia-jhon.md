@@ -266,6 +266,21 @@ Muestra una contraseña temporal (o un PIN, si el usuario es técnico u operario
 intentos fallidos y obliga a cambiarla al ingresar. Queda en la bitácora como `ACCESO_RESTABLECIDO`.
 Si el usuario no existe, muestra la lista de usuarios. No copies la temporal en chats.
 
+### Administrador principal (D-41)
+
+Puede haber varios administradores, pero solo el **administrador principal** enciende o apaga los módulos
+(Ajustes → Módulos), y nadie más puede editar, desactivar ni cambiarle la contraseña a su cuenta. En la lista de
+usuarios sale con la etiqueta **Principal**. Al actualizar quedó marcado `admin`. Se ve y se cambia solo desde el
+servidor:
+
+```bash
+cd ~/apps/cmms
+P="docker compose -f docker-compose.prod.externo.yml --env-file .env.produccion exec app"
+$P node dist/database/administrador-principal.js                 # quién es el principal
+$P node dist/database/administrador-principal.js otro_usuario    # marcar a otro (debe ser Administrador)
+$P node dist/database/administrador-principal.js admin --quitar  # quitarlo (no deja quitar el último)
+```
+
 ## 10. Problemas comunes
 
 - **Actions falla:** revisa la pestaña Actions. Si es por permisos de GHCR, verifica que

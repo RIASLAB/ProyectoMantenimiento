@@ -39,7 +39,9 @@ async function main() {
   if ((await ds.getRepository(User).count()) === 0) {
     const pass = process.env.SEED_ADMIN_PASSWORD ?? `Cmms${randomBytes(6).toString('hex')}9`;
     // Con una contraseña generada, el administrador debe cambiarla al ingresar.
-    await crearUsuario(ds, 'Administrador', 'admin', Rol.ADMIN, pass, !process.env.SEED_ADMIN_PASSWORD);
+    const admin = await crearUsuario(ds, 'Administrador', 'admin', Rol.ADMIN, pass, !process.env.SEED_ADMIN_PASSWORD);
+    // El primer administrador es el principal (D-41).
+    await ds.getRepository(User).update(admin.id, { principal: true });
     console.log('Usuario administrador creado: admin');
     if (!process.env.SEED_ADMIN_PASSWORD) console.log(`Contraseña generada (cámbiela al ingresar): ${pass}`);
   } else {
