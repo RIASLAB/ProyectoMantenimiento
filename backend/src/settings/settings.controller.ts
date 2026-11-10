@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, Get, Param, Put } from '@nestjs/common';
 import { Type } from 'class-transformer';
-import { IsDateString, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
+import { IsBoolean, IsDateString, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
 import { CurrentUser, Roles, SessionUser } from '../common/auth.decorators';
 import { Rol } from '../common/enums';
 import { SettingsService } from './settings.service';
@@ -32,9 +32,29 @@ class FormatoDto {
   fechaActualizacion: string | null;
 }
 
+class ModulosDto {
+  @IsBoolean()
+  inventario: boolean;
+
+  @IsBoolean()
+  compras: boolean;
+}
+
 @Controller('parametros')
 export class SettingsController {
   constructor(private readonly settings: SettingsService) {}
+
+  /** Módulos encendidos (D-40): todos los usuarios los consultan para mostrar u ocultar menús. */
+  @Get('modulos')
+  getModulos() {
+    return this.settings.getModulos();
+  }
+
+  @Put('modulos')
+  @Roles(Rol.ADMIN)
+  setModulos(@Body() dto: ModulosDto, @CurrentUser() actor: SessionUser) {
+    return this.settings.setModulos(dto, actor);
+  }
 
   @Get('autorizador')
   getAutorizador() {

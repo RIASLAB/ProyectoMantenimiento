@@ -6,7 +6,7 @@ import { SessionUser } from '../common/auth.decorators';
 import { Rol } from '../common/enums';
 import { User } from '../users/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
-import { FORMATOS_POR_DEFECTO, FormatoDocumental, PARAM_AUTORIZADOR_COMPRAS, PARAM_FORMATOS, PARAM_TARIFA_HORA, Setting } from './setting.entity';
+import { FORMATOS_POR_DEFECTO, FormatoDocumental, Modulos, MODULOS_POR_DEFECTO, NOMBRE_MODULO, PARAM_AUTORIZADOR_COMPRAS, PARAM_FORMATOS, PARAM_MODULOS, PARAM_TARIFA_HORA, Setting } from './setting.entity';
 
 @Injectable()
 export class SettingsService {
@@ -17,6 +17,44 @@ export class SettingsService {
     private readonly audit: AuditService,
     private readonly notif: NotificationsService,
   ) {}
+
+  /** Módulos encendidos (D-40). */
+  async getModulos(em?: EntityManager): Promise<Modulos> {
+    const s = await (em ?? this.ds.manager).getRepository(Setting).findOne({ where: { clave: PARAM_MODULOS } });
+    try {
+      const m = s?.valor ? (JSON.parse(s.valor) as Partial<Modulos>) : {};
+      const r = { ...MODULOS_POR_DEFECTO, ...m };
+      return { inventario: !!r.inventario, compras: !!r.compras && !!r.inventario };
+    } catch {
+      return { ...MODULOS_POR_DEFECTO };
+    }
+  }
+
+  async moduloActivo(m: keyof Modulos, em?: EntityManager) {
+    return (await this.getModulos(em))[m];
+  }
+
+  /** Corta la operación si el módulo está apagado. */
+  async exigirModulo(m: keyof Modulos, em?: EntityManager) {
+    if (!(await this.moduloActivo(m, em))) {
+      throw new BadRequestException(`El módulo de ${NOMBRE_MODULO[m]} está apagado. El administrador lo puede encender en Ajustes → Módulos.`);
+    }
+  }
+
+  async setModulos(m: Modulos, actor: SessionUser) {
+    const estado = (v: boolean) => (v ? 'Encendido' : 'Apagado');
+    if (m.compras && !m.inventario) throw new BadRequestException('Compras necesita el inventario encendido: lo que se compra entra al inventario');
+    const antes = await this.getModulos();
+    await this.ds.transaction(async (em) => {
+      await em.getRepository(Setting).save({ clave: PARAM_MODULOS, valor: JSON.stringify({ inventario: m.inventario, compras: m.compras }) });
+      await this.audit.log({ usuarioId: actor.id, accion: 'MODULOS_CAMBIADOS', entidad: 'parametro', entidadId: PARAM_MODULOS, detalle: {
+        // Legible en la bitácora: «Inventario: Apagado → Encendido».
+        Inventario: { antes: estado(antes.inventario), despues: estado(m.inventario) },
+        Compras: { antes: estado(antes.compras), despues: estado(m.compras) },
+      } }, em);
+    });
+    return this.getModulos();
+  }
 
   /** Autorizador de compras vigente (COM-04). */
   async getAutorizador() {

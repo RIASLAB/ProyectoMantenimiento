@@ -1,3 +1,4 @@
+import { RequiereModulo } from '../common/modulo.guard';
 import { Body, Controller, Get, Header, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { CurrentUser, Roles, SessionUser } from '../common/auth.decorators';
 import { Rol } from '../common/enums';
@@ -24,12 +25,14 @@ export class SparePartsController {
     return this.inv.kardex(id, { desde, hasta });
   }
 
+  @RequiereModulo('inventario')
   @Post()
   @Roles(Rol.ADMIN)
   create(@Body() dto: CreateSparePartDto, @CurrentUser() actor: SessionUser) {
     return this.inv.create(dto, actor);
   }
 
+  @RequiereModulo('inventario')
   @Patch(':id')
   @Roles(Rol.ADMIN)
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateSparePartDto, @CurrentUser() actor: SessionUser) {
@@ -42,12 +45,14 @@ export class InventoryController {
   constructor(private readonly inv: InventoryService) {}
 
   /** Entradas, salidas y ajustes manuales. Los consumos por OT se registrarán desde el módulo de mantenimiento. */
+  @RequiereModulo('inventario')
   @Post('movimientos')
   @Roles(Rol.ADMIN)
   movimiento(@Body() dto: CreateMovementDto, @CurrentUser() actor: SessionUser) {
     return this.inv.registrarMovimiento(dto, actor);
   }
 
+  @RequiereModulo('inventario')
   @Post('conteos')
   @Roles(Rol.ADMIN)
   conteo(@Body() dto: PhysicalCountDto, @CurrentUser() actor: SessionUser) {

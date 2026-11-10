@@ -1,3 +1,4 @@
+import { SettingsService } from '../settings/settings.service';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
@@ -30,6 +31,7 @@ export class PurchasesService {
     private readonly audit: AuditService,
     private readonly inventory: InventoryService,
     private readonly notif: NotificationsService,
+    private readonly settings: SettingsService,
   ) {}
 
   // ======================= Consultas =======================
@@ -123,6 +125,8 @@ export class PurchasesService {
    * Si ya hay una solicitud pendiente para la misma OT y repuesto, se ajusta su cantidad en vez de duplicarla.
    */
   async verificarFaltantes(em: EntityManager, ordenId: string, actor: SessionUser) {
+    // D-40: con compras apagado no se crean solicitudes automáticas por faltantes.
+    if (!(await this.settings.moduloActivo('compras', em))) return [];
     const o = await em.getRepository(WorkOrder).findOne({ where: { id: ordenId } });
     if (!o || !OT_ABIERTAS.includes(o.estado)) return [];
     const planificados = await em.getRepository(WorkOrderPart).find({ where: { ordenId }, relations: { repuesto: true } });

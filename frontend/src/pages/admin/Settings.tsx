@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { api, qs } from '../../api/client';
 import type { AuditItem, FormatoDocumental, KpiParams, User } from '../../api/types';
 import { Link } from 'react-router-dom';
+import { useModulos } from '../../components/modulos';
 import { Button, Empty, ErrorBox, Field, Icon, Input, Modal, PageHeader, Select, Spinner } from '../../components/ui';
 import { date, dateTime } from '../../format';
 
@@ -55,6 +56,8 @@ const ACCION_LABEL: Record<string, string> = {
   PUNTO_ILUMINACION_CREADO: 'Creó punto de medición de iluminación',
   PUNTO_ILUMINACION_ACTUALIZADO: 'Modificó punto de medición de iluminación',
   MEDICION_ILUMINACION_REGISTRADA: 'Registró medición de iluminación',
+  MODULOS_CAMBIADOS: 'Encendió o apagó los módulos de inventario y compras',
+  ACCESO_RESTABLECIDO: 'Restableció el acceso de un usuario',
 };
 
 const ENTIDADES: Array<[string, string]> = [['', 'Todo'], ['usuario', 'Usuarios'], ['parametro', 'Parámetros'], ['activo', 'Máquinas'], ['repuesto', 'Repuestos'], ['orden', 'Órdenes'], ['plan', 'Planes'], ['modelo', 'Tipos de equipo'], ['compra', 'Compras'], ['calidad', 'Calidad'], ['iluminacion', 'Iluminación']];
@@ -72,6 +75,38 @@ function resumen(d: Record<string, unknown> | null): string {
       return `${k}: ${v}`;
     })
     .join(' · ');
+}
+
+/** D-40: la planta puede no usar todavía el inventario de repuestos ni las compras. */
+function Modulos() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['parametros', 'modulos'], queryFn: () => api.get<{ inventario: boolean; compras: boolean }>('/parametros/modulos') });
+  const m = useMutation({
+    mutationFn: (v: { inventario: boolean; compras: boolean }) => api.put('/parametros/modulos', v),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['parametros', 'modulos'] }); qc.invalidateQueries({ queryKey: ['bitacora'] }); },
+  });
+  const v = q.data;
+  return (
+    <section className="card" id="modulos">
+      <h2>Módulos</h2>
+      <p className="muted">Encienda solo lo que la planta está usando. Apagado, el módulo desaparece del menú y de las órdenes; lo que ya se registró no se borra y vuelve a verse al encenderlo.</p>
+      {q.isPending ? <Spinner /> : q.isError ? <ErrorBox error={q.error} /> : v ? (
+        <div className="stack" style={{ gap: 4 }}>
+          <label className="toggle">
+            <input type="checkbox" checked={v.inventario} disabled={m.isPending}
+              onChange={(e) => m.mutate({ inventario: e.target.checked, compras: e.target.checked ? v.compras : false })} />
+            <span><strong>Inventario de repuestos</strong> <span className="muted">· existencias, materiales de cada máquina y repuestos usados en las órdenes</span></span>
+          </label>
+          <label className="toggle">
+            <input type="checkbox" checked={v.compras} disabled={m.isPending || !v.inventario}
+              onChange={(e) => m.mutate({ inventario: v.inventario, compras: e.target.checked })} />
+            <span><strong>Compras</strong> <span className="muted">· {v.inventario ? 'solicitudes, aprobación y recepción de repuestos' : 'necesita el inventario encendido'}</span></span>
+          </label>
+          {m.isError ? <ErrorBox error={m.error} /> : null}
+        </div>
+      ) : null}
+    </section>
+  );
 }
 
 function Autorizador() {
@@ -309,6 +344,7 @@ function Formatos() {
 }
 
 export function Settings() {
+  const modulos = useModulos();
   return (
     <>
       <PageHeader title="Ajustes" />
@@ -323,11 +359,12 @@ export function Settings() {
         <Link to="/configuracion/carga-masiva" className="card link-card">
           <div>
             <h2 style={{ margin: 0 }}>Carga masiva desde Excel</h2>
-            <p className="muted" style={{ margin: '4px 0 0' }}>Cargar de una vez las máquinas y los repuestos con su stock inicial.</p>
+            <p className="muted" style={{ margin: '4px 0 0' }}>{modulos.inventario ? 'Cargar de una vez las máquinas y los repuestos con su stock inicial.' : 'Cargar de una vez las máquinas desde la plantilla de Excel.'}</p>
           </div>
           <Icon name="upload" />
         </Link>
-        <Autorizador />
+        <Modulos />
+        {modulos.compras ? <Autorizador /> : null}
         <TarifaHora />
         <ParametrosIndicadores />
         <Formatos />

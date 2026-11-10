@@ -47,6 +47,8 @@ async function main() {
   }
 
   if (demo) {
+    // Los datos de demostración usan inventario y compras (D-40): se encienden.
+    await ds.query(`INSERT INTO parametros (clave, valor) VALUES ('modulos_activos', '{"inventario":true,"compras":true}') ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor`);
     const admin = await ds.getRepository(User).findOneOrFail({ where: { usuario: 'admin' } });
     const autorizador = await crearUsuario(ds, 'Autorizador Demo', 'autorizador', Rol.AUTORIZADOR, 'Autoriza2026');
     const tecnico = await crearUsuario(ds, 'Técnico Demo', 'tecnico', Rol.TECNICO, '4826');

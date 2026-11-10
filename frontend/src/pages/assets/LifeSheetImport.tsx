@@ -30,6 +30,8 @@ interface Revision {
   periodicidades: Array<{ clave: string; frecuencia: Frec; texto: string }>;
   tareasNuevas: number;
   repuestosNuevos: Array<{ codigo: string; descripcion: string }>;
+  /** D-40: con el módulo de inventario apagado las referencias quedan solo en las notas. */
+  inventario: boolean;
 }
 interface Resultado {
   creadas: number; actualizadas: number; fotos: number; tareasCreadas: number; repuestosCreados: number; materiales: number;
@@ -110,7 +112,7 @@ export function LifeSheetImport() {
               </div>
               {r.omitidas.length ? <p className="muted small" style={{ margin: 0 }}>Pestañas que no son hojas de vida (no se cargan): {r.omitidas.join(', ')}.</p> : null}
 
-              {r.hojas.map((h) => <HojaCard key={h.hoja} h={h} />)}
+              {r.hojas.map((h) => <HojaCard key={h.hoja} h={h} inventario={r.inventario} />)}
             </li>
 
             {!r.errores ? (
@@ -177,7 +179,7 @@ export function LifeSheetImport() {
   );
 }
 
-function HojaCard({ h }: { h: HojaRevisada }) {
+function HojaCard({ h, inventario }: { h: HojaRevisada; inventario: boolean }) {
   const d = h.datos;
   return (
     <section className={`hv-card ${h.errores.length ? 'hv-bad' : ''}`} aria-label={`Pestaña ${h.hoja}`}>
@@ -214,7 +216,7 @@ function HojaCard({ h }: { h: HojaRevisada }) {
                 <span>{x.texto}</span>{' '}
                 {x.codigo
                   ? <Badge tone={x.enInventario ? 'ok' : 'warn'}>{x.enInventario ? 'En inventario' : 'Repuesto nuevo'}{x.cantidad ? ` · ${x.cantidad} en la lista` : ''}</Badge>
-                  : <Badge tone="muted">Sin código: queda en notas</Badge>}
+                  : <Badge tone="muted">{inventario ? 'Sin código: queda en notas' : 'Queda en las notas'}</Badge>}
               </li>
             ))}
           </ul>

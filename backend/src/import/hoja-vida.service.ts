@@ -1,3 +1,4 @@
+import { SettingsService } from '../settings/settings.service';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
@@ -56,6 +57,7 @@ export class HojaVidaService {
     private readonly ds: DataSource,
     private readonly audit: AuditService,
     private readonly maintenance: MaintenanceService,
+    private readonly settings: SettingsService,
     config: ConfigService,
   ) {
     this.dir = resolve(config.get('UPLOADS_DIR', './uploads'), 'activos');
@@ -94,6 +96,8 @@ export class HojaVidaService {
     const repuestos = refCodigos.length ? await em.getRepository(SparePart).find({ where: { codigo: In(refCodigos) } }) : [];
     const repPorCodigo = new Map(repuestos.map((r) => [r.codigo.toUpperCase(), r]));
     const tareasExistentes = new Set((await em.getRepository(MaintenanceTask).find()).map((t) => t.nombre.toLowerCase()));
+    // D-40: sin inventario, las referencias quedan solo en las notas (no hay repuestos ni listas de materiales).
+    const conInventario = await this.settings.moduloActivo('inventario', em);
     const areas: Array<{ area: string }> = await em.query('SELECT DISTINCT area FROM activos');
 
     const nombreRef = new Map<string, { nombre: string; hoja: string }>();
@@ -147,10 +151,10 @@ export class HojaVidaService {
           if (!previo) nombreRef.set(r.codigo, { nombre: r.nombre, hoja: h.hoja });
           const enInv = repPorCodigo.get(r.codigo);
           descripcion = enInv?.descripcion ?? `${(previo ?? r).nombre} (${equipo})`;
-          if (!enInv) repuestosNuevos.set(r.codigo, descripcion);
+          if (!enInv && conInventario) repuestosNuevos.set(r.codigo, descripcion);
           const almacen = /hay\s+(\d+)\s+en\s+(el\s+)?almac[eé]n/i.exec(r.texto);
-          if (almacen && !enInv) advertencias.push(`Según la hoja hay ${almacen[1]} de ${r.codigo} en almacén: regístrelas como entrada en Inventario`);
-          return { texto: r.texto, nombre: r.nombre, codigo: r.codigo, cantidad: r.cantidad, enInventario: !!enInv, descripcion };
+          if (almacen && !enInv && conInventario) advertencias.push(`Según la hoja hay ${almacen[1]} de ${r.codigo} en almacén: regístrelas como entrada en Inventario`);
+          return { texto: r.texto, nombre: r.nombre, codigo: conInventario ? r.codigo : null, cantidad: r.cantidad, enInventario: !!enInv, descripcion };
         }
         return { texto: r.texto, nombre: r.nombre, codigo: null, cantidad: r.cantidad, enInventario: false, descripcion: null };
       });
@@ -179,6 +183,7 @@ export class HojaVidaService {
       periodicidades: [...periodicidades.values()].sort((a, b) => a.frecuencia.valor * (a.frecuencia.unidad === 'MESES' ? 30 : a.frecuencia.unidad === 'SEMANAS' ? 7 : 1) - b.frecuencia.valor * (b.frecuencia.unidad === 'MESES' ? 30 : b.frecuencia.unidad === 'SEMANAS' ? 7 : 1)),
       tareasNuevas: tareasNuevas.size,
       repuestosNuevos: [...repuestosNuevos].map(([codigo, descripcion]) => ({ codigo, descripcion })),
+      inventario: conInventario,
     };
   }
 

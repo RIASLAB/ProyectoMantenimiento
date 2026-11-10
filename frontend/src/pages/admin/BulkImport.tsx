@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChangeEvent, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api, ApiError, openProtectedFile } from '../../api/client';
+import { useModulos } from '../../components/modulos';
 import { Button, ErrorBox, Icon, PageHeader } from '../../components/ui';
 import { date, money, qty } from '../../format';
 
@@ -27,7 +28,9 @@ const MAX_ERRORES = 200;
 export function BulkImport() {
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
-  const tipo: Tipo = params.get('tipo') === 'repuestos' ? 'repuestos' : 'maquinas';
+  // D-40: sin el módulo de inventario solo se cargan máquinas.
+  const { inventario } = useModulos();
+  const tipo: Tipo = inventario && params.get('tipo') === 'repuestos' ? 'repuestos' : 'maquinas';
   const t = TEXTO[tipo];
   const input = useRef<HTMLInputElement>(null);
   const [archivo, setArchivo] = useState<File | null>(null);
@@ -69,13 +72,15 @@ export function BulkImport() {
   return (
     <>
       <PageHeader back={<Link to="/configuracion" className="back-link"><Icon name="back" size={18} /> Ajustes</Link>} title="Carga masiva desde Excel"
-        subtitle="Para la carga inicial de máquinas y repuestos" />
+        subtitle={inventario ? 'Para la carga inicial de máquinas y repuestos' : 'Para la carga inicial de máquinas'} />
 
-      <div className="chips" role="group" aria-label="Qué va a cargar">
-        {(['maquinas', 'repuestos'] as Tipo[]).map((x) => (
-          <button key={x} type="button" className={`chip ${tipo === x ? 'chip-on' : ''}`} aria-pressed={tipo === x} onClick={() => cambiarTipo(x)}>{TEXTO[x].titulo}</button>
-        ))}
-      </div>
+      {inventario ? (
+        <div className="chips" role="group" aria-label="Qué va a cargar">
+          {(['maquinas', 'repuestos'] as Tipo[]).map((x) => (
+            <button key={x} type="button" className={`chip ${tipo === x ? 'chip-on' : ''}`} aria-pressed={tipo === x} onClick={() => cambiarTipo(x)}>{TEXTO[x].titulo}</button>
+          ))}
+        </div>
+      ) : null}
 
       {cargar.isSuccess ? (
         <section className="card stack" aria-live="polite">

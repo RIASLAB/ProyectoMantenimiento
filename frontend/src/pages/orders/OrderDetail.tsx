@@ -8,6 +8,7 @@ import { AssignModal, useTecnicos } from '../../components/AssignModal';
 import { db } from '../../offline/db';
 import { comprimirFoto, enviarOEncolar, usePendientes } from '../../offline/outbox';
 import { useAuth } from '../../auth/AuthContext';
+import { useModulos } from '../../components/modulos';
 import { OrderBadges, PartRow, PartRows, rowsToPayload, tituloLista, useMaterialesEquipo, useProtectedImage } from '../../components/orders-shared';
 import { Badge, Button, Empty, ErrorBox, Field, Icon, Input, KeyValue, Modal, PageHeader, Select, Spinner, Textarea } from '../../components/ui';
 import { COMPRA_ESTADO_LABEL, COMPRA_ESTADO_TONE, date, dateTime, diaLocal, duration, frecuencia, money, ORDEN_ESTADO_LABEL, PRIORIDAD_LABEL, qty, sumarFrecuencia, TIPO_LABEL, toLocalInput, VERIFICACIONES_CIERRE } from '../../format';
@@ -178,7 +179,8 @@ function PlannedPartsModal({ o, open, onClose }: { o: WorkOrderDetail; open: boo
 
 function CloseModal({ o, open, onClose }: { o: WorkOrderDetail; open: boolean; onClose: () => void }) {
   const { user } = useAuth();
-  const lista = useMaterialesEquipo(open ? o.activo.id : null);
+  const { inventario } = useModulos();
+  const lista = useMaterialesEquipo(open && inventario ? o.activo.id : null);
   const tecnicos = useTecnicos(open);
   const [trabajo, setTrabajo] = useState('');
   const [rows, setRows] = useState<PartRow[]>([]);
@@ -210,7 +212,7 @@ function CloseModal({ o, open, onClose }: { o: WorkOrderDetail; open: boolean; o
   const accion = useAccionOT(o, onClose);
   const m = { ...accion, mutate: () => accion.mutate({ accion: 'cerrar', body: {
       trabajoRealizado: trabajo,
-      repuestosUsados: rowsToPayload(rows),
+      repuestosUsados: inventario ? rowsToPayload(rows) : [],
       manoObra: labor.filter((l) => l.tecnicoId && Number(l.horas) > 0).map((l) => ({ tecnicoId: l.tecnicoId, horas: Number(l.horas) })),
       costoServiciosExternos: externos ? Number(externos) : undefined,
       // Si no se cambió la hora sugerida, se envía el momento exacto (con segundos).
@@ -242,11 +244,11 @@ function CloseModal({ o, open, onClose }: { o: WorkOrderDetail; open: boolean; o
             {(i) => <Input id={i} type="datetime-local" value={fin} onChange={(e) => setFin(e.target.value)} required max={toLocalInput(new Date(Date.now() + 60_000))} />}
           </Field>
         ) : null}
-        <div>
+        {inventario ? <div>
           <p className="subtle-head">Repuestos usados</p>
           <p className="muted small" style={{ marginTop: 0 }}>Ajuste a lo que realmente se usó. Se descuenta del inventario al cerrar.</p>
           <PartRows rows={rows} onChange={setRows} sugeridos={lista.data?.materiales} tituloSugeridos={tituloLista(lista.data, o.activo.codigo)} />
-        </div>
+        </div> : null}
         <div>
           <p className="subtle-head">Mano de obra (horas)</p>
           <div className="stack" style={{ gap: 8 }}>
@@ -346,7 +348,9 @@ export function OrderDetail() {
   const location = useLocation();
   const qc = useQueryClient();
   const { user, can } = useAuth();
-  const verCompras = can('ADMIN', 'AUTORIZADOR', 'TECNICO');
+  // D-40: con Inventario o Compras apagados no se muestran sus secciones (sí lo que ya quedó registrado).
+  const modulos = useModulos();
+  const verCompras = can('ADMIN', 'AUTORIZADOR', 'TECNICO') && modulos.compras;
   const compras = useQuery({ queryKey: ['compras', 'orden', id], queryFn: () => api.get<Purchase[]>(`/compras?ordenId=${id}`), enabled: verCompras });
   const [modal, setModal] = useState<ModalKind>(null);
   const [visor, setVisor] = useState<{ foto: Foto; url: string } | null>(null);
@@ -443,12 +447,12 @@ export function OrderDetail() {
           {o.motivoCancelacion ? <div className="alert alert-warn">Cancelada: {o.motivoCancelacion}</div> : null}
         </section>
 
-        <section className="card">
+        {modulos.inventario || o.repuestos.length ? <section className="card">
           <div className="card-head">
             <h2>Repuestos</h2>
-            {a.editarRepuestos ? <Button variant="ghost" onClick={() => setModal('repuestos')}><Icon name="edit" /> Editar</Button> : null}
+            {a.editarRepuestos && modulos.inventario ? <Button variant="ghost" onClick={() => setModal('repuestos')}><Icon name="edit" /> Editar</Button> : null}
           </div>
-          {faltantes.length > 0 ? <div className="alert alert-warn">Faltan {faltantes.length} repuesto{faltantes.length === 1 ? '' : 's'} en bodega para esta orden.</div> : null}
+          {faltantes.length > 0 && modulos.inventario ? <div className="alert alert-warn">Faltan {faltantes.length} repuesto{faltantes.length === 1 ? '' : 's'} en bodega para esta orden.</div> : null}
           {o.repuestos.length === 0 ? <Empty title="Sin repuestos planificados" /> : (
             <div className="table-wrap">
               <table className="table">
@@ -472,7 +476,7 @@ export function OrderDetail() {
               </table>
             </div>
           )}
-        </section>
+        </section> : null}
 
         {cerrada ? (
           <section className="card span-2">
@@ -486,7 +490,7 @@ export function OrderDetail() {
             {o.observaciones ? <p className="small"><strong>Observaciones:</strong> {o.observaciones}</p> : null}
             <div style={{ height: 14 }} />
             <div className="stats" style={{ marginBottom: 12 }}>
-              <div className="stat"><span>Repuestos</span><strong>{money(o.costoRepuestos)}</strong></div>
+              {modulos.inventario || o.costoRepuestos ? <div className="stat"><span>Repuestos</span><strong>{money(o.costoRepuestos)}</strong></div> : null}
               <div className="stat"><span>Mano de obra</span><strong>{money(o.costoManoObra)}</strong></div>
               <div className="stat"><span>Servicios externos</span><strong>{money(o.costoServiciosExternos)}</strong></div>
               <div className="stat"><span>Total</span><strong>{money(costoTotal)}</strong></div>

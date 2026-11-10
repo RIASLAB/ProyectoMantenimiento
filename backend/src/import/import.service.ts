@@ -1,3 +1,4 @@
+import { SettingsService } from '../settings/settings.service';
 import { BadRequestException, HttpException, Injectable } from '@nestjs/common';
 import { Readable } from 'stream';
 import ExcelJS from 'exceljs';
@@ -190,6 +191,7 @@ export class ImportService {
     private readonly audit: AuditService,
     private readonly inventory: InventoryService,
     private readonly maintenance: MaintenanceService,
+    private readonly settings: SettingsService,
   ) {}
 
   /** Plantilla con encabezados, ayudas y una hoja de instrucciones. */
@@ -328,6 +330,7 @@ export class ImportService {
 
   /** Valida y carga todo en una sola transacción; si hay un error no se carga nada. */
   async cargar(tipo: TipoCarga, file: Express.Multer.File | undefined, actor: SessionUser) {
+    if (tipo === 'repuestos') await this.settings.exigirModulo('inventario');
     const a = await this.analizar(tipo, file);
     if (a.errores.length) {
       throw new BadRequestException({ message: `El archivo tiene ${a.errores.length} error${a.errores.length === 1 ? '' : 'es'}; no se cargó nada`, errores: a.errores });

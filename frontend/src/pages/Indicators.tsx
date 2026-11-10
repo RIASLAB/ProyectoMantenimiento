@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api, qs } from '../api/client';
 import type { KpiMachine, KpiReport } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
+import { useModulos } from '../components/modulos';
 import { Empty, ErrorBox, Field, Icon, Input, PageHeader, Spinner } from '../components/ui';
 import { date, money } from '../format';
 import { useUrlFilters } from '../hooks';
@@ -105,6 +106,7 @@ export function Indicators() {
 }
 
 function Reporte({ r, admin }: { r: KpiReport; admin: boolean }) {
+  const { inventario } = useModulos();
   const g = r.global;
   const m = r.metas;
   const pv = g.preventivos;
@@ -126,12 +128,14 @@ function Reporte({ r, admin }: { r: KpiReport; admin: boolean }) {
         <Kpi titulo="Cumplimiento de preventivos" valor={p(pv.cumplimiento)} tono={frenteMeta(pv.cumplimiento, m.cumplimiento)} meta={m.cumplimiento !== null ? p(m.cumplimiento) : null}
           detalle={`${pv.aTiempo} a tiempo · ${pv.tarde} tarde · ${pv.vencidos} vencido${pv.vencidos === 1 ? '' : 's'}`}
           ayuda="Preventivos cerrados a tiempo / preventivos programados que ya debían estar hechos" />
+        {inventario ? <>
         <Kpi titulo="Rotación del inventario" valor={g.inventario.rotacion === null ? '—' : `${n2.format(g.inventario.rotacion)} veces`} tono={frenteMeta(g.inventario.rotacion, m.rotacion)} meta={m.rotacion !== null ? n2.format(m.rotacion) : null}
           detalle={`Consumo ${money(g.inventario.consumo)} · inventario promedio ${money(g.inventario.valorPromedio)}`}
           ayuda="Costo de los repuestos consumidos en el período / valor promedio del inventario" />
         <Kpi titulo="Valor del inventario hoy" valor={money(r.inventarioActual.valorTotal)}
           detalle={`${r.inventarioActual.bajoMinimo} repuesto${r.inventarioActual.bajoMinimo === 1 ? '' : 's'} bajo el mínimo · ${r.inventarioActual.sinStock} sin stock`}
           ayuda="Stock actual × costo promedio de cada repuesto activo" />
+        </> : null}
       </div>
 
       <div className="kpi-cols">
@@ -139,7 +143,7 @@ function Reporte({ r, admin }: { r: KpiReport; admin: boolean }) {
           <h2>Máquinas que más fallan</h2>
           <BarrasFallas maquinas={r.maquinas} />
         </section>
-        <section className="card">
+        {inventario ? <section className="card">
           <h2>Repuestos bajo el mínimo</h2>
           {r.inventarioActual.criticos.length === 0 ? <p className="muted" style={{ margin: 0 }}>Todos los repuestos están sobre su stock mínimo.</p> : (
             <ul className="crit-list">
@@ -152,7 +156,7 @@ function Reporte({ r, admin }: { r: KpiReport; admin: boolean }) {
               ))}
             </ul>
           )}
-        </section>
+        </section> : null}
       </div>
 
       <section className="card">
@@ -190,7 +194,7 @@ function Reporte({ r, admin }: { r: KpiReport; admin: boolean }) {
           <li><strong>Fallas:</strong> órdenes correctivas reportadas en el período (con o sin parada), sin las canceladas.</li>
           <li><strong>Reparación:</strong> correctivos cerrados en el período. Con la máquina parada se mide de la parada a la puesta en marcha; sin parada, del inicio del trabajo al cierre.</li>
           <li><strong>Preventivos:</strong> los programados en el período que ya debían estar hechos. A tiempo = cerrado hasta el día programado. Los cancelados ({pv.cancelados}) y los que aún están en plazo ({pv.enPlazo}) no cuentan.</li>
-          <li><strong>Inventario promedio:</strong> (valor al inicio + valor al final del período) / 2, con el costo promedio ponderado.</li>
+          {inventario ? <li><strong>Inventario promedio:</strong> (valor al inicio + valor al final del período) / 2, con el costo promedio ponderado.</li> : null}
         </ul>
         <p className="muted small" style={{ margin: 0 }}>
           Fórmulas y metas pendientes de aprobación por Dirección (D-05).

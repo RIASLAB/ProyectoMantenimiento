@@ -1,3 +1,4 @@
+import { RequiereModulo } from '../common/modulo.guard';
 import {
   Body, Controller, Delete, Get, Param, ParseEnumPipe, ParseUUIDPipe, Patch, Post, Put, Query, Res, StreamableFile, UploadedFile, UseInterceptors,
 } from '@nestjs/common';
@@ -95,6 +96,7 @@ export class WorkOrdersController {
     return this.svc.cancelar(id, dto.motivo, actor);
   }
 
+  @RequiereModulo('inventario')
   @Put(':id/repuestos')
   @Roles(Rol.ADMIN, Rol.TECNICO)
   repuestos(@Param('id', ParseUUIDPipe) id: string, @Body() dto: PlannedPartsDto, @CurrentUser() actor: SessionUser) {

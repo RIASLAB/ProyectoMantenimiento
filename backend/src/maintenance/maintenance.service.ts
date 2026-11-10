@@ -239,6 +239,7 @@ export class MaintenanceService {
       const previa = await this.orders.findOne({ where: { clientId: dto.clientId } });
       if (previa) return { ...previa, codigo: numeroOT(previa.numero), duplicado: true };
     }
+    if (dto.repuestos?.some((r) => r.cantidad > 0)) await this.settings.exigirModulo('inventario');
     const activo = await this.assets.findOne({ where: { id: dto.activoId } });
     if (!activo) throw new NotFoundException('Máquina no encontrada');
     if (activo.estado === EstadoActivo.DADO_DE_BAJA) throw new BadRequestException('La máquina está dada de baja');
@@ -349,6 +350,8 @@ export class MaintenanceService {
 
   /** Cierre de la OT (MNT-02, MNT-09, MNT-10): descuenta repuestos, registra mano de obra y congela costos. */
   async cerrar(id: string, dto: CloseOrderDto, actor: SessionUser) {
+    // D-40: sin inventario no se descuentan repuestos; lo cambiado se describe en el trabajo realizado.
+    if (dto.repuestosUsados?.some((r) => r.cantidad > 0)) await this.settings.exigirModulo('inventario');
     const tarifa = await this.settings.getTarifaHora();
     return this.ds.transaction(async (em) => {
       const o = await this.bloquear(em, id);
@@ -617,6 +620,7 @@ export class MaintenanceService {
    * de ese modelo con su primera orden, y se aplica solo a los equipos que se agreguen después.
    */
   async crearPlan(dto: CreatePlanDto, actor: SessionUser) {
+    if (dto.repuestos?.some((r) => r.cantidad > 0)) await this.settings.exigirModulo('inventario');
     if (!!dto.activoId === !!dto.modeloId) throw new BadRequestException('Indique la máquina o el tipo de equipo del plan (uno de los dos)');
     if (dto.modeloId) return this.crearPlanPorTipo(dto, actor);
 
@@ -688,6 +692,7 @@ export class MaintenanceService {
   }
 
   async actualizarPlan(id: string, dto: UpdatePlanDto, actor: SessionUser) {
+    if (dto.repuestos?.some((r) => r.cantidad > 0)) await this.settings.exigirModulo('inventario');
     const plan = await this.plans.findOne({ where: { id }, relations: { plantilla: { modeloEquipo: true } } });
     if (!plan) throw new NotFoundException('Plan no encontrado');
     if (plan.plantillaId) {

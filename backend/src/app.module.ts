@@ -1,6 +1,7 @@
 import { Controller, Get, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { ModuloGuard } from './common/modulo.guard';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AssetsController } from './assets/assets.controller';
@@ -76,6 +77,7 @@ class HealthController {
   ],
   providers: [
     { provide: APP_GUARD, useClass: AuthGuard },
+    { provide: APP_GUARD, useClass: ModuloGuard },
     AuthService, UsersService, SettingsService, AuditService, AssetsService, InventoryService, MaintenanceService, TasksService, PurchasesService, QualityService, NotificationsService, KpiService, PlannerService, ImportService, HojaVidaService, EquipmentService, LightingService, SignaturesService, InstrumentsService,
   ],
 })

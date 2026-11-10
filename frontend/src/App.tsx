@@ -5,6 +5,7 @@ import { useAuth } from './auth/AuthContext';
 import { Layout } from './components/Layout';
 import { Empty, Spinner } from './components/ui';
 import { Settings } from './pages/admin/Settings';
+import { ConModulo } from './components/modulos';
 import { Users } from './pages/admin/Users';
 import { AssetDetail } from './pages/assets/AssetDetail';
 import { AssetForm } from './pages/assets/AssetForm';
@@ -91,8 +92,8 @@ export function App() {
         <Route path="pendientes" element={<Pending />} />
         <Route path="notificaciones" element={<Notifications />} />
         <Route path="cuenta" element={<ChangeCredential />} />
-        <Route path="compras" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><PurchasesList /></OnlyRoles>} />
-        <Route path="compras/:id" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><PurchaseDetail /></OnlyRoles>} />
+        <Route path="compras" element={<ConModulo modulo="compras"><OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><PurchasesList /></OnlyRoles></ConModulo>} />
+        <Route path="compras/:id" element={<ConModulo modulo="compras"><OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><PurchaseDetail /></OnlyRoles></ConModulo>} />
         <Route path="ordenes" element={<OrdersList />} />
         <Route path="ordenes/reportar" element={<ReportFault />} />
         <Route path="ordenes/planes" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR', 'TECNICO']}><Plans /></OnlyRoles>} />
@@ -115,11 +116,11 @@ export function App() {
         <Route path="maquinas/hoja-de-vida" element={<OnlyRoles roles={['ADMIN']}><LifeSheetImport /></OnlyRoles>} />
         <Route path="maquinas/:id" element={<AssetDetail />} />
         <Route path="maquinas/:id/editar" element={<OnlyRoles roles={['ADMIN']}><AssetForm /></OnlyRoles>} />
-        <Route path="inventario" element={<PartsList />} />
+        <Route path="inventario" element={<ConModulo modulo="inventario"><PartsList /></ConModulo>} />
         <Route path="inventario/equipos" element={<StoredEquipment />} />
-        <Route path="inventario/nuevo" element={<OnlyRoles roles={['ADMIN']}><PartForm /></OnlyRoles>} />
-        <Route path="inventario/:id" element={<PartDetail />} />
-        <Route path="inventario/:id/editar" element={<OnlyRoles roles={['ADMIN']}><PartForm /></OnlyRoles>} />
+        <Route path="inventario/nuevo" element={<ConModulo modulo="inventario"><OnlyRoles roles={['ADMIN']}><PartForm /></OnlyRoles></ConModulo>} />
+        <Route path="inventario/:id" element={<ConModulo modulo="inventario"><PartDetail /></ConModulo>} />
+        <Route path="inventario/:id/editar" element={<ConModulo modulo="inventario"><OnlyRoles roles={['ADMIN']}><PartForm /></OnlyRoles></ConModulo>} />
         <Route path="indicadores" element={<OnlyRoles roles={['ADMIN', 'AUTORIZADOR']}><Indicators /></OnlyRoles>} />
         <Route path="usuarios" element={<OnlyRoles roles={['ADMIN']}><Users /></OnlyRoles>} />
         <Route path="configuracion/carga-masiva" element={<OnlyRoles roles={['ADMIN']}><BulkImport /></OnlyRoles>} />

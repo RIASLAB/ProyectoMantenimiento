@@ -9,6 +9,7 @@ import { ConnectionStatus, SyncManager } from '../offline/SyncManager';
 import { usePendientes } from '../offline/outbox';
 import { reasociarAvisos } from '../notifications/push';
 import { useMarcarLeida } from '../pages/Notifications';
+import { useModulos } from './modulos';
 import { Button, Icon, Modal } from './ui';
 
 /** `tab: false` = no aparece en la barra inferior del celular (se llega desde Ajustes). */
@@ -25,12 +26,15 @@ const NAV: Array<{ to: string; label: string; icon: string; roles?: Rol[]; tab?:
 
 export function Layout() {
   const { user, logout, can } = useAuth();
-  const items = NAV.filter((n) => !n.roles || can(...n.roles));
+  const modulos = useModulos();
+  // D-40: sin el módulo de compras no hay menú de compras; sin inventario, el menú lleva a la bodega de máquinas.
+  const items = NAV.filter((n) => (!n.roles || can(...n.roles)) && (n.to !== '/compras' || modulos.compras))
+    .map((n) => (n.to === '/inventario' && !modulos.inventario ? { ...n, to: '/inventario/equipos', label: 'Bodega' } : n));
   // Contador de solicitudes por aprobar junto a "Compras"
   const compras = useQuery({
     queryKey: ['compras', 'resumen'],
     queryFn: () => api.get<{ pendientes: number }>('/compras/resumen'),
-    enabled: can('ADMIN', 'AUTORIZADOR'),
+    enabled: can('ADMIN', 'AUTORIZADOR') && modulos.compras,
     refetchInterval: 60_000,
   });
   const pendientes = compras.data?.pendientes ?? 0;

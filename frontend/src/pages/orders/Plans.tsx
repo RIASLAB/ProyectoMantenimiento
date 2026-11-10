@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { Asset, EquipmentModel, Plan, Prioridad, UnidadFrecuencia } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
+import { useModulos } from '../../components/modulos';
 import { PartRow, PartRows, rowsToPayload, tituloLista, useMaterialesEquipo, useTipoEquipo } from '../../components/orders-shared';
 import { Badge, Button, Empty, ErrorBox, Field, Icon, Input, Modal, PageHeader, Select, Spinner, Textarea } from '../../components/ui';
 import { frecuencia, PRIORIDAD_LABEL, PRIORIDAD_PLAN_LABEL, PRIORIDAD_TONE, qty } from '../../format';
@@ -28,6 +29,7 @@ export function OpcionesTipos({ tipos }: { tipos: EquipmentModel[] | undefined }
 }
 
 function PlanModal({ plan, equiposDelTipo, open, onClose }: { plan: Plan | null; equiposDelTipo: number; open: boolean; onClose: () => void }) {
+  const { inventario } = useModulos();
   const qc = useQueryClient();
   const editing = !!plan;
   const activos = useQuery({ queryKey: ['activos', '', '', ''], queryFn: () => api.get<Asset[]>('/activos'), enabled: open });
@@ -50,8 +52,8 @@ function PlanModal({ plan, equiposDelTipo, open, onClose }: { plan: Plan | null;
   // Tipo de equipo del destino: su lista de materiales es la base del kit del plan.
   const activo = activos.data?.find((a) => a.id === f.activoId);
   // Plan de una máquina: su lista propia (o la de su tipo). Plan por tipo: la lista del tipo.
-  const tipo = useTipoEquipo(destino === 'tipo' ? f.modeloId : null);
-  const listaEquipo = useMaterialesEquipo(destino === 'maquina' ? f.activoId : null);
+  const tipo = useTipoEquipo(inventario && destino === 'tipo' ? f.modeloId : null);
+  const listaEquipo = useMaterialesEquipo(inventario && destino === 'maquina' ? f.activoId : null);
   const fuente = destino === 'tipo'
     ? (tipo.data ? { clave: `t${tipo.data.id}`, materiales: tipo.data.materiales ?? [], titulo: `Lista de materiales · ${tipo.data.nombre}` } : null)
     : (listaEquipo.data && f.activoId ? { clave: `a${f.activoId}`, materiales: listaEquipo.data.materiales, titulo: tituloLista(listaEquipo.data, activo?.codigo) } : null);
@@ -71,7 +73,7 @@ function PlanModal({ plan, equiposDelTipo, open, onClose }: { plan: Plan | null;
     mutationFn: () => {
       const comunes = {
         nombre: f.nombre, tareas: f.tareas || (editing ? null : undefined), frecuenciaValor: Number(f.frecuenciaValor),
-        frecuenciaUnidad: f.frecuenciaUnidad, diasAviso: Number(f.diasAviso), prioridad: f.prioridad, tareaIds, repuestos: rowsToPayload(rows),
+        frecuenciaUnidad: f.frecuenciaUnidad, diasAviso: Number(f.diasAviso), prioridad: f.prioridad, tareaIds, repuestos: inventario ? rowsToPayload(rows) : editing ? undefined : [],
       };
       if (editing) return api.patch(`/planes/${plan!.id}`, { ...comunes, vigente: f.vigente });
       const destinoBody = destino === 'tipo' ? { modeloId: f.modeloId } : { activoId: f.activoId };
@@ -145,10 +147,10 @@ function PlanModal({ plan, equiposDelTipo, open, onClose }: { plan: Plan | null;
         {editing ? (
           <label className="toggle"><input type="checkbox" checked={f.vigente} onChange={(e) => setF((s) => ({ ...s, vigente: e.target.checked }))} /> Plan vigente (si se desactiva, no genera más órdenes)</label>
         ) : null}
-        <div>
+        {inventario ? <div>
           <p className="subtle-head">Materiales por ejecución</p>
           <PartRows rows={rows} onChange={setRows} sugeridos={materiales} tituloSugeridos={fuente?.titulo} />
-        </div>
+        </div> : null}
         {m.isError ? <ErrorBox error={m.error} /> : null}
       </form>
     </Modal>

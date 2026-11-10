@@ -6,6 +6,7 @@ import type { Asset, AssetDocument, AssetHistory } from '../../api/types';
 import { OrderStateBadge, PartRow, PartRows, rowsToPayload, useMaterialesEquipo } from '../../components/orders-shared';
 import { InstallModal } from '../../components/InstallModal';
 import { useAuth } from '../../auth/AuthContext';
+import { useModulos } from '../../components/modulos';
 import { Badge, Button, Empty, ErrorBox, Icon, KeyValue, Modal, PageHeader, Spinner } from '../../components/ui';
 import { date, dateTime, daysUntil, ESTADO_LABEL, ESTADO_TONE, fileSize, money, qty, TIPO_LABEL } from '../../format';
 
@@ -152,6 +153,7 @@ function EliminarMaquina({ a, open, onClose }: { a: Asset; open: boolean; onClos
 export function AssetDetail() {
   const { id } = useParams<{ id: string }>();
   const { can } = useAuth();
+  const modulos = useModulos();
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploadError, setUploadError] = useState('');
@@ -250,7 +252,7 @@ export function AssetDetail() {
             ]}
           />
           {a.notas ? <p className="notes">{a.notas}</p> : null}
-          <MaterialesMaquina a={a} />
+          {modulos.inventario ? <MaterialesMaquina a={a} /> : null}
         </section>
 
         <section className="card">

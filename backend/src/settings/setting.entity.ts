@@ -17,6 +17,15 @@ export const PARAM_AUTORIZADOR_COMPRAS = 'autorizador_compras_id';
 export const PARAM_TARIFA_HORA = 'tarifa_hora_tecnico';
 /** Control documental de los formatos impresos (código, versión y fechas), por formato. */
 export const PARAM_FORMATOS = 'formatos_documentales';
+/**
+ * Módulos que la planta usa (D-40). Con inventario apagado no se planifican ni descuentan repuestos ni hay
+ * listas de materiales; con compras apagado no se crean solicitudes (tampoco las automáticas por faltantes).
+ * Compras necesita inventario (lo comprado entra al inventario).
+ */
+export const PARAM_MODULOS = 'modulos_activos';
+export interface Modulos { inventario: boolean; compras: boolean }
+export const MODULOS_POR_DEFECTO: Modulos = { inventario: true, compras: true };
+export const NOMBRE_MODULO: Record<keyof Modulos, string> = { inventario: 'Inventario', compras: 'Compras' };
 
 export interface FormatoDocumental {
   nombre: string;

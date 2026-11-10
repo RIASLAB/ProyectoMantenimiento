@@ -7,6 +7,7 @@ import { Button, ErrorBox, Field, Icon, PageHeader, Select, Spinner, Textarea } 
 import { useAuth } from '../../auth/AuthContext';
 import { PRIORIDAD_LABEL } from '../../format';
 import { comprimirFoto, enviarOEncolar } from '../../offline/outbox';
+import { useModulos } from '../../components/modulos';
 import { PartRow, PartRows, rowsToPayload, tituloLista, useMaterialesEquipo } from '../../components/orders-shared';
 
 const MAX_MB = 20;
@@ -26,7 +27,7 @@ export function ReportFault() {
   const [fotoClientId] = useState(() => uuid());
   const { user, can } = useAuth();
   // Mantenimiento puede dejar planificados los materiales desde el reporte; el operario solo reporta.
-  const planifica = can('ADMIN', 'TECNICO');
+  const planifica = can('ADMIN', 'TECNICO') && useModulos().inventario;
   const [rows, setRows] = useState<PartRow[]>([]);
 
   const activos = useQuery({ queryKey: ['activos', '', '', ''], queryFn: () => api.get<Asset[]>('/activos') });

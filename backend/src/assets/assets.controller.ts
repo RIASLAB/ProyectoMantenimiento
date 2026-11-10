@@ -1,3 +1,4 @@
+import { RequiereModulo } from '../common/modulo.guard';
 import {
   Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Put, Query, Res, StreamableFile, UploadedFile, UseInterceptors,
 } from '@nestjs/common';
@@ -88,6 +89,7 @@ export class AssetsController {
     return this.assets.materiales(id);
   }
 
+  @RequiereModulo('inventario')
   @Put(':id/materiales')
   @Roles(Rol.ADMIN)
   guardarMateriales(@Param('id', ParseUUIDPipe) id: string, @Body() dto: AssetPartsDto, @CurrentUser() actor: SessionUser) {

@@ -1,3 +1,4 @@
+import { RequiereModulo } from '../common/modulo.guard';
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { CurrentUser, Roles, SessionUser } from '../common/auth.decorators';
 import { Rol } from '../common/enums';
@@ -25,6 +26,7 @@ export class PurchasesController {
     return this.svc.get(id, actor);
   }
 
+  @RequiereModulo('compras')
   @Post()
   @Roles(Rol.ADMIN, Rol.TECNICO)
   crear(@Body() dto: CreatePurchaseDto, @CurrentUser() actor: SessionUser) {
@@ -32,6 +34,7 @@ export class PurchasesController {
   }
 
   /** La aprobación se valida contra el autorizador vigente (parámetro), no solo contra el rol. */
+  @RequiereModulo('compras')
   @Post(':id/aprobar')
   @Roles(Rol.AUTORIZADOR, Rol.ADMIN)
   aprobar(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: SessionUser) {
@@ -44,12 +47,14 @@ export class PurchasesController {
     return this.svc.rechazar(id, dto.motivo, actor);
   }
 
+  @RequiereModulo('compras')
   @Post(':id/comprar')
   @Roles(Rol.ADMIN)
   comprar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: BuyDto, @CurrentUser() actor: SessionUser) {
     return this.svc.comprar(id, dto, actor);
   }
 
+  @RequiereModulo('compras')
   @Post(':id/recibir')
   @Roles(Rol.ADMIN)
   recibir(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReceiveDto, @CurrentUser() actor: SessionUser) {

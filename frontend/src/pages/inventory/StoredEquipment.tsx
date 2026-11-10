@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { Asset } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
+import { useModulos } from '../../components/modulos';
 import { InstallModal } from '../../components/InstallModal';
 import { Button, Empty, ErrorBox, PageHeader, Spinner } from '../../components/ui';
 import { date } from '../../format';
@@ -11,6 +12,8 @@ import { date } from '../../format';
 /** Secciones de Inventario: repuestos y máquinas compradas que están en bodega sin instalar. */
 export function InventoryTabs() {
   const { pathname } = useLocation();
+  // Sin el módulo de inventario (D-40) solo queda la bodega de máquinas: no hace falta mostrar pestañas.
+  if (!useModulos().inventario) return null;
   return (
     <nav className="tabs" aria-label="Secciones de inventario">
       <Link to="/inventario" className={`tab ${pathname === '/inventario' ? 'active' : ''}`}>Repuestos</Link>
@@ -22,6 +25,7 @@ export function InventoryTabs() {
 /** Inventario de equipos: máquinas compradas que están en bodega, agrupadas por tipo, listas para instalar. */
 export function StoredEquipment() {
   const { can } = useAuth();
+  const modulos = useModulos();
   const q = useQuery({ queryKey: ['activos', 'en-bodega'], queryFn: () => api.get<Asset[]>('/activos?estado=EN_BODEGA') });
   const [instalar, setInstalar] = useState<Asset | null>(null);
   const [aviso, setAviso] = useState('');
@@ -36,7 +40,7 @@ export function StoredEquipment() {
 
   return (
     <>
-      <PageHeader title="Inventario" subtitle={q.data ? `${q.data.length} equipo${q.data.length === 1 ? '' : 's'} en bodega sin instalar` : undefined} />
+      <PageHeader title={modulos.inventario ? 'Inventario' : 'Bodega'} subtitle={q.data ? `${q.data.length} equipo${q.data.length === 1 ? '' : 's'} en bodega sin instalar` : undefined} />
       <InventoryTabs />
       {aviso ? <div className="alert alert-ok">{aviso}</div> : null}
       {q.isPending ? <Spinner /> : q.isError ? <ErrorBox error={q.error} onRetry={() => q.refetch()} /> : grupos.length === 0 ? (
