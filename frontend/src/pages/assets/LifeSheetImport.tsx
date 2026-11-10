@@ -47,10 +47,13 @@ const DATOS: Array<[keyof HojaRevisada['datos'], string]> = [
  * Cargar la hoja de vida de maquinaria (AC-PMT-FR05) desde el Excel de la planta (D-34): cada pestaña es una máquina.
  * Se revisa primero y se muestra lo que se va a crear; luego se carga todo junto.
  */
+const MAX_MB = 100;
+
 export function LifeSheetImport() {
   const qc = useQueryClient();
   const input = useRef<HTMLInputElement>(null);
   const [archivo, setArchivo] = useState<File | null>(null);
+  const [grande, setGrande] = useState('');
   const [fechas, setFechas] = useState<Record<string, string>>({});
   const [crearRepuestos, setCrearRepuestos] = useState(true);
   const form = (f: File, extra?: Record<string, string>) => {
@@ -73,6 +76,13 @@ export function LifeSheetImport() {
     if (!f) return;
     setArchivo(f);
     cargar.reset();
+    // Mismo límite del servidor (MAX_BYTES_HV): se avisa antes de subirlo, con el tamaño del archivo.
+    if (f.size > MAX_MB * 1024 * 1024) {
+      setGrande(`El archivo pesa ${Math.round(f.size / 1024 / 1024)} MB y el máximo es ${MAX_MB} MB. Divida el libro en dos archivos (unas pestañas en cada uno) o reduzca las fotos en Excel (Archivo → Comprimir imágenes).`);
+      revisar.reset();
+      return;
+    }
+    setGrande('');
     revisar.mutate(f);
   };
   const r = revisar.data;
@@ -95,6 +105,7 @@ export function LifeSheetImport() {
           </label>
           {archivo ? <p className="small muted" style={{ margin: '8px 0 0' }}><Icon name="file" size={14} /> {archivo.name}</p> : null}
           {revisar.isPending ? <p className="muted"><span className="spinner sm" aria-hidden /> Leyendo el archivo…</p> : null}
+          {grande ? <div className="alert alert-bad">{grande}</div> : null}
           {revisar.isError ? <ErrorBox error={revisar.error} /> : null}
         </li>
 

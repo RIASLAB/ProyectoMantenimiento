@@ -107,7 +107,7 @@ cd backend
 npm run test:e2e
 ```
 
-Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **256 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
+Las pruebas corren contra una base de datos real (`TEST_DATABASE_URL`, por defecto `cmms_test`), que se borra y se recrea en cada ejecución. Hoy hay **258 pruebas de API**, cada una ligada al requisito de la matriz que verifica.
 
 Además, la carpeta `e2e/` recorre los flujos en un navegador real, en escritorio y en celular (**137 verificaciones**):
 

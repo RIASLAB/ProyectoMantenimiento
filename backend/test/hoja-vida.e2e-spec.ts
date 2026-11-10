@@ -1,5 +1,6 @@
 /** D-34 · Carga de la hoja de vida de maquinaria (AC-PMT-FR05) desde Excel. */
 import ExcelJS from 'exceljs';
+import { randomBytes } from 'crypto';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { bootstrap } from './util';
@@ -163,4 +164,30 @@ describe('D-34 · Cargar la hoja de vida', () => {
     expect(r.status).toBe(400);
     expect(r.body.message).toContain('.xlsx');
   });
+});
+
+describe('Libros grandes (fotos del celular)', () => {
+  it('acepta un libro de más de 25 MB con fotos pesadas', async () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Banda 1');
+    ws.getCell('C1').value = 'HOJA DE VIDA DE MAQUINARIA Y EQUIPOS';
+    ws.getCell('A5').value = 'NOMBRE DEL EQUIPO O MAQUINARIA: BANDA TRANSPORTADORA';
+    ws.getCell('A8').value = 'CÓDIGO INVENTARIO: BT-GRANDE-01';
+    ws.getCell('A30').value = 'REGISTRO FOTOGRAFICO DEL EQUIPO';
+    // Fotos de 8 MB que no se comprimen (como las de un celular): el libro queda en unos 32 MB.
+    for (let i = 0; i < 4; i++) {
+      const pesada = Buffer.concat([FOTO, randomBytes(8 * 1024 * 1024)]);
+      ws.addImage(wb.addImage({ buffer: pesada as unknown as ExcelJS.Buffer, extension: 'png' }), `A${32 + i * 10}:E${40 + i * 10}`);
+    }
+    const archivo = Buffer.from(await wb.xlsx.writeBuffer());
+    expect(archivo.length).toBeGreaterThan(30 * 1024 * 1024);
+    const r = await subir('revisar', archivo);
+    expect(r.status).toBe(201);
+    expect(r.body.hojas[0]).toMatchObject({ fotos: 4 });
+  }, 60_000);
+
+  it('más de 100 MB se rechaza', async () => {
+    const r = await subir('revisar', Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(101 * 1024 * 1024)]));
+    expect(r.status).toBe(413);
+  }, 60_000);
 });

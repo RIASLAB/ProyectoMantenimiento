@@ -16,8 +16,11 @@ import { MaintenancePlan, MaintenanceTask } from '../maintenance/maintenance.ent
 import { hoy, MaintenanceService } from '../maintenance/maintenance.service';
 import { Frecuencia, HojaVida, leerLibroHojasDeVida, norm, separarTareas } from './hoja-vida';
 
-/** Una hoja de vida trae fotos: se permiten libros más grandes que la plantilla de carga masiva. */
-export const MAX_BYTES_HV = 25 * 1024 * 1024;
+/**
+ * Una hoja de vida trae fotos tomadas con el celular (varias MB cada una) y un libro puede traer muchas máquinas:
+ * se permiten libros mucho más grandes que la plantilla de carga masiva.
+ */
+export const MAX_BYTES_HV = 100 * 1024 * 1024;
 const NOMBRE_TAREA = 150;
 
 const ESTADOS: Record<string, EstadoActivo> = {
