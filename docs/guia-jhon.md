@@ -273,7 +273,23 @@ docker exec -it postgres_db psql -U postgres -d cmms_produccion
 No tocar las bases `leviathan_db` ni `leviathan_migtest`, ni el contenedor
 `postgres_db` fuera de lo necesario.
 
-## 9. Problemas comunes
+## 9. Nadie puede entrar a la app (restablecer el admin)
+
+Si se olvidó la contraseña del `admin` (o de otro usuario) o quedó bloqueado, desde el servidor:
+
+```bash
+cd ~/apps/cmms
+# Producción
+docker compose -f docker-compose.prod.externo.yml --env-file .env.produccion exec app node dist/database/restablecer-acceso.js admin
+# Pruebas
+docker compose -f docker-compose.pruebas.externo.yml --env-file .env.pruebas exec app node dist/database/restablecer-acceso.js admin
+```
+
+Muestra una contraseña temporal (o un PIN, si el usuario es técnico u operario), quita el bloqueo por
+intentos fallidos y obliga a cambiarla al ingresar. Queda en la bitácora como `ACCESO_RESTABLECIDO`.
+Si el usuario no existe, muestra la lista de usuarios. No copies la temporal en chats.
+
+## 10. Problemas comunes
 
 - **Actions falla:** revisa la pestaña Actions. Si es por permisos de GHCR, verifica que
   el workflow tenga `packages: write` y que Actions esté habilitado en el repositorio.
@@ -285,7 +301,7 @@ No tocar las bases `leviathan_db` ni `leviathan_migtest`, ni el contenedor
   vuelve a la imagen anterior con `IMAGE_TAG`.
 - **Puerto ocupado:** producción usa 8088 y pruebas 8089; el 3000 pertenece a otra app.
 
-## 10. Pendiente: HTTPS
+## 11. Pendiente: HTTPS
 
 La app está en HTTP. Funciona en la red de planta, pero sin HTTPS no hay PWA instalable,
 modo sin conexión ni Web Push. Cuando se defina, se puede usar un certificado de la CA
