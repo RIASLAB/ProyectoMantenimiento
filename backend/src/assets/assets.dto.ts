@@ -26,6 +26,10 @@ export class CreateAssetDto {
   @IsString() @MinLength(2) @MaxLength(100)
   area: string;
 
+  /** D-45: planta donde está (vacío = sin asignar). */
+  @IsOptional() @IsString() @MaxLength(60)
+  planta?: string | null;
+
   @IsOptional() @IsString() @MaxLength(150)
   ubicacion?: string | null;
 

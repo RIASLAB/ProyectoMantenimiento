@@ -67,7 +67,8 @@ export class HojaVidaController {
     @Body('fechas') fechas: string | undefined,
     @Body('crearRepuestos') crearRepuestos: string | undefined,
     @CurrentUser() actor: SessionUser,
+    @Body('planta') planta?: string,
   ) {
-    return this.svc.cargar(file, fechas, crearRepuestos !== 'false', actor);
+    return this.svc.cargar(file, fechas, crearRepuestos !== 'false', actor, planta);
   }
 }

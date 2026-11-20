@@ -31,6 +31,10 @@ export class Asset {
   @Column({ length: 100 })
   area: string;
 
+  /** D-45: planta donde está la máquina (Planta Pollo, Planta Desposte…). Filtra sus checklists. */
+  @Column({ type: 'varchar', length: 60, nullable: true })
+  planta: string | null;
+
   @Column({ type: 'varchar', length: 150, nullable: true })
   ubicacion: string | null;
 

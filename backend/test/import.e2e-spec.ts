@@ -48,7 +48,8 @@ describe('INT-01 · Plantillas', () => {
     await wb.xlsx.load(r.body);
     const ws = wb.worksheets[0];
     const enc = (ws.getRow(1).values as unknown[]).slice(1);
-    expect(enc).toEqual(tipo === 'maquinas' ? H_MAQ : H_REP);
+    // D-45: la plantilla trae la columna Planta (opcional); los archivos viejos sin ella siguen sirviendo.
+    expect(enc).toEqual(tipo === 'maquinas' ? [...H_MAQ.slice(0, 3), 'Planta', ...H_MAQ.slice(3)] : H_REP);
     expect(wb.getWorksheet('Instrucciones')).toBeDefined();
   });
 

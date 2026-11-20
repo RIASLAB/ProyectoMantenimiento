@@ -3,6 +3,7 @@ import { ChangeEvent, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { EstadoActivo, UnidadFrecuencia } from '../../api/types';
+import { PlantaSelect } from '../../components/plantas';
 import { Badge, Button, ErrorBox, Field, Icon, Input, PageHeader } from '../../components/ui';
 import { date, diaLocal, ESTADO_LABEL } from '../../format';
 
@@ -56,6 +57,7 @@ export function LifeSheetImport() {
   const [grande, setGrande] = useState('');
   const [fechas, setFechas] = useState<Record<string, string>>({});
   const [crearRepuestos, setCrearRepuestos] = useState(true);
+  const [planta, setPlanta] = useState('');
   const form = (f: File, extra?: Record<string, string>) => {
     const d = new FormData();
     d.append('archivo', f);
@@ -67,7 +69,7 @@ export function LifeSheetImport() {
     onSuccess: (r) => setFechas(Object.fromEntries(r.periodicidades.map((p) => [p.clave, diaLocal(7)]))),
   });
   const cargar = useMutation({
-    mutationFn: () => api.post<Resultado>('/hojas-de-vida/cargar', form(archivo!, { fechas: JSON.stringify(fechas), crearRepuestos: String(crearRepuestos) })),
+    mutationFn: () => api.post<Resultado>('/hojas-de-vida/cargar', form(archivo!, { fechas: JSON.stringify(fechas), crearRepuestos: String(crearRepuestos), planta })),
     onSuccess: () => { for (const k of ['activos', 'activo', 'planes', 'ordenes', 'ordenes-resumen', 'tareas-mantenimiento', 'repuestos', 'activo-materiales']) qc.invalidateQueries({ queryKey: [k] }); },
   });
   const elegir = (e: ChangeEvent<HTMLInputElement>) => {
@@ -129,6 +131,9 @@ export function LifeSheetImport() {
             {!r.errores ? (
               <li className="card stack">
                 <h2>3. Confirme y cargue</h2>
+                <Field label="Planta de estas máquinas" hint="La hoja de vida no la trae. Con ella, en los preoperacionales de cada planta solo salen sus máquinas.">
+                  {(i) => <PlantaSelect id={i} value={planta} onChange={setPlanta} vacio="Sin asignar (la pongo después)" />}
+                </Field>
                 {r.periodicidades.length ? (
                   <div className="stack" style={{ gap: 8 }}>
                     <p className="muted" style={{ margin: 0 }}>¿Cuándo toca el primer preventivo? Desde esa fecha se programan los siguientes.</p>

@@ -4,17 +4,18 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { Asset, ClaseActivo, EquipmentModel, EstadoActivo } from '../../api/types';
 import { OpcionesTipos } from '../orders/Plans';
+import { PlantaSelect } from '../../components/plantas';
 import { Button, ErrorBox, Field, Icon, Input, PageHeader, Select, Spinner, Textarea } from '../../components/ui';
 import { ESTADO_LABEL } from '../../format';
 
 type FormState = Record<
-  'codigo' | 'codigoSap' | 'nombre' | 'modelo' | 'fabricante' | 'serie' | 'area' | 'ubicacion' | 'fechaCompra' | 'fechaFinGarantia' | 'notas' | 'modeloId' | 'cantidad' | 'enBodega'
+  'codigo' | 'codigoSap' | 'nombre' | 'modelo' | 'fabricante' | 'serie' | 'area' | 'planta' | 'ubicacion' | 'fechaCompra' | 'fechaFinGarantia' | 'notas' | 'modeloId' | 'cantidad' | 'enBodega'
   | 'voltaje' | 'amperaje' | 'capacidad' | 'peso' | 'ubicacionManual',
   string
 > & { estado: EstadoActivo; clase: ClaseActivo };
 
 const EMPTY: FormState = {
-  codigo: '', codigoSap: '', nombre: '', modelo: '', fabricante: '', serie: '', area: '', ubicacion: '',
+  codigo: '', codigoSap: '', nombre: '', modelo: '', fabricante: '', serie: '', area: '', planta: '', ubicacion: '',
   fechaCompra: '', fechaFinGarantia: '', notas: '', estado: 'OPERATIVO', modeloId: '', cantidad: '1', enBodega: '0',
   clase: 'EQUIPO', voltaje: '', amperaje: '', capacidad: '', peso: '', ubicacionManual: '',
 };
@@ -44,7 +45,7 @@ export function AssetForm() {
     const a = current.data;
     setF({
       codigo: a.codigo, codigoSap: a.codigoSap ?? '', nombre: a.nombre, modelo: a.modelo ?? '', fabricante: a.fabricante ?? '',
-      serie: a.serie ?? '', area: a.area, ubicacion: a.ubicacion ?? '', fechaCompra: a.fechaCompra ?? '',
+      serie: a.serie ?? '', area: a.area, planta: a.planta ?? '', ubicacion: a.ubicacion ?? '', fechaCompra: a.fechaCompra ?? '',
       fechaFinGarantia: a.fechaFinGarantia ?? '', notas: a.notas ?? '', estado: a.estado, modeloId: a.modeloId ?? '', cantidad: '1', enBodega: '0',
       clase: a.clase, voltaje: a.voltaje ?? '', amperaje: a.amperaje ?? '', capacidad: a.capacidad ?? '', peso: a.peso ?? '', ubicacionManual: a.ubicacionManual ?? '',
     });
@@ -55,7 +56,7 @@ export function AssetForm() {
       // Los campos vacíos se envían como null para poder borrarlos al editar.
       const { cantidad, enBodega, ...resto } = f;
       const body: Record<string, unknown> = { ...resto };
-      for (const k of ['codigoSap', 'modelo', 'fabricante', 'serie', 'ubicacion', 'fechaCompra', 'fechaFinGarantia', 'notas', 'modeloId', 'voltaje', 'amperaje', 'capacidad', 'peso', 'ubicacionManual']) {
+      for (const k of ['planta', 'codigoSap', 'modelo', 'fabricante', 'serie', 'ubicacion', 'fechaCompra', 'fechaFinGarantia', 'notas', 'modeloId', 'voltaje', 'amperaje', 'capacidad', 'peso', 'ubicacionManual']) {
         if (body[k] === '') body[k] = editing ? null : undefined;
       }
       if (!editing && Number(cantidad) > 1) {
@@ -67,6 +68,7 @@ export function AssetForm() {
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['activos'] });
       qc.invalidateQueries({ queryKey: ['areas'] });
+      qc.invalidateQueries({ queryKey: ['plantas'] });
       qc.invalidateQueries({ queryKey: ['tipos-equipo'] });
       qc.invalidateQueries({ queryKey: ['planes'] });
       if ('varios' in r) {
@@ -154,6 +156,9 @@ export function AssetForm() {
                 <datalist id="areas-list">{areas.data?.map((a) => <option key={a} value={a} />)}</datalist>
               </>
             )}
+          </Field>
+          <Field label="Planta" hint="Al llenar los preoperacionales de una planta solo salen sus máquinas.">
+            {(i) => <PlantaSelect id={i} value={f.planta} onChange={(v) => setF((s) => ({ ...s, planta: v }))} />}
           </Field>
           <Field label="Ubicación">{(i) => <Input id={i} {...bind('ubicacion')} maxLength={150} />}</Field>
           <Field label="Fecha de compra">{(i) => <Input id={i} type="date" {...bind('fechaCompra')} />}</Field>

@@ -64,11 +64,11 @@ with sync_playwright() as p:
 
     # Encabezados: Código, Nombre, Área, Ubicación, Fabricante, Modelo, Serie, Código SAP, Fecha de compra, Fin de garantía, Estado, Notas
     filas_mal = [
-        ['TAJ-001', 'Tajadora de jamón', 'Proceso', 'Sala 2', 'Bizerba', 'A550', 'S-889', 'SAP-1001', datetime.date(2023, 3, 15), datetime.date(2026, 3, 15), 'Operativo', ''],
+        ['TAJ-001', 'Tajadora de jamón', 'Proceso', 'Planta Desposte', 'Sala 2', 'Bizerba', 'A550', 'S-889', 'SAP-1001', datetime.date(2023, 3, 15), datetime.date(2026, 3, 15), 'Operativo', ''],
         ['MOL-001', 'Molino repetido', 'Proceso'],
-        ['EMP-001', 'Empacadora', '', 'Empaque'],
+        ['EMP-001', 'Empacadora', '', '', 'Empaque'],
         ['TAJ-001', 'Tajadora otra vez', 'Proceso'],
-        ['CAL-001', 'Caldera', 'Servicios', 'Cuarto de calderas', '', '', '', '', '30/02/2020'],
+        ['CAL-001', 'Caldera', 'Servicios', '', 'Cuarto de calderas', '', '', '', '', '30/02/2020'],
     ]
     page.get_by_label('Archivo de Excel').set_input_files(llenar(plantilla, filas_mal, os.path.join(SP, 'maquinas-con-errores.xlsx')))
     expect(page.locator('.import-errors tbody tr')).to_have_count(4)
@@ -82,9 +82,9 @@ with sync_playwright() as p:
 
     filas_bien = [
         filas_mal[0],
-        ['EMP-001', 'Empacadora al vacío', 'Empaque', 'Sala de empaque', 'Multivac', 'R245', '', '', '10/01/2021', '', '', 'Revisar sellos'],
-        ['CAL-001', 'Caldera', 'Servicios', 'Cuarto de calderas', '', '', '', '', '28/02/2020'],
-        ['BAS-001', 'Báscula antigua', 'Despachos', '', '', '', '', '', '', '', 'Dado de baja'],
+        ['EMP-001', 'Empacadora al vacío', 'Empaque', '', 'Sala de empaque', 'Multivac', 'R245', '', '', '10/01/2021', '', '', 'Revisar sellos'],
+        ['CAL-001', 'Caldera', 'Servicios', '', 'Cuarto de calderas', '', '', '', '', '28/02/2020'],
+        ['BAS-001', 'Báscula antigua', 'Despachos', '', '', '', '', '', '', '', '', 'Dado de baja'],
     ]
     page.get_by_label('Archivo de Excel').set_input_files(llenar(plantilla, filas_bien, os.path.join(SP, 'maquinas-corregido.xlsx')))
     expect(page.locator('.import-errors')).to_have_count(0)

@@ -6,6 +6,7 @@ import type { Asset, EquipmentModel, EstadoActivo } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { Badge, Empty, ErrorBox, Icon, Input, PageHeader, Select, Spinner } from '../../components/ui';
 import { ESTADO_LABEL, ESTADO_TONE } from '../../format';
+import { usePlantas } from '../../components/plantas';
 import { useDebounced, useUrlFilters } from '../../hooks';
 
 /** Secciones de Máquinas: la lista, los tipos de equipo y el conteo por área. */
@@ -26,8 +27,9 @@ export function AssetsTabs() {
 
 export function AssetsList() {
   const { can } = useAuth();
-  const [filters, set] = useUrlFilters(['q', 'area', 'estado', 'categoriaId', 'modeloId', 'clase'] as const);
-  const { q, area, estado, categoriaId, modeloId } = filters;
+  const [filters, set] = useUrlFilters(['q', 'area', 'estado', 'categoriaId', 'modeloId', 'clase', 'planta'] as const);
+  const { q, area, estado, categoriaId, modeloId, planta } = filters;
+  const plantas = usePlantas();
   // Por defecto solo equipos; las instalaciones (cuartos fríos, salas) se ven aparte.
   const clase = filters.clase === 'TODAS' ? undefined : filters.clase || 'EQUIPO';
   const dq = useDebounced(q);
@@ -35,14 +37,14 @@ export function AssetsList() {
   const areas = useQuery({ queryKey: ['areas'], queryFn: () => api.get<string[]>('/activos/areas') });
   const tipos = useQuery({ queryKey: ['tipos-equipo'], queryFn: () => api.get<EquipmentModel[]>('/tipos-equipo') });
   const list = useQuery({
-    queryKey: ['activos', dq, area, estado, categoriaId, modeloId, clase ?? 'TODAS'],
-    queryFn: () => api.get<Asset[]>(`/activos${qs({ q: dq, area, estado, categoriaId, modeloId, clase })}`),
+    queryKey: ['activos', dq, area, estado, categoriaId, modeloId, clase ?? 'TODAS', planta],
+    queryFn: () => api.get<Asset[]>(`/activos${qs({ q: dq, area, estado, categoriaId, modeloId, clase, planta })}`),
   });
   // Un solo selector para categoría o modelo: "c:<id>" o "m:<id>".
   const categorias = [...new Map((tipos.data ?? []).map((t) => [t.categoria.id, t.categoria.nombre])).entries()];
   const tipoValor = modeloId ? `m:${modeloId}` : categoriaId ? `c:${categoriaId}` : '';
   const elegirTipo = (v: string) => { set('categoriaId', v.startsWith('c:') ? v.slice(2) : ''); set('modeloId', v.startsWith('m:') ? v.slice(2) : ''); };
-  const filtrando = q || area || estado || categoriaId || modeloId;
+  const filtrando = q || area || estado || categoriaId || modeloId || planta;
   const creados = (useLocation().state as { creados?: number } | null)?.creados;
 
   return (
@@ -78,6 +80,11 @@ export function AssetsList() {
           <option value="">Equipos</option>
           <option value="INSTALACION">Instalaciones (locativo)</option>
           <option value="TODAS">Equipos e instalaciones</option>
+        </Select>
+        <Select value={planta} onChange={(e) => set('planta', e.target.value)} aria-label="Filtrar por planta">
+          <option value="">Todas las plantas</option>
+          {plantas.data?.map((p) => <option key={p} value={p}>{p}</option>)}
+          <option value="SIN">Sin planta asignada</option>
         </Select>
         <Select value={area} onChange={(e) => set('area', e.target.value)} aria-label="Filtrar por área">
           <option value="">Todas las áreas</option>
@@ -119,7 +126,7 @@ export function AssetsList() {
                   </span>
                 </div>
                 <div className="list-meta">
-                  <span className="muted">{a.area}{a.ubicacion ? ` · ${a.ubicacion}` : ''}</span>
+                  <span className="muted">{[a.planta, a.area, a.ubicacion].filter(Boolean).join(' · ')}</span>
                   <Badge tone={ESTADO_TONE[a.estado]}>{ESTADO_LABEL[a.estado]}</Badge>
                 </div>
               </Link>

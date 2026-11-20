@@ -82,7 +82,7 @@ export async function cargarFormatos(ds: DataSource, usuarioId: string | null = 
         let a = await em.getRepository(Asset).findOne({ where: { codigo } });
         if (!a) {
           a = await em.getRepository(Asset).save(em.getRepository(Asset).create({
-            codigo, nombre: cuarto, area: t.planta, ubicacion: cuarto, clase: ClaseActivo.INSTALACION,
+            codigo, nombre: cuarto, area: t.planta, planta: t.planta, ubicacion: cuarto, clase: ClaseActivo.INSTALACION,
             notas: 'Cuarto frío o área con registro de temperatura (cargado de los formatos de la planta).',
           }));
           r.instalaciones++;

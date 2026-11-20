@@ -112,6 +112,14 @@ export function FillChecklist() {
   const eligeEquipo = !t.activoId && !t.items.some((i) => i.tipo === 'SECCION');
   const hechoFijo = t.semanal && !eligeEquipo ? hechos.get(t.activoId ?? '') : undefined;
   const hechoElegido = t.semanal && eligeEquipo ? hechos.get(activoId) : undefined;
+  // D-45: en el checklist de una planta solo salen sus máquinas (y aparte las que aún no tienen planta).
+  const enUso = (activos.data ?? []).filter((a) => a.estado !== 'DADO_DE_BAJA' && a.estado !== 'EN_BODEGA');
+  const grupos_equipos: Array<{ titulo: string | null; lista: Asset[] }> = planta
+    ? [
+        { titulo: `Máquinas de ${planta}`, lista: enUso.filter((a) => a.planta === planta) },
+        { titulo: 'Sin planta asignada', lista: enUso.filter((a) => !a.planta) },
+      ].filter((g) => g.lista.length)
+    : [{ titulo: null, lista: enUso }];
   const cuando = (h: HechoSemana) => `${new Date(h.registradoEn).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'short' })} por ${h.usuario}`;
   if (plantasT.length > 1 && !planta) {
     return (
@@ -155,9 +163,12 @@ export function FillChecklist() {
               {(i) => (
                 <Select id={i} value={activoId} onChange={(e) => setActivoId(e.target.value)}>
                   <option value="" disabled={hechos.has('')}>{t.semanal ? 'Elija el equipo…' : 'General / no aplica'}{hechos.has('') ? ' (hecho esta semana)' : ''}</option>
-                  {activos.data?.filter((a) => a.estado !== 'DADO_DE_BAJA' && a.estado !== 'EN_BODEGA').map((a) => (
-                    <option key={a.id} value={a.id} disabled={hechos.has(a.id)}>{a.codigo} · {a.nombre}{hechos.has(a.id) ? ' — hecho esta semana' : ''}</option>
-                  ))}
+                  {grupos_equipos.map((g) => {
+                    const opciones = g.lista.map((a) => (
+                      <option key={a.id} value={a.id} disabled={hechos.has(a.id)}>{a.codigo} · {a.nombre}{hechos.has(a.id) ? ' — hecho esta semana' : ''}</option>
+                    ));
+                    return g.titulo ? <optgroup key={g.titulo} label={g.titulo}>{opciones}</optgroup> : opciones;
+                  })}
                 </Select>
               )}
             </Field>

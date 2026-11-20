@@ -21,13 +21,19 @@ export class AssetsController {
     @Query('modeloId', new ParseUUIDPipe({ optional: true })) modeloId?: string,
     @Query('categoriaId', new ParseUUIDPipe({ optional: true })) categoriaId?: string,
     @Query('clase') clase?: ClaseActivo,
+    @Query('planta') planta?: string,
   ) {
-    return this.assets.list({ q, estado, area, modeloId, categoriaId, clase: clase && Object.values(ClaseActivo).includes(clase) ? clase : undefined });
+    return this.assets.list({ q, estado, area, modeloId, categoriaId, clase: clase && Object.values(ClaseActivo).includes(clase) ? clase : undefined, planta });
   }
 
   @Get('areas')
   areas() {
     return this.assets.areas();
+  }
+
+  @Get('plantas')
+  plantas() {
+    return this.assets.plantas();
   }
 
   @Get('documentos/:docId/archivo')

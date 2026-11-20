@@ -127,13 +127,14 @@ describe('D-34 · Cargar la hoja de vida', () => {
   });
 
   it('crea las máquinas con fotos, tareas, planes con su primera orden y la lista de materiales', async () => {
-    const r = await subir('cargar', archivo, { fechas: fechas(), crearRepuestos: 'true' });
+    const r = await subir('cargar', archivo, { fechas: fechas(), crearRepuestos: 'true', planta: 'Planta Salsamentaria' });
     expect(r.status).toBe(201);
     expect(r.body).toMatchObject({ creadas: 2, actualizadas: 0, fotos: 2, tareasCreadas: 3, repuestosCreados: 2, materiales: 3 });
     expect(r.body.planes).toHaveLength(4);
     const activos = (await c.http.get('/api/activos').set(c.auth(c.admin))).body as Array<{ id: string; codigo: string }>;
     const tf4 = activos.find((a) => a.codigo === 'AP-TF-04')!;
     const ficha = (await c.http.get(`/api/activos/${tf4.id}`).set(c.auth(c.admin))).body;
+    expect(ficha.planta).toBe('Planta Salsamentaria'); // D-45
     expect(ficha).toMatchObject({ nombre: 'Termoformadora', fabricante: 'VARIOVAC', modelo: 'OPTIMUS', serie: 'OL-2590', capacidad: '100 m3/h', peso: '1081 kgs', clase: 'EQUIPO' });
     expect(ficha.notas).toContain('Rutina diaria del operario (no genera órdenes): Limpiar y desinfectar la maquina.');
     expect(ficha.notas).toContain('Referencias de materiales: Grasa: Tipo NLGI2 · Empaque 2x2: A1022992 Cantida 2 · Aceite Mineral: OKS370');

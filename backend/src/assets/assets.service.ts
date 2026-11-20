@@ -36,7 +36,7 @@ export class AssetsService {
     if (!existsSync(this.dir)) mkdirSync(this.dir, { recursive: true });
   }
 
-  list(f: { q?: string; estado?: EstadoActivo; area?: string; modeloId?: string; categoriaId?: string; clase?: ClaseActivo }) {
+  list(f: { q?: string; estado?: EstadoActivo; area?: string; modeloId?: string; categoriaId?: string; clase?: ClaseActivo; planta?: string }) {
     const qb = this.repo.createQueryBuilder('a')
       .leftJoin('a.modeloEquipo', 'm').addSelect(['m.id', 'm.nombre', 'm.categoriaId'])
       .leftJoin('m.categoria', 'mc').addSelect(['mc.id', 'mc.nombre'])
@@ -51,7 +51,20 @@ export class AssetsService {
     if (f.estado) qb.andWhere('a.estado = :estado', { estado: f.estado });
     if (f.clase) qb.andWhere('a.clase = :clase', { clase: f.clase });
     if (f.area) qb.andWhere('lower(a.area) = lower(:area)', { area: f.area });
+    // D-45: "SIN" = máquinas sin planta asignada.
+    if (f.planta === 'SIN') qb.andWhere('a.planta IS NULL');
+    else if (f.planta) qb.andWhere('a.planta = :planta', { planta: f.planta });
     return qb.getMany();
+  }
+
+  /** D-45: plantas conocidas: las de las máquinas y las de los formatos de calidad. */
+  async plantas(): Promise<string[]> {
+    const rows: Array<{ planta: string }> = await this.ds.query(
+      `SELECT planta FROM activos WHERE planta IS NOT NULL
+       UNION SELECT unnest(plantas) FROM plantillas_checklist
+       ORDER BY 1`,
+    );
+    return rows.map((r) => r.planta);
   }
 
   async areas(): Promise<string[]> {

@@ -194,7 +194,9 @@ export class HojaVidaService {
    * Carga el archivo. `fechas` dice, por periodicidad, cuándo toca el primer preventivo (AAAA-MM-DD).
    * Con `crearRepuestos`, las referencias con código que no están en inventario se crean (con existencia 0).
    */
-  async cargar(file: Express.Multer.File | undefined, fechasJson: string | undefined, crearRepuestos: boolean, actor: SessionUser) {
+  async cargar(file: Express.Multer.File | undefined, fechasJson: string | undefined, crearRepuestos: boolean, actor: SessionUser, plantaParam?: string) {
+    // D-45: planta de las máquinas del archivo (la hoja de vida no la trae).
+    const planta = plantaParam?.trim().slice(0, 60) || null;
     const { hojas, omitidas } = await this.leer(file);
     let fechas: Record<string, string> = {};
     try {
@@ -235,7 +237,7 @@ export class HojaVidaService {
           const campos = {
             nombre: d.nombre!, area: d.area!, ubicacion: d.ubicacion, fabricante: d.marca, modelo: d.modelo, serie: d.serie,
             voltaje: d.voltaje?.slice(0, 40) ?? null, amperaje: d.amperaje?.slice(0, 40) ?? null, capacidad: d.capacidad?.slice(0, 60) ?? null,
-            peso: d.peso?.slice(0, 40) ?? null, ubicacionManual: d.ubicacionManual?.slice(0, 150) ?? null,
+            peso: d.peso?.slice(0, 40) ?? null, ubicacionManual: d.ubicacionManual?.slice(0, 150) ?? null, planta,
           };
           let activo = await em.getRepository(Asset).findOne({ where: { codigo: h.codigo! } });
           if (activo) {

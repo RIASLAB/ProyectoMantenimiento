@@ -127,6 +127,7 @@ const COLUMNAS: Record<TipoCarga, Columna[]> = {
     { clave: 'codigo', titulo: 'Código', obligatoria: true, ancho: 14, ayuda: 'Código interno único, ej. EMB-002. Sin espacios.', leer: codigo },
     { clave: 'nombre', titulo: 'Nombre', obligatoria: true, ancho: 32, ayuda: 'Ej. Embutidora al vacío', leer: (v) => texto(v, 150, 2) },
     { clave: 'area', titulo: 'Área', obligatoria: true, ancho: 18, ayuda: 'Ej. Proceso, Refrigeración, Cocción', leer: (v) => texto(v, 100, 2) },
+    { clave: 'planta', titulo: 'Planta', ancho: 20, ayuda: 'Ej. Planta Pollo, Planta Desposte, Planta Salsamentaria (D-45). Opcional.', leer: (v) => texto(v, 60) },
     { clave: 'ubicacion', titulo: 'Ubicación', ancho: 22, ayuda: 'Ej. Sala de embutido', leer: (v) => texto(v, 150) },
     { clave: 'fabricante', titulo: 'Fabricante', ancho: 18, ayuda: '', leer: (v) => texto(v, 100) },
     { clave: 'modelo', titulo: 'Modelo', ancho: 14, ayuda: '', leer: (v) => texto(v, 100) },
@@ -174,7 +175,7 @@ const COLUMNAS: Record<TipoCarga, Columna[]> = {
 const NOMBRE_HOJA: Record<TipoCarga, string> = { maquinas: 'Máquinas', repuestos: 'Repuestos' };
 
 export interface FilaMaquina {
-  fila: number; codigo: string; nombre: string; area: string; ubicacion: string | null; fabricante: string | null; modelo: string | null;
+  fila: number; codigo: string; nombre: string; area: string; planta: string | null; ubicacion: string | null; fabricante: string | null; modelo: string | null;
   serie: string | null; codigoSap: string | null; fechaCompra: string | null; fechaFinGarantia: string | null; estado: EstadoActivo; notas: string | null;
   modeloId: string | null;
   clase: ClaseActivo; voltaje: string | null; amperaje: string | null; capacidad: string | null; peso: string | null; ubicacionManual: string | null;

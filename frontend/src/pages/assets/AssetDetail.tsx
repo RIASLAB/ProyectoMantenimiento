@@ -243,6 +243,7 @@ export function AssetDetail() {
               ['Modelo', a.modelo],
               ['N.° de serie', a.serie],
               ['Código SAP', a.codigoSap],
+              ['Planta', a.planta ?? 'Sin asignar'],
               ['Área', a.area],
               ['Ubicación', a.ubicacion],
               ...([['Voltaje', a.voltaje], ['Amperaje', a.amperaje], ['Capacidad', a.capacidad], ['Peso', a.peso], ['Ubicación del manual', a.ubicacionManual]] as Array<[string, string | null]>)

@@ -41,6 +41,13 @@ with sync_playwright() as p:
     login(a, 'admin', ADMIN_PASS)
 
     # 1) Preoperacional del molino: B/R/M, "Regular" pide observación, "Malo" pide acción correctiva
+    # D-45: el molino MOL-001 queda en Planta Desposte (ficha de la máquina).
+    a.goto(BASE + '/maquinas?q=MOL-001')
+    a.locator('a', has_text='MOL-001').first.click()
+    a.get_by_role('link', name='Editar').click()
+    a.get_by_label('Planta', exact=True).select_option('Planta Desposte')
+    a.get_by_role('button', name='Guardar cambios').click()
+    expect(a.get_by_text('Planta Desposte').first).to_be_visible()
     a.goto(BASE + '/calidad')
     # D-43: los formatos se agrupan por planta: al elegir una se ven los suyos.
     expect(a.locator('#checklists .point', has_text='Preoperacional molino')).to_have_count(0)
@@ -82,7 +89,9 @@ with sync_playwright() as p:
     a.get_by_role('button', name=re.compile('^Planta Salsamentaria')).click()
     expect(a.locator('.point', has_text='Preoperacional molino')).not_to_contain_text('hecho')
     a.locator('.point', has_text='Preoperacional molino').click()
-    expect(a.get_by_label('Equipo *').locator('option', has_text='MOL-001')).to_be_enabled()
+    # D-45: en Salsamentaria no sale el molino de Desposte; sí los que aún no tienen planta.
+    expect(a.get_by_label('Equipo *').locator('option', has_text='MOL-001')).to_have_count(0)
+    expect(a.get_by_label('Equipo *').locator('optgroup[label="Sin planta asignada"] option').first).to_be_attached()
     expect(a.get_by_text('Planta Salsamentaria').first).to_be_visible()
     ok('preoperacional semanal: agrupado por planta, el equipo hecho no se puede llenar otra vez en la semana')
     a.goto(BASE + '/calidad')

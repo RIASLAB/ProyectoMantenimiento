@@ -39,6 +39,8 @@ export interface Asset {
   fabricante: string | null;
   serie: string | null;
   area: string;
+  /** D-45: planta donde está la máquina. */
+  planta: string | null;
   ubicacion: string | null;
   fechaCompra: string | null;
   fechaFinGarantia: string | null;

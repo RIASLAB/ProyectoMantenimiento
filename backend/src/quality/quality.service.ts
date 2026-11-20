@@ -394,6 +394,10 @@ export class QualityService {
     if (p.plantas.length > 1 && (!planta || !p.plantas.includes(planta))) {
       throw new BadRequestException(`Indique en qué planta se llena: ${p.plantas.join(', ')}`);
     }
+    if (activoId && planta) {
+      const a = await this.assets.findOne({ where: { id: activoId } });
+      if (a?.planta && a.planta !== planta) throw new BadRequestException(`La máquina ${a.codigo} es de ${a.planta}, no de ${planta}`);
+    }
     const porItem = new Map(dto.respuestas.map((r) => [r.itemId, r.valor]));
     const obsPorItem = new Map(dto.respuestas.map((r) => [r.itemId, r.observacion?.trim() || null]));
     const desconocida = dto.respuestas.find((r) => !p.items.some((i) => i.id === r.itemId));
