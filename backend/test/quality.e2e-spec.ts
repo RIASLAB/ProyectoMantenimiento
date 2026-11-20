@@ -210,7 +210,7 @@ describe('D-43 · Preoperacional semanal: una vez por semana por equipo', () => 
   let otroId: string;
   let tercerId: string;
   const llenar = (activo: string | undefined, extra: Record<string, unknown> = {}) =>
-    c.http.post('/api/calidad/checklists').set(c.auth(op.token)).send({ plantillaId: semanalId, activoId: activo, respuestas: [{ itemId: items[0].id, valor: 'SI' }], ...extra });
+    c.http.post('/api/calidad/checklists').set(c.auth(op.token)).send({ plantillaId: semanalId, activoId: activo, respuestas: [{ itemId: items[0].id, valor: 'SI' }], planta: 'Planta Desposte', ...extra });
 
   beforeAll(async () => {
     const r = await c.http.post('/api/calidad/plantillas').set(c.auth(c.admin)).send({
@@ -241,13 +241,29 @@ describe('D-43 · Preoperacional semanal: una vez por semana por equipo', () => 
     expect(viejo.plantas).toEqual(['Proceso']);
   });
 
+  it('D-44 · cada planta lleva su registro: el mismo equipo y formato se llena aparte en otra planta', async () => {
+    const sinPlanta = await llenar(otroId, { planta: undefined });
+    expect(sinPlanta.status).toBe(400);
+    expect(sinPlanta.body.message).toBe('Indique en qué planta se llena: Planta Desposte, Planta Salsamentaria');
+    expect((await llenar(otroId, { planta: 'Planta Pollo' })).status).toBe(400);
+    const salsa = await llenar(otroId, { planta: 'Planta Salsamentaria' });
+    expect(salsa.status).toBe(201);
+    expect(salsa.body.planta).toBe('Planta Salsamentaria');
+    const otraVez = await llenar(otroId, { planta: 'Planta Salsamentaria' });
+    expect(otraVez.status).toBe(409);
+    expect(otraVez.body.message).toMatch(/en Planta Salsamentaria/);
+    const t = (await c.http.get(`/api/calidad/plantillas/${semanalId}`).set(c.auth(op.token))).body;
+    expect(t.semana.filter((h: { planta: string }) => h.planta === 'Planta Salsamentaria')).toHaveLength(1);
+    expect(t.semana.filter((h: { planta: string }) => h.planta === 'Planta Desposte')).toHaveLength(2);
+  });
+
   it('la lista de formatos dice qué equipos ya se hicieron esta semana', async () => {
     const l = await c.http.get('/api/calidad/plantillas').set(c.auth(op.token));
     const t = l.body.find((x: { id: string }) => x.id === semanalId);
-    expect(t.semana.map((h: { activoId: string }) => h.activoId).sort()).toEqual([activoId, otroId].sort());
+    expect(t.semana.filter((h: { planta: string }) => h.planta === 'Planta Desposte').map((h: { activoId: string }) => h.activoId).sort()).toEqual([activoId, otroId].sort());
     expect(t.semana[0]).toMatchObject({ usuario: 'Usuario op1' });
     const una = await c.http.get(`/api/calidad/plantillas/${semanalId}`).set(c.auth(op.token));
-    expect(una.body.semana).toHaveLength(2);
+    expect(una.body.semana).toHaveLength(3);
     // Los formatos que no son semanales no traen ese dato ni tienen límite.
     expect(l.body.find((x: { id: string }) => x.id === plantillaId).semana).toBeUndefined();
   });

@@ -200,6 +200,10 @@ export class CreateChecklistDto {
   @IsOptional() @IsUUID()
   activoId?: string;
 
+  /** D-44: planta donde se llena. Obligatoria si el formato es de varias plantas. */
+  @IsOptional() @IsString() @MaxLength(60)
+  planta?: string;
+
   @IsArray() @ArrayMaxSize(150) @ValidateNested({ each: true }) @Type(() => AnswerDto)
   respuestas: AnswerDto[];
 

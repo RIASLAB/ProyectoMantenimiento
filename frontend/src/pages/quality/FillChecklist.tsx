@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FormEvent, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api, uuid } from '../../api/client';
 import type { Asset, ChecklistItemInfo, ChecklistTemplateInfo, HechoSemana } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
@@ -42,6 +42,7 @@ function agrupar(items: ChecklistItemInfo[]) {
 /** CAL-04: llenado de un checklist; las respuestas no conformes se resaltan mientras se responde. */
 export function FillChecklist() {
   const { id } = useParams<{ id: string }>();
+  const [sp, setSp] = useSearchParams();
   const nav = useNavigate();
   const qc = useQueryClient();
   const [valores, setValores] = useState<Record<string, Valor>>({});
@@ -54,6 +55,9 @@ export function FillChecklist() {
   const { user } = useAuth();
 
   const p = useQuery({ queryKey: ['calidad', 'plantilla', id], queryFn: () => api.get<ChecklistTemplateInfo>(`/calidad/plantillas/${id}`) });
+  // D-44: planta donde se llena (el mismo formato puede ser de varias plantas; cada una lleva su registro).
+  const plantasT = p.data?.plantas ?? [];
+  const planta = plantasT.length === 1 ? plantasT[0] : plantasT.includes(sp.get('planta') ?? '') ? sp.get('planta')! : plantasT.length ? '' : sp.get('planta') ?? '';
   const activos = useQuery({ queryKey: ['activos', '', '', ''], queryFn: () => api.get<Asset[]>('/activos'), enabled: !!p.data && !p.data.activoId });
 
   const preguntas = p.data?.items.filter((i) => i.tipo !== 'SECCION') ?? [];
@@ -67,6 +71,7 @@ export function FillChecklist() {
       body: {
         plantillaId: id,
         activoId: activoId || undefined,
+        planta: planta || undefined,
         respuestas: preguntas.map((i) => ({
           itemId: i.id,
           valor: valores[i.id] === undefined || valores[i.id] === '' ? null : i.tipo === 'NUMERO' ? Number(valores[i.id]) : valores[i.id],
@@ -103,11 +108,24 @@ export function FillChecklist() {
   const t = p.data;
   const grupos = agrupar(t.items);
   // D-43: en un preoperacional semanal, cada equipo se llena una vez por semana.
-  const hechos = new Map((t.semana ?? []).map((h) => [h.activoId ?? '', h] as const));
+  const hechos = new Map((t.semana ?? []).filter((h) => (h.planta ?? '') === planta).map((h) => [h.activoId ?? '', h] as const));
   const eligeEquipo = !t.activoId && !t.items.some((i) => i.tipo === 'SECCION');
   const hechoFijo = t.semanal && !eligeEquipo ? hechos.get(t.activoId ?? '') : undefined;
   const hechoElegido = t.semanal && eligeEquipo ? hechos.get(activoId) : undefined;
   const cuando = (h: HechoSemana) => `${new Date(h.registradoEn).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'short' })} por ${h.usuario}`;
+  if (plantasT.length > 1 && !planta) {
+    return (
+      <>
+        <PageHeader back={back} title={t.nombre} subtitle="Este formato se llena en varias plantas" />
+        <section className="card">
+          <h2>¿En qué planta lo va a llenar?</h2>
+          <div className="chips">
+            {plantasT.map((x) => <button key={x} type="button" className="chip" onClick={() => setSp({ planta: x }, { replace: true })}>{x}</button>)}
+          </div>
+        </section>
+      </>
+    );
+  }
   if (hechoFijo) {
     return (
       <>
@@ -126,7 +144,7 @@ export function FillChecklist() {
   return (
     <>
       <PageHeader back={back} title={t.nombre}
-        subtitle={[t.area, t.activo ? `${t.activo.codigo} · ${t.activo.nombre}` : null, t.codigo ? `${t.codigo}${t.version ? ` v${t.version}` : ''}` : null].filter(Boolean).join(' · ') || undefined} />
+        subtitle={[planta || t.area, t.activo ? `${t.activo.codigo} · ${t.activo.nombre}` : null, t.codigo ? `${t.codigo}${t.version ? ` v${t.version}` : ''}` : null].filter(Boolean).join(' · ') || undefined} />
       <form className="stack" onSubmit={submit}>
         {t.descripcion ? <p className="muted" style={{ margin: 0 }}>{t.descripcion}</p> : null}
         {t.recomendacion ? <div className="alert alert-warn"><span><strong>Recomendación:</strong> {t.recomendacion}</span></div> : null}

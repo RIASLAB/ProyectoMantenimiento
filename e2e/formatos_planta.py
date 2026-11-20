@@ -77,6 +77,13 @@ with sync_playwright() as p:
     expect(mol).to_be_disabled()
     expect(mol).to_contain_text('hecho esta semana')
     a.screenshot(path=f'{SP}/fmt-01b-semanal.png', full_page=False)
+    # D-44: el mismo formato en otra planta va aparte: en Salsamentaria el molino sigue pendiente.
+    a.goto(BASE + '/calidad')
+    a.get_by_role('button', name=re.compile('^Planta Salsamentaria')).click()
+    expect(a.locator('.point', has_text='Preoperacional molino')).not_to_contain_text('hecho')
+    a.locator('.point', has_text='Preoperacional molino').click()
+    expect(a.get_by_label('Equipo *').locator('option', has_text='MOL-001')).to_be_enabled()
+    expect(a.get_by_text('Planta Salsamentaria').first).to_be_visible()
     ok('preoperacional semanal: agrupado por planta, el equipo hecho no se puede llenar otra vez en la semana')
     a.goto(BASE + '/calidad')
     ok('preoperacional del molino: "marcar lo pendiente como bueno", Regular con observación y No tiene con acción correctiva')

@@ -305,11 +305,11 @@ export class QualityService {
    * las plantillas indicadas en esa semana, por plantilla: equipo, cuándo y quién.
    */
   async hechosEnLaSemana(plantillaIds: string[], momento = new Date(), em = this.ds.manager) {
-    const r = new Map<string, Array<{ registroId: string; activoId: string | null; registradoEn: Date; usuario: string }>>();
+    const r = new Map<string, Array<{ registroId: string; activoId: string | null; planta: string | null; registradoEn: Date; usuario: string }>>();
     if (!plantillaIds.length) return r;
     const tz = process.env.APP_TZ ?? 'America/Bogota';
-    const filas: Array<{ id: string; plantilla_id: string; activo_id: string | null; registrado_en: Date; usuario: string }> = await em.query(
-      `SELECT c.id, c.plantilla_id, c.activo_id, c.registrado_en, u.nombre AS usuario
+    const filas: Array<{ id: string; plantilla_id: string; activo_id: string | null; planta: string | null; registrado_en: Date; usuario: string }> = await em.query(
+      `SELECT c.id, c.plantilla_id, c.activo_id, c.planta, c.registrado_en, u.nombre AS usuario
          FROM registros_checklist c JOIN usuarios u ON u.id = c.usuario_id
         WHERE c.plantilla_id = ANY($1::uuid[])
           AND c.registrado_en >= (date_trunc('week', $2::timestamptz AT TIME ZONE $3) AT TIME ZONE $3)
@@ -320,7 +320,7 @@ export class QualityService {
     );
     for (const f of filas) {
       const l = r.get(f.plantilla_id) ?? [];
-      l.push({ registroId: f.id, activoId: f.activo_id, registradoEn: f.registrado_en, usuario: f.usuario });
+      l.push({ registroId: f.id, activoId: f.activo_id, planta: f.planta, registradoEn: f.registrado_en, usuario: f.usuario });
       r.set(f.plantilla_id, l);
     }
     return r;
@@ -389,6 +389,11 @@ export class QualityService {
       if (a.estado === EstadoActivo.EN_BODEGA) throw new BadRequestException('La máquina está en bodega (sin instalar)');
     }
     const registradoEn = this.momento(dto.registradoEn);
+    // D-44: el mismo formato sirve en varias plantas y cada planta lleva su propio registro.
+    const planta = p.plantas.length === 1 ? p.plantas[0] : dto.planta?.trim() || null;
+    if (p.plantas.length > 1 && (!planta || !p.plantas.includes(planta))) {
+      throw new BadRequestException(`Indique en qué planta se llena: ${p.plantas.join(', ')}`);
+    }
     const porItem = new Map(dto.respuestas.map((r) => [r.itemId, r.valor]));
     const obsPorItem = new Map(dto.respuestas.map((r) => [r.itemId, r.observacion?.trim() || null]));
     const desconocida = dto.respuestas.find((r) => !p.items.some((i) => i.id === r.itemId));
@@ -421,17 +426,18 @@ export class QualityService {
       if (p.semanal) {
         // D-43: una vez por semana por equipo. Se bloquea la plantilla para que dos envíos a la vez no pasen los dos.
         await em.query(`SELECT 1 FROM plantillas_checklist WHERE id = $1 FOR UPDATE`, [p.id]);
-        const previo = (await this.hechosEnLaSemana([p.id], registradoEn, em)).get(p.id)?.find((h) => h.activoId === activoId);
+        const previo = (await this.hechosEnLaSemana([p.id], registradoEn, em)).get(p.id)
+          ?.find((h) => h.activoId === activoId && h.planta === planta);
         if (previo) {
           const cuando = previo.registradoEn.toLocaleString('es-CO', { timeZone: process.env.APP_TZ ?? 'America/Bogota', weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
           throw new ConflictException(
-            `Este preoperacional ya se llenó esta semana${activoId ? ' para este equipo' : ''} (${cuando}, por ${previo.usuario}). ` +
+            `Este preoperacional ya se llenó esta semana${activoId ? ' para este equipo' : ''}${planta && p.plantas.length > 1 ? ` en ${planta}` : ''} (${cuando}, por ${previo.usuario}). ` +
             'Se puede volver a llenar desde el lunes. Si quedó mal, anule ese registro y llénelo de nuevo.',
           );
         }
       }
       const r = await em.getRepository(ChecklistRecord).save({
-        plantillaId: p.id, plantillaNombre: p.nombre, activoId, respuestas, noConformes,
+        plantillaId: p.id, plantillaNombre: p.nombre, activoId, planta, respuestas, noConformes,
         observaciones: dto.observaciones?.trim() || null, accionCorrectiva: accion, registradoEn, usuarioId: actor.id, clientId: dto.clientId ?? null,
       } as never) as unknown as ChecklistRecord;
       if (noConformes > 0) {

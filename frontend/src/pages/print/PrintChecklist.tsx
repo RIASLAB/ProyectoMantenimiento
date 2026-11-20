@@ -178,7 +178,7 @@ export function PrintChecklist() {
             <tbody>
               <tr>
                 <td><span className="plabel">FECHA:</span> {dateTime(r.registradoEn)}</td>
-                <td><span className="plabel">ÁREA:</span> {r.activo?.area ?? r.plantilla?.area ?? ''}</td>
+                <td><span className="plabel">{r.planta ? 'PLANTA:' : 'ÁREA:'}</span> {r.planta ?? r.activo?.area ?? r.plantilla?.area ?? ''}</td>
               </tr>
               {r.activo ? (
                 <tr>

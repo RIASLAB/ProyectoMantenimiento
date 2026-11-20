@@ -242,6 +242,10 @@ export class ChecklistRecord {
   @Column({ name: 'activo_id', type: 'uuid', nullable: true })
   activoId: string | null;
 
+  /** D-44: planta donde se llenó (el mismo formato se usa en varias plantas y cada una lleva su registro). */
+  @Column({ type: 'varchar', length: 60, nullable: true })
+  planta: string | null;
+
   @Column({ type: 'jsonb' })
   respuestas: ChecklistAnswer[];
 

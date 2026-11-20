@@ -29,11 +29,12 @@ function VoidModal({ target, onClose }: { target: { tipo: 'TEMPERATURA' | 'CHECK
 }
 
 /** D-43: un preoperacional semanal ya hecho esta semana (para todo lo que cubre) no se ofrece hasta el lunes. */
-function ListaPlantillas({ lista }: { lista: ChecklistTemplateInfo[] }) {
+function ListaPlantillas({ lista, planta }: { lista: ChecklistTemplateInfo[]; planta: string }) {
   return (
     <ul className="points">
       {lista.map((t) => {
-        const hechos = t.semana ?? [];
+        // D-44: cada planta lleva su propio registro del mismo formato.
+        const hechos = (t.semana ?? []).filter((h) => (h.planta ?? '') === planta);
         // Con equipo fijo, o si se llenó como "general", la plantilla queda cerrada hasta la semana siguiente.
         const cerrada = t.semanal && (t.activoId ? hechos.some((h) => h.activoId === t.activoId) : hechos.some((h) => !h.activoId));
         const detalle = [t.activo?.codigo, t.codigo, `${t.items.filter((i) => i.tipo !== 'SECCION').length} preguntas`, t.semanal ? 'semanal' : null].filter(Boolean).join(' · ');
@@ -57,7 +58,7 @@ function ListaPlantillas({ lista }: { lista: ChecklistTemplateInfo[] }) {
           <li key={t.id}>
             {cerrada ? (
               <div className="point point-hecho">{contenido}</div>
-            ) : <Link to={`/calidad/checklist/${t.id}`} className="point">{contenido}</Link>}
+            ) : <Link to={`/calidad/checklist/${t.id}${planta ? `?planta=${encodeURIComponent(planta)}` : ''}`} className="point">{contenido}</Link>}
           </li>
         );
       })}
@@ -194,11 +195,11 @@ export function QualityHome() {
               ) : null}
               {plantas.length && !planta ? <p className="muted" style={{ margin: '8px 0 0' }}>Elija la planta para ver los formatos que se llenan en ella.</p> : (
                 <>
-                  {dePlanta.length ? <ListaPlantillas lista={dePlanta} /> : null}
+                  {dePlanta.length ? <ListaPlantillas lista={dePlanta} planta={planta} /> : null}
                   {generales.length ? (
                     <>
                       {plantas.length ? <p className="subtle-head" style={{ marginTop: 12 }}>Para todas las plantas</p> : null}
-                      <ListaPlantillas lista={generales} />
+                      <ListaPlantillas lista={generales} planta={planta} />
                     </>
                   ) : null}
                 </>
@@ -255,7 +256,7 @@ export function QualityHome() {
               <li key={c.id} className={`list-row static ${c.anulacion ? 'is-off' : ''}`}>
                 <details className="list-main">
                   <summary>
-                    <strong>{c.plantillaNombre}</strong>{c.activo ? <span className="muted"> · {c.activo.codigo}</span> : null}
+                    <strong>{c.plantillaNombre}</strong>{c.activo ? <span className="muted"> · {c.activo.codigo}</span> : null}{c.planta ? <span className="muted"> · {c.planta}</span> : null}
                     <span className="muted small" style={{ display: 'block' }}>{dateTime(c.registradoEn)} · {c.usuario.nombre}</span>
                   </summary>
                   <ul className="answers">

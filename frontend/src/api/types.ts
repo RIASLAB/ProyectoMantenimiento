@@ -328,12 +328,14 @@ export interface ChecklistTemplateInfo {
   semana?: HechoSemana[];
 }
 
-export interface HechoSemana { registroId: string; activoId: string | null; registradoEn: string; usuario: string }
+export interface HechoSemana { registroId: string; activoId: string | null; planta: string | null; registradoEn: string; usuario: string }
 
 export interface ChecklistRecordInfo {
   id: string;
   plantillaId: string;
   plantillaNombre: string;
+  /** D-44: planta donde se llenó. */
+  planta?: string | null;
   activo: { id: string; codigo: string; nombre: string } | null;
   respuestas: Array<{ itemId: string; texto: string; tipo: TipoItem; valor: string | number | null; conforme: boolean; observacion?: string | null }>;
   noConformes: number;
