@@ -67,11 +67,15 @@ function TemplateModal({ plantilla, open, onClose }: { plantilla: ChecklistTempl
   const [area, setArea] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [vigente, setVigente] = useState(true);
+  const [semanal, setSemanal] = useState(false);
+  const plantas = useQuery({ queryKey: ['calidad', 'plantillas'], queryFn: () => api.get<ChecklistTemplateInfo[]>('/calidad/plantillas'), enabled: open });
+  const nombresPlantas = [...new Set((plantas.data ?? []).map((t) => t.area).filter((a): a is string => !!a))].sort();
   const [items, setItems] = useState<ItemDraft[]>([]);
   const [doc, setDoc] = useState(docVacio);
   useEffect(() => {
     if (!open) return;
     setNombre(plantilla?.nombre ?? ''); setArea(plantilla?.area ?? ''); setDescripcion(plantilla?.descripcion ?? ''); setVigente(plantilla?.vigente ?? true);
+    setSemanal(plantilla?.semanal ?? false);
     setDoc(plantilla ? {
       codigo: plantilla.codigo ?? '', version: plantilla.version ?? '', fechaElaboracion: plantilla.fechaElaboracion ?? '',
       fechaActualizacion: plantilla.fechaActualizacion ?? '', recomendacion: plantilla.recomendacion ?? '',
@@ -85,7 +89,7 @@ function TemplateModal({ plantilla, open, onClose }: { plantilla: ChecklistTempl
         nombre, area: area || null, descripcion: descripcion || null,
         codigo: doc.codigo || null, version: doc.version || null, fechaElaboracion: doc.fechaElaboracion || null,
         fechaActualizacion: doc.fechaActualizacion || null, recomendacion: doc.recomendacion || null,
-        recordarHora: doc.recordarHora === '' ? null : Number(doc.recordarHora),
+        recordarHora: doc.recordarHora === '' ? null : Number(doc.recordarHora), semanal,
         items: items.map((i) => ({
           id: i.id, texto: i.texto, tipo: i.tipo, obligatorio: i.tipo === 'SECCION' ? false : i.obligatorio,
           ...(i.tipo === 'SI_NO' ? { esperado: i.esperado, etiqueta: i.etiqueta, permiteNA: i.permiteNA } : {}),
@@ -108,7 +112,18 @@ function TemplateModal({ plantilla, open, onClose }: { plantilla: ChecklistTempl
       footer={<><Button variant="ghost" type="button" onClick={onClose}>Cancelar</Button><Button type="submit" form="tpl-form" busy={m.isPending}>Guardar</Button></>}>
       <form id="tpl-form" className="stack" onSubmit={submit}>
         <Field label="Nombre *">{(i) => <Input id={i} value={nombre} onChange={(e) => setNombre(e.target.value)} required minLength={3} maxLength={150} />}</Field>
-        <Field label="Área">{(i) => <Input id={i} value={area} onChange={(e) => setArea(e.target.value)} maxLength={100} />}</Field>
+        <Field label="Planta" hint="Al llenar checklists se agrupan por planta. Vacío = se muestra en todas las plantas">
+          {(i) => (
+            <>
+              <Input id={i} value={area} onChange={(e) => setArea(e.target.value)} maxLength={100} list="plantas-checklist" placeholder="Ej. Planta Desposte" />
+              <datalist id="plantas-checklist">{nombresPlantas.map((p) => <option key={p} value={p} />)}</datalist>
+            </>
+          )}
+        </Field>
+        <label className="toggle">
+          <input type="checkbox" checked={semanal} onChange={(e) => setSemanal(e.target.checked)} />
+          <span><strong>Se llena una vez por semana por equipo</strong> <span className="muted">· hecho para un equipo, ese equipo no se puede volver a llenar hasta el lunes siguiente</span></span>
+        </label>
         <Field label="Instrucciones">{(i) => <Textarea id={i} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} maxLength={2000} rows={2} />}</Field>
         <Field label="Recomendación de seguridad" hint="Se muestra al llenarlo y sale en el formato impreso">
           {(i) => <Textarea id={i} value={doc.recomendacion} onChange={(e) => setDoc({ ...doc, recomendacion: e.target.value })} maxLength={1000} rows={2} />}
@@ -293,7 +308,7 @@ export function QualitySetup() {
                 <li key={t.id} className={`list-row static ${t.vigente ? '' : 'is-off'}`}>
                   <div className="list-main">
                     <strong>{t.nombre}</strong>
-                    <span className="muted">{[t.area, t.codigo ? `${t.codigo}${t.version ? ` v${t.version}` : ''}` : null, `${t.items.filter((i) => i.tipo !== 'SECCION').length} preguntas`].filter(Boolean).join(' · ')}</span>
+                    <span className="muted">{[t.area, t.codigo ? `${t.codigo}${t.version ? ` v${t.version}` : ''}` : null, `${t.items.filter((i) => i.tipo !== 'SECCION').length} preguntas`, t.semanal ? 'una vez por semana por equipo' : null].filter(Boolean).join(' · ')}</span>
                   </div>
                   <div className="list-meta">
                     {!t.vigente ? <Badge tone="muted">Inactiva</Badge> : null}

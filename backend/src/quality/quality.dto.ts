@@ -127,6 +127,10 @@ export class CreateTemplateDto {
   /** Checklist diario: hora (0-23) desde la que se avisa si no se ha llenado. */
   @IsOptional() @ValidateIf((_, v) => v !== null) @Type(() => Number) @IsInt() @Min(0) @Max(23)
   recordarHora?: number | null;
+
+  /** D-43: una vez por semana por equipo. */
+  @IsOptional() @IsBoolean()
+  semanal?: boolean;
 }
 
 export class UpdateTemplateDto {
@@ -165,6 +169,9 @@ export class UpdateTemplateDto {
 
   @IsOptional() @ValidateIf((_, v) => v !== null) @Type(() => Number) @IsInt() @Min(0) @Max(23)
   recordarHora?: number | null;
+
+  @IsOptional() @IsBoolean()
+  semanal?: boolean;
 }
 
 export class AnswerDto {

@@ -28,11 +28,50 @@ function VoidModal({ target, onClose }: { target: { tipo: 'TEMPERATURA' | 'CHECK
   );
 }
 
+/** D-43: un preoperacional semanal ya hecho esta semana (para todo lo que cubre) no se ofrece hasta el lunes. */
+function ListaPlantillas({ lista }: { lista: ChecklistTemplateInfo[] }) {
+  return (
+    <ul className="points">
+      {lista.map((t) => {
+        const hechos = t.semana ?? [];
+        // Con equipo fijo, o si se llenó como "general", la plantilla queda cerrada hasta la semana siguiente.
+        const cerrada = t.semanal && (t.activoId ? hechos.some((h) => h.activoId === t.activoId) : hechos.some((h) => !h.activoId));
+        const detalle = [t.activo?.codigo, t.codigo, `${t.items.filter((i) => i.tipo !== 'SECCION').length} preguntas`, t.semanal ? 'semanal' : null].filter(Boolean).join(' · ');
+        const contenido = (
+          <>
+            <div>
+              <strong>{t.nombre}</strong>
+              <span className="muted small">{detalle}</span>
+              {cerrada ? (() => {
+                const h = hechos.find((x) => (t.activoId ? x.activoId === t.activoId : !x.activoId))!;
+                return <span className="small text-ok">Hecho el {dia(h.registradoEn)} por {h.usuario} · se llena de nuevo desde el lunes</span>;
+              })() : null}
+              {t.semanal && hechos.length && !cerrada ? (
+                <span className="small text-ok"> Esta semana: {hechos.length} equipo{hechos.length === 1 ? '' : 's'} hecho{hechos.length === 1 ? '' : 's'}</span>
+              ) : null}
+            </div>
+            {cerrada ? <Badge tone="ok">Hecho esta semana</Badge> : <span className="btn btn-secondary">Llenar</span>}
+          </>
+        );
+        return (
+          <li key={t.id}>
+            {cerrada ? (
+              <div className="point point-hecho">{contenido}</div>
+            ) : <Link to={`/calidad/checklist/${t.id}`} className="point">{contenido}</Link>}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+const dia = (s: string) => new Date(s).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'short' });
+
 export function QualityHome() {
   const { can } = useAuth();
   const location = useLocation();
   const guardado = (location.state as { guardado?: string } | null)?.guardado;
-  const [f, set] = useUrlFilters(['vista', 'desde', 'hasta', 'desviaciones'] as const);
+  const [f, set] = useUrlFilters(['vista', 'desde', 'hasta', 'desviaciones', 'planta'] as const);
   const vista = f.vista || 'temperaturas';
   const [anular, setAnular] = useState<{ tipo: 'TEMPERATURA' | 'CHECKLIST'; id: string; resumen: string } | null>(null);
   const [exportError, setExportError] = useState('');
@@ -68,6 +107,11 @@ export function QualityHome() {
     return [...m].sort((a, b) => a[0].localeCompare(b[0]));
   })();
   const etiquetas = new Map((plantillas.data ?? []).flatMap((t) => t.items.map((i) => [i.id, i.etiqueta] as const)));
+  // D-43: los formatos se agrupan por planta; al elegir una se ven los suyos y los que aplican a todas.
+  const plantas = [...new Set((plantillas.data ?? []).map((t) => t.area).filter((a): a is string => !!a))].sort((a, b) => a.localeCompare(b));
+  const planta = plantas.includes(f.planta) ? f.planta : plantas.length === 1 ? plantas[0] : '';
+  const dePlanta = (plantillas.data ?? []).filter((t) => t.area === planta);
+  const generales = (plantillas.data ?? []).filter((t) => !t.area);
   return (
     <>
       <PageHeader
@@ -138,19 +182,28 @@ export function QualityHome() {
         <section className="card" id="checklists">
           <h2>Checklists</h2>
           {plantillas.isPending ? <Spinner /> : !plantillas.data?.length ? <Empty title="Sin plantillas configuradas" /> : (
-            <ul className="points">
-              {plantillas.data.map((t) => (
-                <li key={t.id}>
-                  <Link to={`/calidad/checklist/${t.id}`} className="point">
-                    <div>
-                      <strong>{t.nombre}</strong>
-                      <span className="muted small">{[t.area, t.activo?.codigo, t.codigo, `${t.items.filter((i) => i.tipo !== 'SECCION').length} preguntas`].filter(Boolean).join(' · ')}</span>
-                    </div>
-                    <span className="btn btn-secondary">Llenar</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <>
+              {plantas.length ? (
+                <div className="chips" role="group" aria-label="Planta">
+                  {plantas.map((p) => (
+                    <button key={p} type="button" className={`chip ${planta === p ? 'chip-on' : ''}`} aria-pressed={planta === p} onClick={() => set('planta', p)}>
+                      {p} <span className="muted">· {(plantillas.data ?? []).filter((t) => t.area === p).length}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {plantas.length && !planta ? <p className="muted" style={{ margin: '8px 0 0' }}>Elija la planta para ver los formatos que se llenan en ella.</p> : (
+                <>
+                  {dePlanta.length ? <ListaPlantillas lista={dePlanta} /> : null}
+                  {generales.length ? (
+                    <>
+                      {plantas.length ? <p className="subtle-head" style={{ marginTop: 12 }}>Para todas las plantas</p> : null}
+                      <ListaPlantillas lista={generales} />
+                    </>
+                  ) : null}
+                </>
+              )}
+            </>
           )}
         </section>
       </div>

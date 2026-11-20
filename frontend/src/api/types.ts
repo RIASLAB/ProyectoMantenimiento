@@ -320,7 +320,13 @@ export interface ChecklistTemplateInfo {
   recordarHora: number | null;
   items: ChecklistItemInfo[];
   vigente: boolean;
+  /** D-43: preoperacional semanal (una vez por semana por equipo). */
+  semanal: boolean;
+  /** Si es semanal: lo llenado esta semana (lunes a domingo), sin contar lo anulado. */
+  semana?: HechoSemana[];
 }
+
+export interface HechoSemana { registroId: string; activoId: string | null; registradoEn: string; usuario: string }
 
 export interface ChecklistRecordInfo {
   id: string;

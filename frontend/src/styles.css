@@ -422,6 +422,7 @@ a.list-row:hover { border-color: var(--brand-2); }
   border: 1px solid var(--line); border-radius: 10px; text-decoration: none; background: var(--surface);
 }
 .point:hover { border-color: var(--brand-2); }
+.point-hecho, .point-hecho:hover { border-color: var(--line); background: var(--bg); cursor: default; }
 .point > div:first-child { display: flex; flex-direction: column; min-width: 0; }
 .point-last { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
 .point-val { font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; }

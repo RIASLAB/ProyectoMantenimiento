@@ -182,6 +182,13 @@ export class ChecklistTemplate {
   @Column({ name: 'recordar_hora', type: 'int', nullable: true })
   recordarHora: number | null;
 
+  /**
+   * D-43: preoperacional semanal. Se llena una vez por semana (lunes a domingo) por cada equipo: llenado para un
+   * equipo, ese equipo no se puede volver a llenar hasta la semana siguiente (salvo que se anule el registro).
+   */
+  @Column({ default: false })
+  semanal: boolean;
+
   @Column({ type: 'jsonb' })
   items: ChecklistItem[];
 
@@ -208,6 +215,7 @@ export interface ChecklistAnswer {
 /** Checklist diligenciado (CAL-04). Inmutable; guarda una copia de las preguntas tal como se respondieron. */
 @Entity('registros_checklist')
 @Index(['registradoEn'])
+@Index('IDX_registros_checklist_plantilla_fecha', ['plantillaId', 'registradoEn'])
 export class ChecklistRecord {
   @PrimaryGeneratedColumn('uuid')
   id: string;

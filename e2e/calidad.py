@@ -53,6 +53,7 @@ with sync_playwright() as p:
     ok('lectura en rango sin pedir acción correctiva; el formulario queda listo para la siguiente')
 
     page.goto(BASE + '/calidad')
+    page.get_by_role('button', name=re.compile('^Proceso')).click()
     page.locator('.point', has_text='Pre-operacional y limpieza').click()
     def responder(pregunta, valor):
         page.locator('.check-item', has_text=pregunta).get_by_role('radio', name=valor, exact=True).click()

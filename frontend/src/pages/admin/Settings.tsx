@@ -57,6 +57,7 @@ const ACCION_LABEL: Record<string, string> = {
   PUNTO_ILUMINACION_CREADO: 'Creó punto de medición de iluminación',
   PUNTO_ILUMINACION_ACTUALIZADO: 'Modificó punto de medición de iluminación',
   MEDICION_ILUMINACION_REGISTRADA: 'Registró medición de iluminación',
+  RANGOS_TEMPERATURA_ACTUALIZADOS: 'Se actualizaron los rangos de temperatura de los cuartos',
   MODULOS_CAMBIADOS: 'Encendió o apagó los módulos de inventario y compras',
   PRINCIPAL_ASIGNADO: 'Marcó al administrador principal (desde el servidor)',
   PRINCIPAL_QUITADO: 'Quitó un administrador principal (desde el servidor)',

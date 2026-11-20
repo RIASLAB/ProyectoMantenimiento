@@ -281,16 +281,46 @@ export class QualityService {
 
   // ======================= Checklists =======================
 
-  listPlantillas(incluirInactivas = false) {
+  async listPlantillas(incluirInactivas = false) {
     const qb = this.plantillas.createQueryBuilder('c').leftJoin('c.activo', 'a').addSelect(['a.id', 'a.codigo', 'a.nombre']).orderBy('c.nombre');
     if (!incluirInactivas) qb.where('c.vigente = true');
-    return qb.getMany();
+    const lista = await qb.getMany();
+    // D-43: lo que ya se llenó esta semana en los preoperacionales semanales (para no ofrecerlo otra vez).
+    const hechos = await this.hechosEnLaSemana(lista.filter((p) => p.semanal).map((p) => p.id));
+    return lista.map((p) => (p.semanal ? { ...p, semana: hechos.get(p.id) ?? [] } : p));
+  }
+
+  /**
+   * D-43: semana (lunes 00:00 a domingo 24:00, hora de la planta) de un momento, y los registros no anulados de
+   * las plantillas indicadas en esa semana, por plantilla: equipo, cuándo y quién.
+   */
+  async hechosEnLaSemana(plantillaIds: string[], momento = new Date(), em = this.ds.manager) {
+    const r = new Map<string, Array<{ registroId: string; activoId: string | null; registradoEn: Date; usuario: string }>>();
+    if (!plantillaIds.length) return r;
+    const tz = process.env.APP_TZ ?? 'America/Bogota';
+    const filas: Array<{ id: string; plantilla_id: string; activo_id: string | null; registrado_en: Date; usuario: string }> = await em.query(
+      `SELECT c.id, c.plantilla_id, c.activo_id, c.registrado_en, u.nombre AS usuario
+         FROM registros_checklist c JOIN usuarios u ON u.id = c.usuario_id
+        WHERE c.plantilla_id = ANY($1::uuid[])
+          AND c.registrado_en >= (date_trunc('week', $2::timestamptz AT TIME ZONE $3) AT TIME ZONE $3)
+          AND c.registrado_en <  ((date_trunc('week', $2::timestamptz AT TIME ZONE $3) + interval '7 days') AT TIME ZONE $3)
+          AND NOT EXISTS (SELECT 1 FROM anulaciones_calidad n WHERE n.tipo = 'CHECKLIST' AND n.registro_id = c.id)
+        ORDER BY c.registrado_en`,
+      [plantillaIds, momento, tz],
+    );
+    for (const f of filas) {
+      const l = r.get(f.plantilla_id) ?? [];
+      l.push({ registroId: f.id, activoId: f.activo_id, registradoEn: f.registrado_en, usuario: f.usuario });
+      r.set(f.plantilla_id, l);
+    }
+    return r;
   }
 
   async getPlantilla(id: string) {
     const p = await this.plantillas.findOne({ where: { id }, relations: { activo: true } });
     if (!p) throw new NotFoundException('Plantilla no encontrada');
-    return p;
+    if (!p.semanal) return p;
+    return { ...p, semana: (await this.hechosEnLaSemana([p.id])).get(p.id) ?? [] };
   }
 
   async crearPlantilla(dto: CreateTemplateDto, actor: SessionUser) {
@@ -300,7 +330,7 @@ export class QualityService {
         nombre: dto.nombre.trim(), area: dto.area?.trim() || null, activoId: dto.activoId ?? null, descripcion: dto.descripcion?.trim() || null,
         codigo: dto.codigo?.trim() || null, version: dto.version?.trim() || null, fechaElaboracion: dto.fechaElaboracion || null,
         fechaActualizacion: dto.fechaActualizacion || null, recomendacion: dto.recomendacion?.trim() || null,
-        recordarHora: dto.recordarHora ?? null,
+        recordarHora: dto.recordarHora ?? null, semanal: dto.semanal ?? false,
         items: this.normalizarItems(dto.items),
       });
       await this.audit.log({ usuarioId: actor.id, accion: 'PLANTILLA_CREADA', entidad: 'calidad', entidadId: p.id, detalle: { nombre: p.nombre, preguntas: p.items.length } }, em);
@@ -322,6 +352,7 @@ export class QualityService {
     if (dto.fechaActualizacion !== undefined) cambios.fechaActualizacion = dto.fechaActualizacion || null;
     if (dto.recomendacion !== undefined) cambios.recomendacion = dto.recomendacion?.trim() || null;
     if (dto.recordarHora !== undefined) cambios.recordarHora = dto.recordarHora;
+    if (dto.semanal !== undefined) cambios.semanal = dto.semanal;
     if (dto.items) cambios.items = this.normalizarItems(dto.items);
     await this.ds.transaction(async (em) => {
       await em.getRepository(ChecklistTemplate).update(id, cambios as never);
@@ -377,6 +408,18 @@ export class QualityService {
     }
 
     return this.ds.transaction(async (em) => {
+      if (p.semanal) {
+        // D-43: una vez por semana por equipo. Se bloquea la plantilla para que dos envíos a la vez no pasen los dos.
+        await em.query(`SELECT 1 FROM plantillas_checklist WHERE id = $1 FOR UPDATE`, [p.id]);
+        const previo = (await this.hechosEnLaSemana([p.id], registradoEn, em)).get(p.id)?.find((h) => h.activoId === activoId);
+        if (previo) {
+          const cuando = previo.registradoEn.toLocaleString('es-CO', { timeZone: process.env.APP_TZ ?? 'America/Bogota', weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
+          throw new ConflictException(
+            `Este preoperacional ya se llenó esta semana${activoId ? ' para este equipo' : ''} (${cuando}, por ${previo.usuario}). ` +
+            'Se puede volver a llenar desde el lunes. Si quedó mal, anule ese registro y llénelo de nuevo.',
+          );
+        }
+      }
       const r = await em.getRepository(ChecklistRecord).save({
         plantillaId: p.id, plantillaNombre: p.nombre, activoId, respuestas, noConformes,
         observaciones: dto.observaciones?.trim() || null, accionCorrectiva: accion, registradoEn, usuarioId: actor.id, clientId: dto.clientId ?? null,

@@ -203,3 +203,67 @@ describe('CAL-04 · Checklists', () => {
     expect((await c.http.get('/api/calidad/exportar/checklists').set(c.auth(op.token))).status).toBe(403);
   });
 });
+
+describe('D-43 · Preoperacional semanal: una vez por semana por equipo', () => {
+  let semanalId: string;
+  let items: Array<{ id: string }>;
+  let otroId: string;
+  let tercerId: string;
+  const llenar = (activo: string | undefined, extra: Record<string, unknown> = {}) =>
+    c.http.post('/api/calidad/checklists').set(c.auth(op.token)).send({ plantillaId: semanalId, activoId: activo, respuestas: [{ itemId: items[0].id, valor: 'SI' }], ...extra });
+
+  beforeAll(async () => {
+    const r = await c.http.post('/api/calidad/plantillas').set(c.auth(c.admin)).send({
+      nombre: 'Preoperacional tajadora', area: 'Planta Desposte', semanal: true,
+      items: [{ texto: '¿Guardas en su sitio?', tipo: 'SI_NO', obligatorio: true }],
+    });
+    expect(r.status).toBe(201);
+    expect(r.body.semanal).toBe(true);
+    semanalId = r.body.id;
+    items = r.body.items;
+    otroId = (await c.http.post('/api/activos').set(c.auth(c.admin)).send({ codigo: 'TAJ-02', nombre: 'Tajadora 2', area: 'Desposte' })).body.id;
+    tercerId = (await c.http.post('/api/activos').set(c.auth(c.admin)).send({ codigo: 'TAJ-03', nombre: 'Tajadora 3', area: 'Desposte' })).body.id;
+  });
+
+  it('llenado para un equipo, ese equipo no se puede llenar otra vez en la semana; otro equipo sí', async () => {
+    expect((await llenar(activoId)).status).toBe(201);
+    const otraVez = await llenar(activoId);
+    expect(otraVez.status).toBe(409);
+    expect(otraVez.body.message).toMatch(/ya se llenó esta semana para este equipo .*por Usuario op1\).*Se puede volver a llenar desde el lunes/);
+    expect((await llenar(otroId)).status).toBe(201);
+  });
+
+  it('la lista de formatos dice qué equipos ya se hicieron esta semana', async () => {
+    const l = await c.http.get('/api/calidad/plantillas').set(c.auth(op.token));
+    const t = l.body.find((x: { id: string }) => x.id === semanalId);
+    expect(t.semana.map((h: { activoId: string }) => h.activoId).sort()).toEqual([activoId, otroId].sort());
+    expect(t.semana[0]).toMatchObject({ usuario: 'Usuario op1' });
+    const una = await c.http.get(`/api/calidad/plantillas/${semanalId}`).set(c.auth(op.token));
+    expect(una.body.semana).toHaveLength(2);
+    // Los formatos que no son semanales no traen ese dato ni tienen límite.
+    expect(l.body.find((x: { id: string }) => x.id === plantillaId).semana).toBeUndefined();
+  });
+
+  it('si el registro se anula, el equipo se puede volver a llenar', async () => {
+    const t = (await c.http.get(`/api/calidad/plantillas/${semanalId}`).set(c.auth(op.token))).body;
+    const registroId = t.semana.find((h: { activoId: string }) => h.activoId === activoId).registroId;
+    await c.http.post('/api/calidad/anulaciones').set(c.auth(c.admin)).send({ tipo: 'CHECKLIST', registroId, motivo: 'Se llenó con la tajadora equivocada' }).expect(201);
+    expect((await llenar(activoId)).status).toBe(201);
+  });
+
+  it('lo de la semana pasada no cuenta: se puede llenar esta semana', async () => {
+    const semanaPasada = new Date(Date.now() - 7 * 86_400_000 + 60_000).toISOString();
+    expect((await llenar(tercerId, { registradoEn: semanaPasada })).status).toBe(201);
+    expect((await llenar(tercerId)).status).toBe(201);
+    expect((await llenar(tercerId)).status).toBe(409);
+  });
+
+  it('el reenvío del mismo registro (sin conexión) no choca con la regla', async () => {
+    const clientId = '6f1c2a7e-3b0d-4c8e-9a51-2d7e4f6a8b90';
+    const cuarto = (await c.http.post('/api/activos').set(c.auth(c.admin)).send({ codigo: 'TAJ-04', nombre: 'Tajadora 4', area: 'Desposte' })).body.id;
+    expect((await llenar(cuarto, { clientId })).status).toBe(201);
+    const otra = await llenar(cuarto, { clientId });
+    expect(otra.status).toBe(201);
+    expect(otra.body.duplicado).toBe(true);
+  });
+});

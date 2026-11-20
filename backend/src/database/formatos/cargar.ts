@@ -12,20 +12,34 @@ import { FORMATOS_POR_DEFECTO, FormatoDocumental, PARAM_FORMATOS, Setting } from
 import { HOJAS_DIARIAS, ILUMINACION, PlantillaFormato, PREOPERACIONALES, TABLEROS_ELECTRICOS, TEMPERATURAS } from './datos-formatos';
 
 /**
- * Rango de temperatura de un cuarto según los parámetros de los formatos de la planta (D-22, asumido por el nombre):
- * túnel de congelación −24 a −18 °C; friss, contenedores y cuartos de congelación −18 a −10 °C; cuartos de canales −5 a 4 °C;
- * subproductos y devoluciones −2 a 6 °C; refrigeración −4 a 4 °C. Salas, pasillos y muelles quedan sin límites hasta que calidad los defina.
+ * Rango de temperatura de un cuarto según su nombre (D-22; rangos actualizados por calidad en D-42):
+ * refrigeración −8 a 4 °C; conservación −24 a −14 °C; subproducto y muelles −4 a 6 °C; salas, marinado y pasillos
+ * 4 a 10 °C; cuarto de cabezas y pezuñas −8 a 6 °C; frizado −25 a −10 °C. Los que calidad no ha cambiado siguen
+ * con los de los formatos: IQF y congelación rápida −24 a −18; congelación −18 a −10; canales −5 a 4;
+ * devoluciones −2 a 6; producto terminado, maduración, precámara y cavas −4 a 4. Alistamiento, procesos, fileteado,
+ * áreas y empaque secundario, sin límites.
  */
 export function rangoCuarto(nombre: string): { minimo: number | null; maximo: number | null } {
-  const n = nombre.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  if (/^(SALA|PASILLO|PASSILLO|MUELLE|AREA)\b/.test(n) || /\bEMPAQUE SECUNDARIO\b|\bALISTAMIENTO\b|^PROCESOS\b|\bFILETEADO\b/.test(n)) return { minimo: null, maximo: null };
-  if (/TUNEL|IQF|CONGELACION RAPIDA/.test(n)) return { minimo: -24, maximo: -18 };
-  if (/FRISS|FRIZZ|CONTENEDOR|CONGELACION|CONGELADO/.test(n)) return { minimo: -18, maximo: -10 };
+  const n = normalizar(nombre);
+  if (/CABEZA/.test(n)) return { minimo: -8, maximo: 6 };
+  if (/SUBPRODUCTO|^MUELLE\b/.test(n)) return { minimo: -4, maximo: 6 };
+  if (/^(SALA|PASILLO|PASSILLO)\b|MARINADO/.test(n)) return { minimo: 4, maximo: 10 };
+  if (/^AREA\b|\bEMPAQUE SECUNDARIO\b|\bALISTAMIENTO\b|^PROCESOS\b|\bFILETEADO\b/.test(n)) return { minimo: null, maximo: null };
+  if (/FRISS|FRIZZ|FRIZADO|FRIZ\b/.test(n)) return { minimo: -25, maximo: -10 };
+  if (/CONSERVACION/.test(n)) return { minimo: -24, maximo: -14 };
+  if (/IQF|CONGELACION RAPIDA/.test(n)) return { minimo: -24, maximo: -18 };
+  if (/CONTENEDOR|CONGELACION|CONGELADO/.test(n)) return { minimo: -18, maximo: -10 };
   if (/CANAL/.test(n)) return { minimo: -5, maximo: 4 };
-  if (/SUBPRODUCTO|CABEZAS|DEVOLUC/.test(n)) return { minimo: -2, maximo: 6 };
-  if (/REFRIGERACION|CONSERVACION|MADURACION|PRODUCTO TERMINADO|PRECAMARA|CAVA/.test(n)) return { minimo: -4, maximo: 4 };
+  if (/DEVOLUC/.test(n)) return { minimo: -2, maximo: 6 };
+  if (/REFRIGERACION/.test(n)) return { minimo: -8, maximo: 4 };
+  if (/MADURACION|PRODUCTO TERMINADO|PRECAMARA|CAVA/.test(n)) return { minimo: -4, maximo: 4 };
   return { minimo: null, maximo: null };
 }
+
+const normalizar = (nombre: string) => nombre.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+/** D-42: calidad ya no registra la temperatura de los túneles de congelación. */
+export const sinRegistroDeTemperatura = (nombre: string) => /TUNEL/.test(normalizar(nombre));
 
 const PREFIJO_PLANTA: Record<string, string> = { 'Planta Pollo': 'POL', 'Planta Desposte': 'DES', 'Planta Salsamentaria': 'SAL' };
 
@@ -48,9 +62,9 @@ export async function cargarFormatos(ds: DataSource, usuarioId: string | null = 
     const r: ResumenCarga = { plantillas: 0, instalaciones: 0, puntosTemperatura: 0, recintos: 0, puntosIluminacion: 0, formatos: 0 };
 
     // Checklists (preoperacionales, hojas diarias y tableros).
-    for (const f of [...PREOPERACIONALES, ...HOJAS_DIARIAS, TABLEROS_ELECTRICOS]) {
-      if (await crearPlantilla(em, f)) r.plantillas++;
-    }
+    // Los preoperacionales por máquina se llenan una vez por semana por equipo (D-43).
+    for (const f of PREOPERACIONALES) if (await crearPlantilla(em, f, true)) r.plantillas++;
+    for (const f of [...HOJAS_DIARIAS, TABLEROS_ELECTRICOS]) if (await crearPlantilla(em, f)) r.plantillas++;
     // Las hojas diarias de cada planta avisan a las 9 a. m. si no se han llenado (solo si nadie configuró otra hora).
     for (const f of HOJAS_DIARIAS) {
       await em.getRepository(ChecklistTemplate).update({ nombre: f.nombre, recordarHora: IsNull() }, { recordarHora: HORA_RECORDAR_DIARIA });
@@ -61,6 +75,8 @@ export async function cargarFormatos(ds: DataSource, usuarioId: string | null = 
     for (const t of TEMPERATURAS) {
       const prefijo = PREFIJO_PLANTA[t.planta] ?? t.planta.replace(/\W/g, '').slice(0, 3).toUpperCase();
       for (const [i, cuarto] of t.cuartos.entries()) {
+        // Se salta sin correr la numeración: los códigos CF-… de los demás cuartos no cambian.
+        if (sinRegistroDeTemperatura(cuarto)) continue;
         const codigo = `CF-${prefijo}-${String(i + 1).padStart(2, '0')}`;
         let a = await em.getRepository(Asset).findOne({ where: { codigo } });
         if (!a) {
@@ -108,10 +124,10 @@ export async function cargarFormatos(ds: DataSource, usuarioId: string | null = 
   });
 }
 
-async function crearPlantilla(em: EntityManager, f: PlantillaFormato) {
+async function crearPlantilla(em: EntityManager, f: PlantillaFormato, semanal = false) {
   if (await em.getRepository(ChecklistTemplate).exists({ where: { nombre: f.nombre } })) return false;
   await em.getRepository(ChecklistTemplate).save({
-    nombre: f.nombre, area: f.area, descripcion: f.descripcion, recomendacion: f.recomendacion,
+    semanal, nombre: f.nombre, area: f.area, descripcion: f.descripcion, recomendacion: f.recomendacion,
     codigo: f.codigo, version: f.version, fechaElaboracion: f.fechaElaboracion, fechaActualizacion: f.fechaActualizacion,
     items: f.items.map((it) => ({ ...it, id: randomUUID().slice(0, 8) })),
   } as never);

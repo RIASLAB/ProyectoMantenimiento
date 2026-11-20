@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, uuid } from '../../api/client';
-import type { Asset, ChecklistItemInfo, ChecklistTemplateInfo } from '../../api/types';
+import type { Asset, ChecklistItemInfo, ChecklistTemplateInfo, HechoSemana } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { Button, ErrorBox, Field, Icon, Input, PageHeader, Select, Spinner, Textarea } from '../../components/ui';
 import { ESCALA, ETIQUETAS_SI_NO } from '../../format';
@@ -102,6 +102,23 @@ export function FillChecklist() {
   if (p.isError) return <>{back}<ErrorBox error={p.error} /></>;
   const t = p.data;
   const grupos = agrupar(t.items);
+  // D-43: en un preoperacional semanal, cada equipo se llena una vez por semana.
+  const hechos = new Map((t.semana ?? []).map((h) => [h.activoId ?? '', h] as const));
+  const eligeEquipo = !t.activoId && !t.items.some((i) => i.tipo === 'SECCION');
+  const hechoFijo = t.semanal && !eligeEquipo ? hechos.get(t.activoId ?? '') : undefined;
+  const hechoElegido = t.semanal && eligeEquipo ? hechos.get(activoId) : undefined;
+  const cuando = (h: HechoSemana) => `${new Date(h.registradoEn).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'short' })} por ${h.usuario}`;
+  if (hechoFijo) {
+    return (
+      <>
+        <PageHeader back={back} title={t.nombre} />
+        <div className="alert alert-ok">
+          <span>Este preoperacional ya se llenó esta semana ({cuando(hechoFijo)}). Se puede volver a llenar desde el lunes.</span>
+        </div>
+        <p><Link to={`/imprimir/checklist/${hechoFijo.registroId}`}>Ver el registro</Link></p>
+      </>
+    );
+  }
   const usaEscala = preguntas.some((i) => i.tipo === 'ESCALA');
   const usaCnc = preguntas.some((i) => i.tipo === 'SI_NO' && i.etiqueta === 'C_NC');
   let n = 0;
@@ -114,16 +131,23 @@ export function FillChecklist() {
         {t.descripcion ? <p className="muted" style={{ margin: 0 }}>{t.descripcion}</p> : null}
         {t.recomendacion ? <div className="alert alert-warn"><span><strong>Recomendación:</strong> {t.recomendacion}</span></div> : null}
         {/* Las hojas diarias cubren todos los equipos de la planta: no se elige uno. */}
-        {!t.activoId && !t.items.some((i) => i.tipo === 'SECCION') ? (
+        {eligeEquipo ? (
           <section className="card">
-            <Field label="Equipo (opcional)">
+            <Field label={t.semanal ? 'Equipo *' : 'Equipo (opcional)'} hint={t.semanal ? 'Se llena una vez por semana por equipo: los ya hechos esta semana no se pueden elegir' : undefined}>
               {(i) => (
                 <Select id={i} value={activoId} onChange={(e) => setActivoId(e.target.value)}>
-                  <option value="">General / no aplica</option>
-                  {activos.data?.filter((a) => a.estado !== 'DADO_DE_BAJA' && a.estado !== 'EN_BODEGA').map((a) => <option key={a.id} value={a.id}>{a.codigo} · {a.nombre}</option>)}
+                  <option value="" disabled={hechos.has('')}>{t.semanal ? 'Elija el equipo…' : 'General / no aplica'}{hechos.has('') ? ' (hecho esta semana)' : ''}</option>
+                  {activos.data?.filter((a) => a.estado !== 'DADO_DE_BAJA' && a.estado !== 'EN_BODEGA').map((a) => (
+                    <option key={a.id} value={a.id} disabled={hechos.has(a.id)}>{a.codigo} · {a.nombre}{hechos.has(a.id) ? ' — hecho esta semana' : ''}</option>
+                  ))}
                 </Select>
               )}
             </Field>
+            {t.semanal && hechos.size ? (
+              <p className="muted small" style={{ margin: '6px 0 0' }}>
+                Hechos esta semana: {[...hechos.values()].map((h) => activos.data?.find((a) => a.id === h.activoId)?.codigo ?? 'general').join(', ')}.
+              </p>
+            ) : null}
           </section>
         ) : null}
 
@@ -206,7 +230,8 @@ export function FillChecklist() {
           ) : null}
           <Field label="Observaciones">{(i) => <Textarea id={i} value={obs} onChange={(e) => setObs(e.target.value)} maxLength={2000} />}</Field>
           {m.isError ? <ErrorBox error={m.error} /> : null}
-          <Button type="submit" busy={m.isPending} disabled={regularesSinObs.length > 0} className="btn-block btn-lg">Guardar checklist</Button>
+          {t.semanal && eligeEquipo && !activoId ? <p className="muted small" style={{ margin: 0 }}>Elija el equipo arriba para poder guardarlo.</p> : null}
+          <Button type="submit" busy={m.isPending} disabled={regularesSinObs.length > 0 || (t.semanal && eligeEquipo && !activoId) || !!hechoElegido} className="btn-block btn-lg">Guardar checklist</Button>
         </section>
       </form>
     </>

@@ -42,9 +42,15 @@ with sync_playwright() as p:
 
     # 1) Preoperacional del molino: B/R/M, "Regular" pide observación, "Malo" pide acción correctiva
     a.goto(BASE + '/calidad')
+    # D-43: los formatos se agrupan por planta: al elegir una se ven los suyos.
+    expect(a.locator('#checklists .point', has_text='Preoperacional molino')).to_have_count(0)
+    a.get_by_role('button', name=re.compile('^Planta Desposte')).click()
+    expect(a.locator('#checklists .point', has_text='Preoperatorio diario de equipos · Planta Pollo')).to_have_count(0)
     a.locator('.point', has_text='Preoperacional molino').click()
     expect(a.locator('.alert-warn')).to_contain_text('No hacer funcionar nunca la máquina en vacío')
-    elegir(a.get_by_label('Equipo (opcional)'), 'MOL-001')
+    # Semanal: hay que elegir el equipo para guardarlo.
+    expect(a.get_by_role('button', name='Guardar checklist')).to_be_disabled()
+    elegir(a.get_by_label('Equipo *'), 'MOL-001')
     a.get_by_role('button', name=re.compile('Marcar lo pendiente como bueno')).click()
     item(a, 'discos, cuchillas').get_by_role('radio', name='Regular').click()
     expect(a.get_by_role('button', name='Guardar checklist')).to_be_disabled()
@@ -55,6 +61,16 @@ with sync_playwright() as p:
     a.screenshot(path=f'{SP}/fmt-01-preoperacional.png', full_page=True)
     a.get_by_role('button', name='Guardar checklist').click()
     expect(a.locator('.alert-ok')).to_contain_text('Preoperacional molino')
+    # D-43: ese molino no se puede volver a llenar esta semana.
+    a.get_by_role('button', name=re.compile('^Planta Desposte')).click()
+    expect(a.locator('.point', has_text='Preoperacional molino')).to_contain_text('Esta semana: 1 equipo hecho')
+    a.locator('.point', has_text='Preoperacional molino').click()
+    mol = a.get_by_label('Equipo *').locator('option', has_text='MOL-001')
+    expect(mol).to_be_disabled()
+    expect(mol).to_contain_text('hecho esta semana')
+    a.screenshot(path=f'{SP}/fmt-01b-semanal.png', full_page=False)
+    ok('preoperacional semanal: agrupado por planta, el equipo hecho no se puede llenar otra vez en la semana')
+    a.goto(BASE + '/calidad')
     ok('preoperacional del molino: "marcar lo pendiente como bueno", Regular con observación y No tiene con acción correctiva')
 
     # 2) La semana del preoperacional (lunes a domingo) y el formato del registro
@@ -72,7 +88,7 @@ with sync_playwright() as p:
     ok('semana del preoperacional: código del formato, R con observación y "Realizada por" en la columna del día')
 
     # 3) Hoja diaria de preoperatorio de la planta de pollo: C / NC / NA por equipo, agrupados por área
-    a.goto(BASE + '/calidad')
+    a.goto(BASE + '/calidad?planta=' + 'Planta Pollo')
     a.locator('.point', has_text='Preoperatorio diario de equipos · Planta Pollo').click()
     expect(a.get_by_label('Equipo (opcional)')).to_have_count(0)
     expect(a.locator('.check-section h2').first).to_have_text('Area de recibo de canales')
@@ -102,7 +118,7 @@ with sync_playwright() as p:
     a.goto(BASE + '/calidad/ronda?area=' + 'Planta Pollo')
     a.get_by_label('Temperatura Refrigeracion (°C)').fill('2.5')
     a.get_by_label('Temperatura Congelacion#1 (°C)').fill('-5')
-    a.get_by_label('Temperatura Muelle (°C)').fill('9')
+    a.get_by_label('Temperatura Muelle (°C)').fill('5')
     expect(a.get_by_role('button', name='Guardar 3 lecturas')).to_be_disabled()
     a.get_by_label('Acción correctiva Congelacion#1').fill('Se cerró la puerta y se llamó al técnico de refrigeración')
     a.screenshot(path=f'{SP}/fmt-04-ronda.png', full_page=True)

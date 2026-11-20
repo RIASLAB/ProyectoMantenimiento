@@ -291,7 +291,8 @@ describe('Carga de los formatos de la planta', () => {
     try {
       const primera = await cargarFormatos(ds);
       // La cubicadora y el punto "Sala de desposte" ya existían (creados arriba): no se pisan.
-      expect(primera).toMatchObject({ plantillas: 16, instalaciones: 55, puntosTemperatura: 55, recintos: 2, puntosIluminacion: 25 });
+      // D-42: los dos túneles de desposte ya no se cargan.
+      expect(primera).toMatchObject({ plantillas: 16, instalaciones: 53, puntosTemperatura: 53, recintos: 2, puntosIluminacion: 25 });
       const segunda = await cargarFormatos(ds);
       expect(segunda).toMatchObject({ plantillas: 0, instalaciones: 0, puntosTemperatura: 0, recintos: 0, puntosIluminacion: 0 });
     } finally {
@@ -312,11 +313,60 @@ describe('Carga de los formatos de la planta', () => {
     expect(f.body['TEMPERATURA:Planta Desposte'].version).toBe('17');
     expect(f.body['TEMPERATURA:Planta Salsamentaria']).toMatchObject({ codigo: 'AC-PMT-FR02', version: '1' });
 
-    expect(rangoCuarto('TUNEL DE CONGELACION #2')).toEqual({ minimo: -24, maximo: -18 });
-    expect(rangoCuarto('Cuarto frizz empaque')).toEqual({ minimo: -18, maximo: -10 });
+    // D-42: rangos de calidad (noviembre de 2026).
+    expect(rangoCuarto('Refrigeración #5')).toEqual({ minimo: -8, maximo: 4 });
+    expect(rangoCuarto('Cuarto conservacion')).toEqual({ minimo: -24, maximo: -14 });
+    expect(rangoCuarto('Cava conservacion')).toEqual({ minimo: -24, maximo: -14 });
+    expect(rangoCuarto('Cuarto subproducto')).toEqual({ minimo: -4, maximo: 6 });
+    expect(rangoCuarto('Muelle hueso')).toEqual({ minimo: -4, maximo: 6 });
+    expect(rangoCuarto('Sala marinado')).toEqual({ minimo: 4, maximo: 10 });
+    expect(rangoCuarto('Passillo 1')).toEqual({ minimo: 4, maximo: 10 });
+    expect(rangoCuarto('Pasillo de canales (4-5)')).toEqual({ minimo: 4, maximo: 10 });
+    expect(rangoCuarto('Cuarto cabezas y pezuñas')).toEqual({ minimo: -8, maximo: 6 });
+    expect(rangoCuarto('Cuarto frizz empaque')).toEqual({ minimo: -25, maximo: -10 });
+    expect(rangoCuarto('Friss #1')).toEqual({ minimo: -25, maximo: -10 });
+    // Los que calidad no cambió.
     expect(rangoCuarto('Cuarto de canal de res')).toEqual({ minimo: -5, maximo: 4 });
-    expect(rangoCuarto('Cuarto subproducto')).toEqual({ minimo: -2, maximo: 6 });
-    expect(rangoCuarto('Refrigeración #5')).toEqual({ minimo: -4, maximo: 4 });
-    expect(rangoCuarto('Sala marinado')).toEqual({ minimo: null, maximo: null });
+    expect(rangoCuarto('IQF')).toEqual({ minimo: -24, maximo: -18 });
+    expect(rangoCuarto('Congelacion#1')).toEqual({ minimo: -18, maximo: -10 });
+    expect(rangoCuarto('Producto terminado')).toEqual({ minimo: -4, maximo: 4 });
+    expect(rangoCuarto('Area de empaque')).toEqual({ minimo: null, maximo: null });
+    // D-43: los preoperacionales por máquina quedan semanales; las hojas diarias no.
+    expect(molino.semanal).toBe(true);
+    expect(diaria.semanal).toBe(false);
+    const puntos = await c.http.get('/api/calidad/puntos').set(c.auth(op.token));
+    expect(puntos.body.some((p: { activo: { nombre: string } }) => /tunel/i.test(p.activo.nombre))).toBe(false);
+    expect(puntos.body.find((p: { activo: { nombre: string } }) => p.activo.nombre === 'Sala marinado')).toMatchObject({ minimo: 4, maximo: 10 });
+  });
+
+  it('D-42 · la actualización cambia los rangos de los cuartos ya cargados y deja de pedir los túneles', async () => {
+    const { RangosTemperaturaCalidad1794400000000: Migracion } = await import('../src/database/migrations/1794400000000-RangosTemperaturaCalidad');
+    const ds = c.app.get(DataSource);
+    // Como estaba la planta antes: rangos viejos y el túnel con su punto.
+    const tunel = (await c.http.post('/api/activos').set(c.auth(c.admin)).send({ codigo: 'CF-DES-05', nombre: 'Tunel de congelado #1', area: 'Planta Desposte', clase: 'INSTALACION' })).body;
+    await c.http.post('/api/calidad/puntos').set(c.auth(c.admin)).send({ activoId: tunel.id, nombre: 'Temperatura del cuarto', minimo: -24, maximo: -18, frecuenciaHoras: 3 }).expect(201);
+    await ds.query(`UPDATE puntos_control p SET minimo = -4, maximo = 4 FROM activos a WHERE a.id = p.activo_id AND a.nombre IN ('Cuarto conservacion', 'Refrigeracion #1 res')`);
+    await ds.query(`UPDATE puntos_control p SET minimo = NULL, maximo = NULL FROM activos a WHERE a.id = p.activo_id AND a.nombre = 'Sala marinado'`);
+    // Un punto creado a mano (sin código CF-) no se toca.
+    const propio = await ds.query(`SELECT p.id, p.minimo, p.maximo FROM puntos_control p JOIN activos a ON a.id = p.activo_id WHERE a.codigo NOT LIKE 'CF-%' LIMIT 1`);
+
+    const qr = ds.createQueryRunner();
+    try { await new Migracion().up(qr); } finally { await qr.release(); }
+
+    const rango = async (nombre: string) => (await ds.query(
+      `SELECT p.minimo::float AS minimo, p.maximo::float AS maximo, p.vigente FROM puntos_control p JOIN activos a ON a.id = p.activo_id WHERE a.nombre = $1`, [nombre]))[0];
+    expect(await rango('Cuarto conservacion')).toMatchObject({ minimo: -24, maximo: -14, vigente: true });
+    expect(await rango('Refrigeracion #1 res')).toMatchObject({ minimo: -8, maximo: 4 });
+    expect(await rango('Sala marinado')).toMatchObject({ minimo: 4, maximo: 10 });
+    expect(await rango('Tunel de congelado #1')).toMatchObject({ vigente: false });
+    if (propio.length) {
+      const despues = await ds.query(`SELECT minimo, maximo FROM puntos_control WHERE id = $1`, [propio[0].id]);
+      expect(despues[0]).toEqual({ minimo: propio[0].minimo, maximo: propio[0].maximo });
+    }
+    const [b] = await ds.query(`SELECT detalle FROM bitacora WHERE accion = 'RANGOS_TEMPERATURA_ACTUALIZADOS'`);
+    expect(b.detalle.cambios).toEqual(expect.arrayContaining([
+      expect.objectContaining({ cuarto: 'Cuarto conservacion', antes: '-4 a 4 °C', despues: '-24 a -14 °C' }),
+      expect.objectContaining({ cuarto: 'Tunel de congelado #1', cambio: 'Ya no se registra (túnel)' }),
+    ]));
   });
 });
