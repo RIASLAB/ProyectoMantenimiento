@@ -292,7 +292,7 @@ describe('Carga de los formatos de la planta', () => {
       const primera = await cargarFormatos(ds);
       // La cubicadora y el punto "Sala de desposte" ya existían (creados arriba): no se pisan.
       // D-42: los dos túneles de desposte ya no se cargan.
-      expect(primera).toMatchObject({ plantillas: 16, instalaciones: 53, puntosTemperatura: 53, recintos: 2, puntosIluminacion: 25 });
+      expect(primera).toMatchObject({ plantillas: 19, instalaciones: 53, puntosTemperatura: 53, recintos: 2, puntosIluminacion: 25 });
       const segunda = await cargarFormatos(ds);
       expect(segunda).toMatchObject({ plantillas: 0, instalaciones: 0, puntosTemperatura: 0, recintos: 0, puntosIluminacion: 0 });
     } finally {
@@ -303,7 +303,16 @@ describe('Carga de los formatos de la planta', () => {
     expect(cubicadora).toHaveLength(1);
     expect(cubicadora[0].items).toHaveLength(7);
     const molino = plantillas.body.find((p: { nombre: string }) => p.nombre === 'Preoperacional molino');
-    expect(molino).toMatchObject({ codigo: 'AC-PMT-FR078', version: '3', area: 'Planta Desposte' });
+    expect(molino).toMatchObject({ codigo: 'AC-PMT-FR078', version: '3', area: 'Planta Desposte · Planta Salsamentaria', plantas: ['Planta Desposte', 'Planta Salsamentaria'] });
+    // D-43: los formatos de cada planta (Excel de calidad, noviembre de 2026).
+    const de = (planta: string) => plantillas.body.filter((p: { plantas: string[]; nombre: string }) => p.plantas.includes(planta) && p.nombre.startsWith('Preoperacional ')).map((p: { nombre: string }) => p.nombre.replace('Preoperacional ', '')).sort();
+    expect(de('Planta Pollo')).toEqual(['basculas', 'compresor de aire', 'lavadora de canastilla', 'marinadora']);
+    expect(de('Planta Salsamentaria')).toEqual(['basculas', 'embutidora', 'empacadora al vacio', 'horno', 'mezcladora', 'molino', 'sierra sin fin', 'tajadora', 'termoformadora']);
+    expect(de('Planta Desposte')).toHaveLength(13);
+    const horno = plantillas.body.find((p: { nombre: string }) => p.nombre === 'Preoperacional horno');
+    expect(horno).toMatchObject({ semanal: true, codigo: 'AC-PMT-FR072', recomendacion: 'No mojar la unidad de mando e instalar bolsa desecantes.' });
+    expect(horno.items).toHaveLength(20);
+    expect(plantillas.body.find((p: { nombre: string }) => p.nombre === 'Revisión de tableros eléctricos').plantas).toEqual([]);
     expect(molino.items.every((i: { tipo: string }) => i.tipo === 'ESCALA')).toBe(true);
     const diaria = plantillas.body.find((p: { nombre: string }) => p.nombre === 'Preoperatorio diario de equipos · Planta Salsamentaria');
     expect(diaria.items[0]).toMatchObject({ tipo: 'SECCION', texto: 'Area de procesos' });

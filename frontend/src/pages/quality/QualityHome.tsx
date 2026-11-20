@@ -108,10 +108,10 @@ export function QualityHome() {
   })();
   const etiquetas = new Map((plantillas.data ?? []).flatMap((t) => t.items.map((i) => [i.id, i.etiqueta] as const)));
   // D-43: los formatos se agrupan por planta; al elegir una se ven los suyos y los que aplican a todas.
-  const plantas = [...new Set((plantillas.data ?? []).map((t) => t.area).filter((a): a is string => !!a))].sort((a, b) => a.localeCompare(b));
+  const plantas = [...new Set((plantillas.data ?? []).flatMap((t) => t.plantas))].sort((a, b) => a.localeCompare(b));
   const planta = plantas.includes(f.planta) ? f.planta : plantas.length === 1 ? plantas[0] : '';
-  const dePlanta = (plantillas.data ?? []).filter((t) => t.area === planta);
-  const generales = (plantillas.data ?? []).filter((t) => !t.area);
+  const dePlanta = (plantillas.data ?? []).filter((t) => t.plantas.includes(planta));
+  const generales = (plantillas.data ?? []).filter((t) => !t.plantas.length);
   return (
     <>
       <PageHeader
@@ -187,7 +187,7 @@ export function QualityHome() {
                 <div className="chips" role="group" aria-label="Planta">
                   {plantas.map((p) => (
                     <button key={p} type="button" className={`chip ${planta === p ? 'chip-on' : ''}`} aria-pressed={planta === p} onClick={() => set('planta', p)}>
-                      {p} <span className="muted">· {(plantillas.data ?? []).filter((t) => t.area === p).length}</span>
+                      {p} <span className="muted">· {(plantillas.data ?? []).filter((t) => t.plantas.includes(p)).length}</span>
                     </button>
                   ))}
                 </div>

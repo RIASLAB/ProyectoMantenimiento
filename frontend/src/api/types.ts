@@ -309,6 +309,8 @@ export interface ChecklistTemplateInfo {
   id: string;
   nombre: string;
   area: string | null;
+  /** D-43: plantas donde se llena (vacío = en todas). */
+  plantas: string[];
   activoId: string | null;
   activo: { id: string; codigo: string; nombre: string } | null;
   descripcion: string | null;

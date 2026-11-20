@@ -233,6 +233,14 @@ describe('D-43 · Preoperacional semanal: una vez por semana por equipo', () => 
     expect((await llenar(otroId)).status).toBe(201);
   });
 
+  it('un formato puede llenarse en varias plantas', async () => {
+    const r = await c.http.patch(`/api/calidad/plantillas/${semanalId}`).set(c.auth(c.admin)).send({ plantas: ['Planta Desposte', 'Planta Salsamentaria', 'Planta Desposte '] });
+    expect(r.body).toMatchObject({ plantas: ['Planta Desposte', 'Planta Salsamentaria'], area: 'Planta Desposte · Planta Salsamentaria' });
+    // Quien manda solo "area" (una planta) sigue funcionando.
+    const viejo = (await c.http.get(`/api/calidad/plantillas/${plantillaId}`).set(c.auth(c.admin))).body;
+    expect(viejo.plantas).toEqual(['Proceso']);
+  });
+
   it('la lista de formatos dice qué equipos ya se hicieron esta semana', async () => {
     const l = await c.http.get('/api/calidad/plantillas').set(c.auth(op.token));
     const t = l.body.find((x: { id: string }) => x.id === semanalId);

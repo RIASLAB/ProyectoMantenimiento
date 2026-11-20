@@ -147,8 +147,13 @@ export class ChecklistTemplate {
   @Column({ length: 150 })
   nombre: string;
 
+  /** Texto de las plantas para mostrar e imprimir ("Planta Pollo · Planta Desposte"); se arma con `plantas`. */
   @Column({ type: 'varchar', length: 100, nullable: true })
   area: string | null;
+
+  /** D-43: plantas donde se llena este formato (el mismo formato puede servir en varias). Vacío = en todas. */
+  @Column({ type: 'text', array: true, default: '{}' })
+  plantas: string[];
 
   /** Si aplica a un equipo específico. */
   @ManyToOne(() => Asset, { nullable: true })

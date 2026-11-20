@@ -199,7 +199,7 @@ async function main() {
         });
       }
       await ds.getRepository(ChecklistTemplate).save({
-        nombre: 'Pre-operacional y limpieza', area: 'Proceso',
+        nombre: 'Pre-operacional y limpieza', area: 'Proceso', plantas: ['Proceso'],
         descripcion: 'Antes de iniciar el turno (datos de demostración)',
         items: [
           { id: 'limpio', texto: '¿Superficies en contacto con alimento limpias y desinfectadas?', tipo: 'SI_NO', obligatorio: true, esperado: 'SI' },

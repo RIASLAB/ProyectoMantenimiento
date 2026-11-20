@@ -8,6 +8,7 @@ import { AuditLog } from '../../audit/audit-log.entity';
 import { ClaseActivo } from '../../common/enums';
 import { LightingPoint, LightingRoomType } from '../../lighting/lighting.entities';
 import { ChecklistTemplate, ControlPoint } from '../../quality/quality.entities';
+import { plantasDe } from '../../quality/quality.service';
 import { FORMATOS_POR_DEFECTO, FormatoDocumental, PARAM_FORMATOS, Setting } from '../../settings/setting.entity';
 import { HOJAS_DIARIAS, ILUMINACION, PlantillaFormato, PREOPERACIONALES, TABLEROS_ELECTRICOS, TEMPERATURAS } from './datos-formatos';
 
@@ -127,7 +128,7 @@ export async function cargarFormatos(ds: DataSource, usuarioId: string | null = 
 async function crearPlantilla(em: EntityManager, f: PlantillaFormato, semanal = false) {
   if (await em.getRepository(ChecklistTemplate).exists({ where: { nombre: f.nombre } })) return false;
   await em.getRepository(ChecklistTemplate).save({
-    semanal, nombre: f.nombre, area: f.area, descripcion: f.descripcion, recomendacion: f.recomendacion,
+    semanal, nombre: f.nombre, ...plantasDe({ plantas: f.plantas, area: f.area }), descripcion: f.descripcion, recomendacion: f.recomendacion,
     codigo: f.codigo, version: f.version, fechaElaboracion: f.fechaElaboracion, fechaActualizacion: f.fechaActualizacion,
     items: f.items.map((it) => ({ ...it, id: randomUUID().slice(0, 8) })),
   } as never);

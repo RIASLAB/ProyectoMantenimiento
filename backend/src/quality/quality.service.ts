@@ -28,6 +28,16 @@ function rango(q: RecordsQuery) {
   return { desde, hasta };
 }
 
+/**
+ * D-43: plantas de un formato. Se guardan en `plantas` y en `area` queda el texto para mostrar. Quien envía solo
+ * `area` (una planta) sigue funcionando.
+ */
+export function plantasDe(dto: { plantas?: string[]; area?: string | null }) {
+  const lista = dto.plantas !== undefined ? dto.plantas : dto.area?.trim() ? [dto.area] : [];
+  const plantas = [...new Set(lista.map((p) => p.trim()).filter(Boolean))];
+  return { plantas, area: plantas.join(' · ').slice(0, 100) || null };
+}
+
 @Injectable()
 export class QualityService {
   constructor(
@@ -327,7 +337,7 @@ export class QualityService {
     if (dto.activoId && !(await this.assets.exists({ where: { id: dto.activoId } }))) throw new NotFoundException('Máquina no encontrada');
     return this.ds.transaction(async (em) => {
       const p = await em.getRepository(ChecklistTemplate).save({
-        nombre: dto.nombre.trim(), area: dto.area?.trim() || null, activoId: dto.activoId ?? null, descripcion: dto.descripcion?.trim() || null,
+        nombre: dto.nombre.trim(), ...plantasDe(dto), activoId: dto.activoId ?? null, descripcion: dto.descripcion?.trim() || null,
         codigo: dto.codigo?.trim() || null, version: dto.version?.trim() || null, fechaElaboracion: dto.fechaElaboracion || null,
         fechaActualizacion: dto.fechaActualizacion || null, recomendacion: dto.recomendacion?.trim() || null,
         recordarHora: dto.recordarHora ?? null, semanal: dto.semanal ?? false,
@@ -342,7 +352,7 @@ export class QualityService {
     const p = await this.getPlantilla(id);
     const cambios: Partial<ChecklistTemplate> = {};
     if (dto.nombre !== undefined) cambios.nombre = dto.nombre.trim();
-    if (dto.area !== undefined) cambios.area = dto.area?.trim() || null;
+    if (dto.plantas !== undefined || dto.area !== undefined) Object.assign(cambios, plantasDe(dto));
     if (dto.activoId !== undefined) cambios.activoId = dto.activoId;
     if (dto.descripcion !== undefined) cambios.descripcion = dto.descripcion?.trim() || null;
     if (dto.vigente !== undefined) cambios.vigente = dto.vigente;

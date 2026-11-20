@@ -44,6 +44,14 @@ with sync_playwright() as p:
     a.goto(BASE + '/calidad')
     # D-43: los formatos se agrupan por planta: al elegir una se ven los suyos.
     expect(a.locator('#checklists .point', has_text='Preoperacional molino')).to_have_count(0)
+    # Cada planta con sus formatos (Excel de calidad): el mismo formato sale en las plantas que lo usan.
+    a.get_by_role('button', name=re.compile('^Planta Pollo')).click()
+    expect(a.locator('#checklists .point', has_text='Preoperacional marinadora')).to_have_count(1)
+    expect(a.locator('#checklists .point', has_text='Preoperacional cubicadora')).to_have_count(0)
+    a.get_by_role('button', name=re.compile('^Planta Salsamentaria')).click()
+    expect(a.locator('#checklists .point', has_text='Preoperacional horno')).to_have_count(1)
+    expect(a.locator('#checklists .point', has_text='Preoperacional molino')).to_have_count(1)
+    a.locator('#checklists').screenshot(path=f'{SP}/fmt-00-plantas.png')
     a.get_by_role('button', name=re.compile('^Planta Desposte')).click()
     expect(a.locator('#checklists .point', has_text='Preoperatorio diario de equipos · Planta Pollo')).to_have_count(0)
     a.locator('.point', has_text='Preoperacional molino').click()

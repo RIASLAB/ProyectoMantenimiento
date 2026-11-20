@@ -64,17 +64,19 @@ const docVacio = { codigo: '', version: '', fechaElaboracion: '', fechaActualiza
 function TemplateModal({ plantilla, open, onClose }: { plantilla: ChecklistTemplateInfo | null; open: boolean; onClose: () => void }) {
   const qc = useQueryClient();
   const [nombre, setNombre] = useState('');
-  const [area, setArea] = useState('');
+  const [plantasSel, setPlantasSel] = useState<string[]>([]);
+  const [otraPlanta, setOtraPlanta] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [vigente, setVigente] = useState(true);
   const [semanal, setSemanal] = useState(false);
   const plantas = useQuery({ queryKey: ['calidad', 'plantillas'], queryFn: () => api.get<ChecklistTemplateInfo[]>('/calidad/plantillas'), enabled: open });
-  const nombresPlantas = [...new Set((plantas.data ?? []).map((t) => t.area).filter((a): a is string => !!a))].sort();
+  const nombresPlantas = [...new Set([...(plantas.data ?? []).flatMap((t) => t.plantas), ...plantasSel])].sort();
+  const alternarPlanta = (p: string) => setPlantasSel((s) => (s.includes(p) ? s.filter((x) => x !== p) : [...s, p]));
   const [items, setItems] = useState<ItemDraft[]>([]);
   const [doc, setDoc] = useState(docVacio);
   useEffect(() => {
     if (!open) return;
-    setNombre(plantilla?.nombre ?? ''); setArea(plantilla?.area ?? ''); setDescripcion(plantilla?.descripcion ?? ''); setVigente(plantilla?.vigente ?? true);
+    setNombre(plantilla?.nombre ?? ''); setPlantasSel(plantilla?.plantas ?? []); setOtraPlanta(''); setDescripcion(plantilla?.descripcion ?? ''); setVigente(plantilla?.vigente ?? true);
     setSemanal(plantilla?.semanal ?? false);
     setDoc(plantilla ? {
       codigo: plantilla.codigo ?? '', version: plantilla.version ?? '', fechaElaboracion: plantilla.fechaElaboracion ?? '',
@@ -86,7 +88,7 @@ function TemplateModal({ plantilla, open, onClose }: { plantilla: ChecklistTempl
   const m = useMutation({
     mutationFn: () => {
       const body = {
-        nombre, area: area || null, descripcion: descripcion || null,
+        nombre, plantas: plantasSel, descripcion: descripcion || null,
         codigo: doc.codigo || null, version: doc.version || null, fechaElaboracion: doc.fechaElaboracion || null,
         fechaActualizacion: doc.fechaActualizacion || null, recomendacion: doc.recomendacion || null,
         recordarHora: doc.recordarHora === '' ? null : Number(doc.recordarHora), semanal,
@@ -112,14 +114,21 @@ function TemplateModal({ plantilla, open, onClose }: { plantilla: ChecklistTempl
       footer={<><Button variant="ghost" type="button" onClick={onClose}>Cancelar</Button><Button type="submit" form="tpl-form" busy={m.isPending}>Guardar</Button></>}>
       <form id="tpl-form" className="stack" onSubmit={submit}>
         <Field label="Nombre *">{(i) => <Input id={i} value={nombre} onChange={(e) => setNombre(e.target.value)} required minLength={3} maxLength={150} />}</Field>
-        <Field label="Planta" hint="Al llenar checklists se agrupan por planta. Vacío = se muestra en todas las plantas">
-          {(i) => (
-            <>
-              <Input id={i} value={area} onChange={(e) => setArea(e.target.value)} maxLength={100} list="plantas-checklist" placeholder="Ej. Planta Desposte" />
-              <datalist id="plantas-checklist">{nombresPlantas.map((p) => <option key={p} value={p} />)}</datalist>
-            </>
-          )}
-        </Field>
+        <fieldset className="plantas-sel">
+          <legend>Plantas donde se llena</legend>
+          <p className="muted small" style={{ margin: '0 0 6px' }}>Al llenar checklists se agrupan por planta. Sin ninguna marcada, sale en todas.</p>
+          <div className="chips">
+            {nombresPlantas.map((p) => (
+              <label key={p} className={`chip ${plantasSel.includes(p) ? 'chip-on' : ''}`}>
+                <input type="checkbox" className="sr-only" checked={plantasSel.includes(p)} onChange={() => alternarPlanta(p)} /> {p}
+              </label>
+            ))}
+          </div>
+          <div style={{ display: "flex", marginTop: 6, gap: 6 }}>
+            <Input value={otraPlanta} onChange={(e) => setOtraPlanta(e.target.value)} maxLength={60} placeholder="Otra planta" aria-label="Otra planta" />
+            <Button type="button" variant="ghost" disabled={!otraPlanta.trim()} onClick={() => { const p = otraPlanta.trim(); if (!plantasSel.includes(p)) setPlantasSel([...plantasSel, p]); setOtraPlanta(''); }}>Agregar</Button>
+          </div>
+        </fieldset>
         <label className="toggle">
           <input type="checkbox" checked={semanal} onChange={(e) => setSemanal(e.target.checked)} />
           <span><strong>Se llena una vez por semana por equipo</strong> <span className="muted">· hecho para un equipo, ese equipo no se puede volver a llenar hasta el lunes siguiente</span></span>

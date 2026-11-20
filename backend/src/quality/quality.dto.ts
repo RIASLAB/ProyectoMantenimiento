@@ -99,6 +99,10 @@ export class CreateTemplateDto {
   @IsOptional() @IsString() @MaxLength(100)
   area?: string | null;
 
+  /** D-43: plantas donde se llena (vacío = en todas). Si no se envía, se toma `area`. */
+  @IsOptional() @IsArray() @ArrayMaxSize(10) @IsString({ each: true }) @MaxLength(60, { each: true })
+  plantas?: string[];
+
   @IsOptional() @IsUUID()
   activoId?: string | null;
 
@@ -139,6 +143,10 @@ export class UpdateTemplateDto {
 
   @IsOptional() @IsString() @MaxLength(100)
   area?: string | null;
+
+  /** D-43: plantas donde se llena (vacío = en todas). Si no se envía, se toma `area`. */
+  @IsOptional() @IsArray() @ArrayMaxSize(10) @IsString({ each: true }) @MaxLength(60, { each: true })
+  plantas?: string[];
 
   @IsOptional() @IsUUID()
   activoId?: string | null;

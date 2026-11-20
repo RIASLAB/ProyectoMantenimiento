@@ -8,6 +8,8 @@ import type { ChecklistItem } from '../../quality/quality.entities';
 export interface PlantillaFormato {
   nombre: string;
   area: string | null;
+  /** D-43: plantas donde se llena (el mismo formato sirve en varias). Si falta, la de `area`. */
+  plantas?: string[];
   descripcion: string;
   recomendacion: string | null;
   codigo: string;
@@ -22,6 +24,7 @@ export const PREOPERACIONALES: PlantillaFormato[] = [
   {
     nombre: "Preoperacional cubicadora",
     area: "Planta Desposte",
+    plantas: ["Planta Desposte"],
     descripcion: "Periodicidad de uso: diario. Califique cada punto: B bueno, R regular, M malo, No tiene, NA no aplica.",
     recomendacion: "No mojar la unidad de mando e instalar bolsa desecantes.",
     codigo: "AC-PMT-FR072",
@@ -133,7 +136,8 @@ export const PREOPERACIONALES: PlantillaFormato[] = [
   },
   {
     nombre: "Preoperacional tajadora",
-    area: "Planta Desposte",
+    area: "Planta Desposte · Planta Salsamentaria",
+    plantas: ["Planta Desposte", "Planta Salsamentaria"],
     descripcion: "Periodicidad de uso: diario. Califique cada punto: B bueno, R regular, M malo, No tiene, NA no aplica.",
     recomendacion: "Procesar solo producto refrigerado",
     codigo: "AC-PMT-FR072",
@@ -245,7 +249,8 @@ export const PREOPERACIONALES: PlantillaFormato[] = [
   },
   {
     nombre: "Preoperacional marinadora",
-    area: "Planta Desposte",
+    area: "Planta Pollo · Planta Desposte",
+    plantas: ["Planta Pollo", "Planta Desposte"],
     descripcion: "Periodicidad de uso: diario. Califique cada punto: B bueno, R regular, M malo, No tiene, NA no aplica. Equipo de referencia: HENNEKEN · HPI-450.",
     recomendacion: "Limpiar despues la maquina con agua despues del proceso.",
     codigo: "AC-PMT-FR080",
@@ -372,7 +377,8 @@ export const PREOPERACIONALES: PlantillaFormato[] = [
   },
   {
     nombre: "Preoperacional sierra sin fin",
-    area: "Planta Desposte",
+    area: "Planta Desposte · Planta Salsamentaria",
+    plantas: ["Planta Desposte", "Planta Salsamentaria"],
     descripcion: "Periodicidad de uso: diario. Califique cada punto: B bueno, R regular, M malo, No tiene, NA no aplica. Equipo de referencia: TORREY · SJ-295.",
     recomendacion: "Dientes de la cinta sierra siempre hacia abajo.",
     codigo: "AC-PMT-FR079",
@@ -479,7 +485,8 @@ export const PREOPERACIONALES: PlantillaFormato[] = [
   },
   {
     nombre: "Preoperacional molino",
-    area: "Planta Desposte",
+    area: "Planta Desposte · Planta Salsamentaria",
+    plantas: ["Planta Desposte", "Planta Salsamentaria"],
     descripcion: "Periodicidad de uso: diario. Califique cada punto: B bueno, R regular, M malo, No tiene, NA no aplica. Equipo de referencia: KOLBE · TPM-160.",
     recomendacion: "No hacer funcionar nunca la máquina en vacío. Esta máquina permite únicamente picar carne fresca o semicongelada.",
     codigo: "AC-PMT-FR078",
@@ -586,8 +593,9 @@ export const PREOPERACIONALES: PlantillaFormato[] = [
   },
   {
     nombre: "Preoperacional compresor de aire",
-    area: "Planta Desposte",
-    descripcion: "Periodicidad de uso: diario. Califique cada punto: B bueno, R regular, M malo, No tiene, NA no aplica. Equipo de referencia: FUSHENG · FU22A.",
+    area: "Planta Pollo · Planta Desposte",
+    plantas: ["Planta Pollo", "Planta Desposte"],
+    descripcion: "Periodicidad de uso: diario. Califique cada punto: B bueno, R regular, M malo, No tiene, NA no aplica. Equipos de referencia: FUSHENG · FU22A (Planta Desposte), SHANGHAI ROTORCOMP · LGCD-37D B VP (Planta Pollo).",
     recomendacion: "Drenar dia por medio.",
     codigo: "AC-PMT-FR077",
     version: "3",
@@ -718,7 +726,8 @@ export const PREOPERACIONALES: PlantillaFormato[] = [
   },
   {
     nombre: "Preoperacional lavadora de canastilla",
-    area: null,
+    area: "Planta Pollo · Planta Desposte",
+    plantas: ["Planta Pollo", "Planta Desposte"],
     descripcion: "Periodicidad de uso: diario. Califique cada punto: B bueno, R regular, M malo, No tiene, NA no aplica. Equipo de referencia: XUCLA · ESFERA.",
     recomendacion: "Nunca meta las manos en el tanque de agua cuando la bomba se encuentre en operación.",
     codigo: "AC-PMT-FR076",
@@ -850,7 +859,8 @@ export const PREOPERACIONALES: PlantillaFormato[] = [
   },
   {
     nombre: "Preoperacional empacadora al vacio",
-    area: "Planta Desposte",
+    area: "Planta Desposte · Planta Salsamentaria",
+    plantas: ["Planta Desposte", "Planta Salsamentaria"],
     descripcion: "Periodicidad de uso: diario. Califique cada punto: B bueno, R regular, M malo, No tiene, NA no aplica. Equipo de referencia: NEW DIAMOND VAC.",
     recomendacion: "El lado abierto de la bolsa podrà exceder el borde exterior del transportador guìa-bolsas por un maximo de 3 cm",
     codigo: "AC-PMT-FR075",
@@ -957,7 +967,8 @@ export const PREOPERACIONALES: PlantillaFormato[] = [
   },
   {
     nombre: "Preoperacional termoformadora",
-    area: "Planta Desposte",
+    area: "Planta Desposte · Planta Salsamentaria",
+    plantas: ["Planta Desposte", "Planta Salsamentaria"],
     descripcion: "Periodicidad de uso: diario. Califique cada punto: B bueno, R regular, M malo, No tiene, NA no aplica. Equipo de referencia: VARIOVAC · OPTIMUS.",
     recomendacion: "Lubricar las troqueladoras con grasa en base PTFE despues de cada limpieza.",
     codigo: "AC-PMT-FR074",
@@ -1095,6 +1106,7 @@ export const PREOPERACIONALES: PlantillaFormato[] = [
   {
     nombre: "Preoperacional porcionadora",
     area: "Planta Desposte",
+    plantas: ["Planta Desposte"],
     descripcion: "Periodicidad de uso: diario. Califique cada punto: B bueno, R regular, M malo, No tiene, NA no aplica. Equipo de referencia: MARREL.",
     recomendacion: "No mojar la unidad de mando e instalar bolsa desecantes.",
     codigo: "AC-PMT-FR073",
@@ -1197,6 +1209,7 @@ export const PREOPERACIONALES: PlantillaFormato[] = [
   {
     nombre: "Preoperacional descuerador",
     area: "Planta Desposte",
+    plantas: ["Planta Desposte"],
     descripcion: "Periodicidad de uso: diario. Califique cada punto: B bueno, R regular, M malo, No tiene, NA no aplica. Equipo de referencia: MAJA · FP-240-6.",
     recomendacion: "Prohibido el procesado de piezas de carne planas en modo manual, tal como p.ej. trozos de tocino",
     codigo: "AC-PMT-FR072",
@@ -1319,6 +1332,7 @@ export const PREOPERACIONALES: PlantillaFormato[] = [
   {
     nombre: "Preoperacional afilador",
     area: "Planta Desposte",
+    plantas: ["Planta Desposte"],
     descripcion: "Periodicidad de uso: diario. Califique cada punto: B bueno, R regular, M malo, No tiene, NA no aplica. Equipo de referencia: DICK · SM-110.",
     recomendacion: "Limpiar la hoja siempre antes de afilar. Sino va a utilizar durante 2 hr la maquina vaciar la caja de agua.",
     codigo: "AC-PMT-FR071",
@@ -1440,7 +1454,8 @@ export const PREOPERACIONALES: PlantillaFormato[] = [
   },
   {
     nombre: "Preoperacional basculas",
-    area: "Planta Desposte",
+    area: "Planta Pollo · Planta Desposte · Planta Salsamentaria",
+    plantas: ["Planta Pollo", "Planta Desposte", "Planta Salsamentaria"],
     descripcion: "Periodicidad de uso: diario. Califique cada punto: B bueno, R regular, M malo, No tiene, NA no aplica. Equipo de referencia: VECTOR · VI-405.",
     recomendacion: null,
     codigo: "AC-PMT-FR07",
@@ -1512,6 +1527,351 @@ export const PREOPERACIONALES: PlantillaFormato[] = [
         texto: "Calibracion de cero",
         tipo: "ESCALA",
         obligatorio: true
+      }
+    ]
+  },
+  {
+    "nombre": "Preoperacional mezcladora",
+    "area": "Planta Salsamentaria",
+    "plantas": [
+      "Planta Salsamentaria"
+    ],
+    "descripcion": "Periodicidad de uso: diario. Califique cada punto: B bueno, R regular, M malo, No tiene, NA no aplica.",
+    "recomendacion": "No mojar la unidad de mando e instalar bolsa desecantes.",
+    "codigo": "AC-PMT-FR072",
+    "version": "3",
+    "fechaElaboracion": "2020-11-10",
+    "fechaActualizacion": "2024-11-15",
+    "items": [
+      {
+        "texto": "Limpieza general del equipo.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Motor.Conexiones electricas. Polo a tierra.Aislamiento .",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Dispositivos de proteccion. Puertas-Estructura de la maquina",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Inspeccion de las cuchillas y portacuchillas. Control del grado de afilado",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Comprobar errores en los rotulos de aviso y de indicacion en la maquina.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Verificar el funcionamiento del freno",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Estado del embolo de prensado",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Estado y cierre del cargador",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Puerta de la caja portacuchillas",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Barras del cierre de la reja",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Frenos de la maquina.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Elementos de sujeccion (Tuercas-tornillos-mariposas-seguros axiales).",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Interruptor de puesta en marcha y apagado.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Panel de mando",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Los puntos de peligro y partes en movimientos estan señalizadas.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Presenta bordes cortantes o superficies irregulares.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "El operador tiene elementos de proteccion personal.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "El area es apta para realizar las actividades.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Extintor cerca del equipo.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "La maquina se encuentra apta para su utilizacion",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      }
+    ]
+  },
+  {
+    "nombre": "Preoperacional embutidora",
+    "area": "Planta Salsamentaria",
+    "plantas": [
+      "Planta Salsamentaria"
+    ],
+    "descripcion": "Periodicidad de uso: diario. Califique cada punto: B bueno, R regular, M malo, No tiene, NA no aplica.",
+    "recomendacion": "No mojar la unidad de mando e instalar bolsa desecantes.",
+    "codigo": "AC-PMT-FR072",
+    "version": "3",
+    "fechaElaboracion": "2020-11-10",
+    "fechaActualizacion": "2024-11-15",
+    "items": [
+      {
+        "texto": "Limpieza general del equipo.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Motor.Conexiones electricas. Polo a tierra.Aislamiento .",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Dispositivos de proteccion. Puertas-Estructura de la maquina",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Inspeccion de las cuchillas y portacuchillas. Control del grado de afilado",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Comprobar errores en los rotulos de aviso y de indicacion en la maquina.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Verificar el funcionamiento del freno",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Estado del embolo de prensado",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Estado y cierre del cargador",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Puerta de la caja portacuchillas",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Barras del cierre de la reja",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Frenos de la maquina.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Elementos de sujeccion (Tuercas-tornillos-mariposas-seguros axiales).",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Interruptor de puesta en marcha y apagado.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Panel de mando",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Los puntos de peligro y partes en movimientos estan señalizadas.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Presenta bordes cortantes o superficies irregulares.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "El operador tiene elementos de proteccion personal.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "El area es apta para realizar las actividades.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Extintor cerca del equipo.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "La maquina se encuentra apta para su utilizacion",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      }
+    ]
+  },
+  {
+    "nombre": "Preoperacional horno",
+    "area": "Planta Salsamentaria",
+    "plantas": [
+      "Planta Salsamentaria"
+    ],
+    "descripcion": "Periodicidad de uso: diario. Califique cada punto: B bueno, R regular, M malo, No tiene, NA no aplica.",
+    "recomendacion": "No mojar la unidad de mando e instalar bolsa desecantes.",
+    "codigo": "AC-PMT-FR072",
+    "version": "3",
+    "fechaElaboracion": "2020-11-10",
+    "fechaActualizacion": "2024-11-15",
+    "items": [
+      {
+        "texto": "Limpieza general del equipo.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Motor.Conexiones electricas. Polo a tierra.Aislamiento .",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Dispositivos de proteccion. Puertas-Estructura de la maquina",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Inspeccion de las cuchillas y portacuchillas. Control del grado de afilado",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Comprobar errores en los rotulos de aviso y de indicacion en la maquina.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Verificar el funcionamiento del freno",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Estado del embolo de prensado",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Estado y cierre del cargador",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Puerta de la caja portacuchillas",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Barras del cierre de la reja",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Frenos de la maquina.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Elementos de sujeccion (Tuercas-tornillos-mariposas-seguros axiales).",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Interruptor de puesta en marcha y apagado.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Panel de mando",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Los puntos de peligro y partes en movimientos estan señalizadas.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Presenta bordes cortantes o superficies irregulares.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "El operador tiene elementos de proteccion personal.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "El area es apta para realizar las actividades.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "Extintor cerca del equipo.",
+        "tipo": "ESCALA",
+        "obligatorio": true
+      },
+      {
+        "texto": "La maquina se encuentra apta para su utilizacion",
+        "tipo": "ESCALA",
+        "obligatorio": true
       }
     ]
   }
