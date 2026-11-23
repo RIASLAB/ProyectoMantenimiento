@@ -291,8 +291,8 @@ describe('Carga de los formatos de la planta', () => {
     try {
       const primera = await cargarFormatos(ds);
       // La cubicadora y el punto "Sala de desposte" ya existían (creados arriba): no se pisan.
-      // D-42: los dos túneles de desposte ya no se cargan.
-      expect(primera).toMatchObject({ plantillas: 19, instalaciones: 53, puntosTemperatura: 53, recintos: 2, puntosIluminacion: 25 });
+      // D-46: los túneles se cargan (sin rango).
+      expect(primera).toMatchObject({ plantillas: 19, instalaciones: 55, puntosTemperatura: 55, recintos: 2, puntosIluminacion: 25 });
       const segunda = await cargarFormatos(ds);
       expect(segunda).toMatchObject({ plantillas: 0, instalaciones: 0, puntosTemperatura: 0, recintos: 0, puntosIluminacion: 0 });
     } finally {
@@ -344,16 +344,19 @@ describe('Carga de los formatos de la planta', () => {
     expect(molino.semanal).toBe(true);
     expect(diaria.semanal).toBe(false);
     const puntos = await c.http.get('/api/calidad/puntos').set(c.auth(op.token));
-    expect(puntos.body.some((p: { activo: { nombre: string } }) => /tunel/i.test(p.activo.nombre))).toBe(false);
+    // D-46: los túneles se registran, sin rango.
+    const tuneles = puntos.body.filter((p: { activo: { nombre: string } }) => /tunel/i.test(p.activo.nombre));
+    expect(tuneles).toHaveLength(2);
+    for (const t of tuneles) expect(t).toMatchObject({ minimo: null, maximo: null });
+    expect(rangoCuarto('TUNEL DE CONGELACION #2')).toEqual({ minimo: null, maximo: null });
     expect(puntos.body.find((p: { activo: { nombre: string } }) => p.activo.nombre === 'Sala marinado')).toMatchObject({ minimo: 4, maximo: 10 });
   });
 
-  it('D-42 · la actualización cambia los rangos de los cuartos ya cargados y deja de pedir los túneles', async () => {
+  it('D-42 y D-46 · la actualización cambia los rangos de los cuartos ya cargados; los túneles quedan sin rango', async () => {
     const { RangosTemperaturaCalidad1794400000000: Migracion } = await import('../src/database/migrations/1794400000000-RangosTemperaturaCalidad');
     const ds = c.app.get(DataSource);
-    // Como estaba la planta antes: rangos viejos y el túnel con su punto.
-    const tunel = (await c.http.post('/api/activos').set(c.auth(c.admin)).send({ codigo: 'CF-DES-05', nombre: 'Tunel de congelado #1', area: 'Planta Desposte', clase: 'INSTALACION' })).body;
-    await c.http.post('/api/calidad/puntos').set(c.auth(c.admin)).send({ activoId: tunel.id, nombre: 'Temperatura del cuarto', minimo: -24, maximo: -18, frecuenciaHoras: 3 }).expect(201);
+    // Como estaba la planta antes: rangos viejos (el túnel con el suyo).
+    await ds.query(`UPDATE puntos_control p SET minimo = -24, maximo = -18 FROM activos a WHERE a.id = p.activo_id AND a.nombre = 'Tunel de congelado #1'`);
     await ds.query(`UPDATE puntos_control p SET minimo = -4, maximo = 4 FROM activos a WHERE a.id = p.activo_id AND a.nombre IN ('Cuarto conservacion', 'Refrigeracion #1 res')`);
     await ds.query(`UPDATE puntos_control p SET minimo = NULL, maximo = NULL FROM activos a WHERE a.id = p.activo_id AND a.nombre = 'Sala marinado'`);
     // Un punto creado a mano (sin código CF-) no se toca.
@@ -368,14 +371,23 @@ describe('Carga de los formatos de la planta', () => {
     expect(await rango('Refrigeracion #1 res')).toMatchObject({ minimo: -8, maximo: 4 });
     expect(await rango('Sala marinado')).toMatchObject({ minimo: 4, maximo: 10 });
     expect(await rango('Tunel de congelado #1')).toMatchObject({ vigente: false });
+    // D-46: la corrección los vuelve a pedir, sin rango.
+    const { TunelesSinRango1795400000000: Correccion } = await import('../src/database/migrations/1795400000000-TunelesSinRango');
+    const qr2 = ds.createQueryRunner();
+    try { await new Correccion().up(qr2); } finally { await qr2.release(); }
+    expect(await rango('Tunel de congelado #1')).toEqual({ minimo: null, maximo: null, vigente: true });
+    expect(await rango('Tunel de congelacion #2')).toEqual({ minimo: null, maximo: null, vigente: true });
     if (propio.length) {
       const despues = await ds.query(`SELECT minimo, maximo FROM puntos_control WHERE id = $1`, [propio[0].id]);
       expect(despues[0]).toEqual({ minimo: propio[0].minimo, maximo: propio[0].maximo });
     }
-    const [b] = await ds.query(`SELECT detalle FROM bitacora WHERE accion = 'RANGOS_TEMPERATURA_ACTUALIZADOS'`);
+    const [b, b2] = await ds.query(`SELECT detalle FROM bitacora WHERE accion = 'RANGOS_TEMPERATURA_ACTUALIZADOS' ORDER BY creado_en`);
     expect(b.detalle.cambios).toEqual(expect.arrayContaining([
       expect.objectContaining({ cuarto: 'Cuarto conservacion', antes: '-4 a 4 °C', despues: '-24 a -14 °C' }),
       expect.objectContaining({ cuarto: 'Tunel de congelado #1', cambio: 'Ya no se registra (túnel)' }),
+    ]));
+    expect(b2.detalle.cambios).toEqual(expect.arrayContaining([
+      expect.objectContaining({ cuarto: 'Tunel de congelado #1', antes: 'no se registraba; -24 a -18 °C', despues: 'Se registra, sin rango' }),
     ]));
   });
 });

@@ -15,13 +15,15 @@ import { HOJAS_DIARIAS, ILUMINACION, PlantillaFormato, PREOPERACIONALES, TABLERO
 /**
  * Rango de temperatura de un cuarto según su nombre (D-22; rangos actualizados por calidad en D-42):
  * refrigeración −8 a 4 °C; conservación −24 a −14 °C; subproducto y muelles −4 a 6 °C; salas, marinado y pasillos
- * 4 a 10 °C; cuarto de cabezas y pezuñas −8 a 6 °C; frizado −25 a −10 °C. Los que calidad no ha cambiado siguen
+ * 4 a 10 °C; cuarto de cabezas y pezuñas −8 a 6 °C; frizado −25 a −10 °C; túneles sin rango (se registran, D-46).
+ * Los que calidad no ha cambiado siguen
  * con los de los formatos: IQF y congelación rápida −24 a −18; congelación −18 a −10; canales −5 a 4;
  * devoluciones −2 a 6; producto terminado, maduración, precámara y cavas −4 a 4. Alistamiento, procesos, fileteado,
  * áreas y empaque secundario, sin límites.
  */
 export function rangoCuarto(nombre: string): { minimo: number | null; maximo: number | null } {
   const n = normalizar(nombre);
+  if (/TUNEL/.test(n)) return { minimo: null, maximo: null };
   if (/CABEZA/.test(n)) return { minimo: -8, maximo: 6 };
   if (/SUBPRODUCTO|^MUELLE\b/.test(n)) return { minimo: -4, maximo: 6 };
   if (/^(SALA|PASILLO|PASSILLO)\b|MARINADO/.test(n)) return { minimo: 4, maximo: 10 };
@@ -38,9 +40,6 @@ export function rangoCuarto(nombre: string): { minimo: number | null; maximo: nu
 }
 
 const normalizar = (nombre: string) => nombre.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-/** D-42: calidad ya no registra la temperatura de los túneles de congelación. */
-export const sinRegistroDeTemperatura = (nombre: string) => /TUNEL/.test(normalizar(nombre));
 
 const PREFIJO_PLANTA: Record<string, string> = { 'Planta Pollo': 'POL', 'Planta Desposte': 'DES', 'Planta Salsamentaria': 'SAL' };
 
@@ -76,8 +75,6 @@ export async function cargarFormatos(ds: DataSource, usuarioId: string | null = 
     for (const t of TEMPERATURAS) {
       const prefijo = PREFIJO_PLANTA[t.planta] ?? t.planta.replace(/\W/g, '').slice(0, 3).toUpperCase();
       for (const [i, cuarto] of t.cuartos.entries()) {
-        // Se salta sin correr la numeración: los códigos CF-… de los demás cuartos no cambian.
-        if (sinRegistroDeTemperatura(cuarto)) continue;
         const codigo = `CF-${prefijo}-${String(i + 1).padStart(2, '0')}`;
         let a = await em.getRepository(Asset).findOne({ where: { codigo } });
         if (!a) {
